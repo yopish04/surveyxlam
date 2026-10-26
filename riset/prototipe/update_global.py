@@ -17,6 +17,10 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import surpac_bin as sb
 from trim_global import Boundary
 
+EDGE_TOL = 0.01   # m: a point on the boundary line counts as inside (as in Surpac)
+LINE_STRINGS = {2, 3, 5, 6, 23}   # crest / toe strings (old and daily numbering)
+CHECK_DIST = 2.0  # m: report cut line remnants this close outside the boundary
+
 
 def read_daily(paths):
     """Daily text .str -> (boundaries, segments). Segment = list of (num, y, x, z, desc)."""
@@ -67,21 +71,36 @@ def update(old_path, new_path, daily_paths, new_name=None, date=None):
                 st['titik harian ditambah'] += len(s)
 
     def inside(x, y):
-        if x < gx0 or x > gx1 or y < gy0 or y > gy1: return False
-        return any(b.inside(x, y) for b in bounds)
+        if x < gx0 - EDGE_TOL or x > gx1 + EDGE_TOL or y < gy0 - EDGE_TOL or y > gy1 + EDGE_TOL: return False
+        return any(b.inside(x, y) or b.on_edge(x, y, EDGE_TOL) for b in bounds)
 
+    check = []
     for seg in sb.iter_strings(old_path):
         write_daily_upto(seg[0][0])
-        kept = 0
+        kept, cut = [], False
         for r in seg:
             st['titik global lama'] += 1
             if inside(r[2], r[1]):
-                st['titik lama dibuang (di dalam boundary)'] += 1
+                st['titik lama dibuang (di dalam boundary)'] += 1; cut = True
             else:
-                w.point(*r); kept += 1
+                kept.append(r)
+        for r in kept: w.point(*r)
         if kept: w.end_string()
+        # remnants of an old crest/toe line that was cut, lying just outside the boundary:
+        # often removed by hand, but not always -> only reported, never removed
+        if cut and seg[0][0] in LINE_STRINGS:
+            for r in kept:
+                if any(b.on_edge(r[2], r[1], CHECK_DIST) for b in bounds):
+                    check.append(r)
     write_daily_upto(float('inf'))
     w.close()
+    st['sisa garis lama dekat boundary (cek manual)'] = len(check)
+    with open(os.path.splitext(new_path)[0] + '_CEK.txt', 'w', newline='\r\n') as f:
+        f.write(f'Sisa garis crest/toe lama yang terpotong, berjarak < {CHECK_DIST} m di luar boundary harian.\n'
+                'Tidak dihapus otomatis; cek di Surpac apakah perlu dihapus.\n'
+                'string\tnorthing\teasting\televasi\tdeskripsi\n')
+        for r in check:
+            f.write(f'{r[0]}\t{r[1]:.3f}\t{r[2]:.3f}\t{r[3]:.3f}\t{r[4].decode("latin1")}\n')
     st['detik'] = round(time.time() - t0, 1)
     return st
 

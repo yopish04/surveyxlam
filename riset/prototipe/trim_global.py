@@ -44,6 +44,18 @@ class Boundary:
             for b in range(int((min(ay, by) - self.y0) // self.BAND), int((max(ay, by) - self.y0) // self.BAND) + 1):
                 self.bands[b].append(e)
 
+    def on_edge(self, x, y, tol):
+        """Point within tol of the boundary line (Surpac removes those too)."""
+        if x < self.x0 - tol or x > self.x1 + tol or y < self.y0 - tol or y > self.y1 + tol: return False
+        b0, b1 = int((y - tol - self.y0) // self.BAND), int((y + tol - self.y0) // self.BAND)
+        for b in range(b0, b1 + 1):
+            for (ax, ay), (bx, by) in self.bands.get(b, ()):
+                dx, dy = bx - ax, by - ay
+                L2 = dx * dx + dy * dy
+                t = 0 if L2 == 0 else max(0, min(1, ((x - ax) * dx + (y - ay) * dy) / L2))
+                if (x - ax - t * dx) ** 2 + (y - ay - t * dy) ** 2 <= tol * tol: return True
+        return False
+
     def inside(self, x, y):
         if x < self.x0 or x > self.x1 or y < self.y0 or y > self.y1: return False
         c = False
