@@ -146,3 +146,23 @@ Uji pengelompokan (`uji_kelompok.py`) terhadap pembagian manual 22–26 Okt:
 **52/52 file masuk ke area yang sama.** Satu hari diproses < 1 detik.
 Nama area otomatis (mis. `pelebaran_tos17`, `dumpingan`) bisa berbeda dari nama yang biasa
 dipakai (`fill_quarry_perluasan_tos9`, `waste_tf9`); nama ini nanti bisa diubah di panel.
+
+## Boundary menyusuri garis crest/toe terluar
+
+Pada boundary manual, 51 % sisinya berjalan tepat di atas garis crest/toe; sisanya lewat
+titik spot di tepi area. Versi awal (concave hull saja) hanya 33 %, karena memotong dari
+titik ke titik dan melewati titik crest/toe di antaranya.
+
+Perbaikan (`follow_strings`): kalau dua titik boundary berurutan ada di garis crest/toe yang
+sama, boundary menyusuri garis itu titik demi titik, selama garisnya tidak menjauh > 6 m
+dari potongan lurusnya. Setiap penyusuran hanya dipakai jika boundary tetap tidak saling
+silang (`_simple`).
+
+`python3 uji_boundary.py <folder hari 1> ... <folder hari n>`
+
+| | Sebelum | Sesudah |
+|---|---|---|
+| Sisi boundary yang mengikuti crest/toe (manual: 51 %) | 33 % | **54 %** |
+| Sisi boundary yang sama persis dengan manual | 46 % | **64 %** |
+| Rata-rata IoU luas boundary | 0,962 | **0,967** |
+| Boundary yang saling silang | – | **0 / 38** |

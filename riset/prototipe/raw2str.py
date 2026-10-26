@@ -307,7 +307,73 @@ def build_road(seq, n_fixed=5, max_resid=1.0):
     return strings, ok
 
 
-def convert(raw_files, out_path, title, date, line_gap=8.0, area_link=12.0, k=8, profile=None):
+def _seg_dist(p, a, b):
+    ax, ay, bx, by = a['e'], a['n'], b['e'], b['n']
+    L2 = (bx - ax) ** 2 + (by - ay) ** 2
+    t = 0 if L2 == 0 else max(0, min(1, ((p['e'] - ax) * (bx - ax) + (p['n'] - ay) * (by - ay)) / L2))
+    return math.hypot(p['e'] - ax - t * (bx - ax), p['n'] - ay - t * (by - ay))
+
+
+def follow_strings(hull, lines, max_dev=6.0):
+    """Where two consecutive boundary points lie on the same crest/toe string, walk the
+    boundary along that string point by point (as done by hand) instead of cutting across.
+    Only when the string stays close to the cut (max_dev) so the boundary never folds inward."""
+    where = {}
+    for li, r in enumerate(lines):
+        for i, p in enumerate(r): where.setdefault(id(p), []).append((li, i))
+    ring = hull + hull[:1]
+    detours = {}
+    for e, (a, b) in enumerate(zip(ring, ring[1:])):
+        best = None
+        for la, ia in where.get(id(a), []):
+            for lb, ib in where.get(id(b), []):
+                if la != lb or abs(ia - ib) < 2: continue
+                step = 1 if ib > ia else -1
+                mid = lines[la][ia + step:ib:step]
+                if all(_seg_dist(p, a, b) <= max_dev for p in mid) and (best is None or len(mid) < len(best)):
+                    best = mid
+        if best and not any(id(p) in {id(h) for h in hull} for p in best):
+            detours[e] = best
+    def build(chosen):
+        out, used = [], set()
+        for e, a in enumerate(hull):
+            out.append(a)
+            for p in chosen.get(e, []):
+                if id(p) not in used: out.append(p); used.add(id(p))
+        return out
+
+    # accept detours one by one, keeping only those that leave a simple (non-crossing) ring
+    chosen = {}
+    for e in sorted(detours, key=lambda e: -len(detours[e])):
+        trial = dict(chosen); trial[e] = detours[e]
+        if _simple(build(trial)): chosen = trial
+    return build(chosen)
+
+
+def _simple(ring):
+    """True when the closed ring has no crossing edges and no repeated coordinates."""
+    if len({(round(p['e'], 3), round(p['n'], 3)) for p in ring}) != len(ring): return False
+    n = len(ring); segs = [(ring[i], ring[(i + 1) % n]) for i in range(n)]
+    for i in range(n):
+        a1, b1 = segs[i]
+        x1, x2 = min(a1['e'], b1['e']), max(a1['e'], b1['e'])
+        y1, y2 = min(a1['n'], b1['n']), max(a1['n'], b1['n'])
+        for j in range(i + 2, n - (1 if i == 0 else 0)):
+            a2, b2 = segs[j]
+            if max(a2['e'], b2['e']) < x1 or min(a2['e'], b2['e']) > x2 or \
+               max(a2['n'], b2['n']) < y1 or min(a2['n'], b2['n']) > y2: continue
+            if _segx(a1, b1, a2, b2) or _touch(a1, b1, a2, b2): return False
+    return True
+
+
+def _touch(p1, p2, p3, p4):
+    """Non-adjacent edges touching (a vertex lying on the other edge)."""
+    return any(_seg_dist(p, a, b) < 1e-6 for p, a, b in
+               ((p1, p3, p4), (p2, p3, p4), (p3, p1, p2), (p4, p1, p2)))
+
+
+def convert(raw_files, out_path, title, date, line_gap=8.0, area_link=12.0, k=8, profile=None,
+            follow=True, max_dev=6.0):
     num = NUMBERING[profile or detect_profile(raw_files)]
     pts, report, road = [], collections.Counter(), []
     for f in raw_files:
@@ -336,6 +402,9 @@ def convert(raw_files, out_path, title, date, line_gap=8.0, area_link=12.0, k=8,
         lines[kind] = merge_runs(runs, line_gap)
     areas = clusters(pts, area_link)
     hulls = [h for h in (concave_hull(a, k) for a in areas if len(a) >= 10) if h]
+    if follow:
+        all_lines = lines[CREST] + lines[TOE]
+        hulls = [follow_strings(h, all_lines, max_dev) for h in hulls]
     for h in hulls: strings.append((BND, h, True))
     for kind, no in ((CREST, num['crest']), (TOE, num['toe'])):
         for r in lines[kind]:
