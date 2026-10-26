@@ -66,12 +66,23 @@ Tidak bisa diuji: `241026_dumpingan` dan `241026_pit_tofu9`, karena file mentahn
 (`24102026-Dumpingan WSDM-TF01.txt`, `24102026_pitDS_TF09C.txt`) rusak di arsip.
 Di `251026_pit_tofu3`, dua area yang bersentuhan (< 8 m) masih tergabung jadi satu.
 
-## Nomor string data progress harian (dikonfirmasi pengguna)
+## Nomor string (dipelajari dari pekerjaan manual 22–26 Okt 2026)
 
-Data **progress harian**: `2 → 5`, `3 → 6`, `500 → 602`, `602 → 602`, `23 → 5 + 6 + 23`,
-boundary `1`. Nomor lain yang ditemukan di file 24–25 Okt (600, dan 2/3/500 di file
-dumping/waste) berasal dari data **progress area**, bukan data harian. Prototipe ini
-mengikuti aturan harian.
+| Jenis area (dari nama file) | Crest (2) | Toe (3) | Spot kode 500 | Spot kode 602 | Kode angka lain (mis. 800) |
+|---|---|---|---|---|---|
+| Pit, rehandling, quarry (`harian`) | 5 | 6 | **600** | 602 | nomor sama dengan kode |
+| Base, dumping, waste, pelebaran, fill (`base`) | 2 | 3 | 500 | 602 | nomor sama dengan kode |
+
+Boundary selalu `1`, titik `23` masuk crest + toe + string `23`, jalan `7`/`77`.
+
+Spot kode 500 → **600** dipakai di 14 dari 18 file pit/rehandling (22–25 Okt). Hanya file
+26 Okt yang memakai 602 untuk kode 500, sehingga dianggap pengecualian. Jenis area ditebak
+dari nama file (`BASE`, `DUMP`, `DAMPING`, `WASTE`, `WSD`, `WD_`, `PELEBARAN`, `FILL` → base)
+dan nanti bisa dipilih manual di panel.
+
+Uji 5 hari (`evaluasi_semua.py`, 21 file yang file mentahnya lengkap): nomor spot sama
+100 % untuk 22–25 Okt; crest 87 %, toe 89 % sambungan sama; jumlah area sama di 18/21 file,
+rata-rata IoU boundary 0,96.
 
 ## Jalan (kode 7)
 

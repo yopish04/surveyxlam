@@ -9,7 +9,7 @@ from shapely.geometry import Polygon
 from shapely.ops import unary_union
 
 LINK = float(os.environ.get('LINK', 12))
-SKIP = ('exa', 'clip', 'jalan')
+SKIP = ('exa', 'exca', 'clip', 'jalan')
 
 
 def edges(segs, nums):
@@ -19,6 +19,14 @@ def edges(segs, nums):
         for a, b in zip(s, s[1:]):
             if a[1:3] != b[1:3]: E.add(frozenset([a[1:3], b[1:3]]))
     return E
+
+
+def spot_cmp(M, A):
+    """Spot string numbers per point: share of manual spot points that got the same number."""
+    def nums(S): return {p[1:3]: p[0] for s in S for p in s if p[0] not in (1, 2, 3, 5, 6, 23)}
+    m, a = nums(M), nums(A)
+    same = sum(1 for k, v in m.items() if a.get(k) == v)
+    return f'{100 * same / max(1, len(m)):.0f}% nomor sama'
 
 
 def bpoly(segs):
@@ -46,13 +54,15 @@ def main(folders):
             num_by_code = collections.defaultdict(collections.Counter)
             for p, h in zip(pts, hit):
                 if h and p[0] != 1: num_by_code[h[0][2]][p[0]] += 1
-            crest_no = num_by_code['2'].most_common(1)[0][0]
-            toe_no = num_by_code['3'].most_common(1)[0][0]
+            crest_no = (num_by_code['2'].most_common(1) or [(None,)])[0][0]
+            toe_no = (num_by_code['3'].most_common(1) or [(None,)])[0][0]
             o = os.path.join(out, name + '_AUTO.str')
             s, rep, areas = auto.convert([os.path.join(folder, x) for x in srcs], o, name, 'x', area_link=LINK)
             A = read_str(o)
             row = []
-            for lab, mn, an in (('crest', crest_no, 5), ('toe', toe_no, 6)):
+            num = auto.NUMBERING[auto.detect_profile(srcs)]
+            for lab, mn, an in (('crest', crest_no, num['crest']), ('toe', toe_no, num['toe'])):
+                if mn is None: row.append(f'{lab} -'); continue
                 em, ea = edges(M, {mn}), edges(A, {an}); tp = len(em & ea)
                 tot[lab + 'tp'] += tp; tot[lab + 'm'] += len(em); tot[lab + 'a'] += len(ea)
                 row.append(f'{lab} {100 * tp / max(1, len(em)):.0f}%')
@@ -61,7 +71,7 @@ def main(folders):
             nbm = sum(1 for x in M if x[0][0] == 1); nba = sum(1 for x in A if x[0][0] == 1)
             tot['iou_sum'] += iou; tot['n'] += 1; tot['area_ok'] += nbm == nba
             print(f'== {name}: string crest/toe manual = {crest_no}/{toe_no} | area {nbm}/{nba} | '
-                  f'boundary IoU {iou:.3f} | ' + ' | '.join(row) + f" | double {rep['titik double (dihapus)']}")
+                  f'boundary IoU {iou:.3f} | ' + ' | '.join(row) + f" | spot {spot_cmp(M, A)}")
     for lab in ('crest', 'toe'):
         print(f"TOTAL {lab}: {tot[lab + 'tp']}/{tot[lab + 'm']} = {100 * tot[lab + 'tp'] / tot[lab + 'm']:.1f}% cocok")
     print(f"Boundary: jumlah area sama {tot['area_ok']}/{tot['n']} file, rata-rata IoU {tot['iou_sum'] / tot['n']:.3f}")

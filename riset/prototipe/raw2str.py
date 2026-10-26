@@ -2,8 +2,21 @@
 algorithms so they can be ported to VBA. Evaluated against manually finished str."""
 import math, os, re, sys, collections
 
-CREST, TOE, SPOT, JUNC, BND = 5, 6, 602, 23, 1   # daily progress numbering
-ROAD_EDGE, ROAD_CENTRE, ROAD = 7, 77, 'ROAD'
+CREST, TOE, SPOT, ROAD = 'CREST', 'TOE', 'SPOT', 'ROAD'   # internal point classes
+JUNC, BND, ROAD_EDGE, ROAD_CENTRE = 23, 1, 7, 77           # fixed string numbers
+
+# String numbers per kind of area, learned from 22-26 Oct 2026 manual work.
+# Spot strings are keyed by the raw code; any other numeric code keeps its own number.
+NUMBERING = {
+    'harian': dict(crest=5, toe=6, spot={'500': 600, '602': 602}),   # pit, rehandling, quarry
+    'base':   dict(crest=2, toe=3, spot={'500': 500, '602': 602}),   # base, dumping, waste, fill
+}
+BASE_WORDS = ('BASE', 'DUMP', 'DAMPING', 'WASTE', 'WSD', 'WD_', 'WD-', 'PELEBARAN', 'FILL')
+
+
+def detect_profile(raw_files):
+    names = ' '.join(os.path.basename(f).upper() for f in raw_files)
+    return 'base' if any(w in names for w in BASE_WORDS) else 'harian'
 
 
 def read_raw(path):
@@ -21,9 +34,9 @@ def classify(code):
     if code == '2': return {CREST}
     if code == '3': return {TOE}
     if code == '23': return {CREST, TOE, JUNC}
-    if code in ('500', '602'): return {SPOT}
     if code == '7': return {ROAD}        # road: moved to its own jalan.str
     if code == '': return set()          # no code -> skipped, reported
+    if code.isdigit(): return {SPOT}     # 500, 602, 800, ...: spot heights
     return {'EXCA'}                      # EX..., EXA_..., Bolong: unit positions
 
 
@@ -294,7 +307,8 @@ def build_road(seq, n_fixed=5, max_resid=1.0):
     return strings, ok
 
 
-def convert(raw_files, out_path, title, date, line_gap=8.0, area_link=12.0, k=8):
+def convert(raw_files, out_path, title, date, line_gap=8.0, area_link=12.0, k=8, profile=None):
+    num = NUMBERING[profile or detect_profile(raw_files)]
     pts, report, road = [], collections.Counter(), []
     for f in raw_files:
         for p in read_raw(f):
@@ -323,13 +337,16 @@ def convert(raw_files, out_path, title, date, line_gap=8.0, area_link=12.0, k=8)
     areas = clusters(pts, area_link)
     hulls = [h for h in (concave_hull(a, k) for a in areas if len(a) >= 10) if h]
     for h in hulls: strings.append((BND, h, True))
-    for kind in (CREST, TOE):
+    for kind, no in ((CREST, num['crest']), (TOE, num['toe'])):
         for r in lines[kind]:
-            if len(r) >= 2: strings.append((kind, r, False))
+            if len(r) >= 2: strings.append((no, r, False))
     for p in pts:
         if JUNC in p['cls']: strings.append((JUNC, [p], False))
     for fp in by_file.values():
-        for r in runs_for(fp, SPOT, 15.0): strings.append((SPOT, r, False))
+        for code in sorted({p['code'] for p in fp if SPOT in p['cls']}):
+            same = [p for p in fp if p['code'] == code or SPOT not in p['cls']]
+            for r in runs_for(same, SPOT, 15.0):
+                strings.append((num['spot'].get(code, int(code)), r, False))
     write_str(out_path, title, date, strings)
     flags = flag_heights(pts, lines)
     report['tinggi mencurigakan (dicek manual)'] = len(flags)
