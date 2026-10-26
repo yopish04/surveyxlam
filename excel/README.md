@@ -16,6 +16,11 @@ menjadi `.str` Surpac. Isinya terjemahan langsung dari prototipe Python di
   peringatan kalau tembakan satu unit berjarak > 1 m.
 - Angka dibaca dengan `Val()` dan ditulis dengan `Fmt3()`: selalu titik desimal, aman di
   Windows dengan setelan regional Indonesia.
+- **Tanggal dan label bisa diganti.** `DATE=auto` mengambil tanggal terbaru dari nama file
+  `.txt` (26102026, 26-10-2026, 20261026); `DATE=2026-10-27` atau `27/10/2026` memakai hari
+  itu; teks lain dipakai apa adanya. Nama bulan selalu bahasa Inggris (`Oct`, bukan `Okt`).
+  `LABEL=RTK_SMA` mengisi kolom deskripsi terakhir. Awalan nama file (`271026_`) ikut tanggal.
+  Panel memanggil `SetDateLabel` sebelum `RunJob`.
 
 Masukan berupa daftar pekerjaan (lihat `uji_libreoffice/contoh_job_251026.txt`), yaitu
 isi yang nanti diisi lewat panel: folder masuk/keluar, baris AREA, JALAN, EXCA.
@@ -31,6 +36,7 @@ setiap file dibandingkan baris demi baris dengan hasil Python:
 | 22 Okt 2026 | 11 file (8 area, jalan, exa_ds, exa_ns, gabung) | semua sama persis |
 | 25 Okt 2026 | 10 file | semua sama persis |
 | 26 Okt 2026 | 7 file | semua sama persis |
+| 25 Okt, `DATE=auto` / `DATE=2026-10-27` + `LABEL=RTK_XYZ` | 10 + 10 file | semua sama persis |
 
 ```
 excel/uji_libreoffice/run_lo.sh excel/SurveyCore.bas <job.txt>

@@ -101,7 +101,9 @@ def update(old_path, new_path, daily_paths, new_name=None, date=None):
         L = [f'{new_name}_CEK,{date},0,0',
              '0,           0.000,           0.000,           0.000,           0.000,           0.000,           0.000']
         for r in check:
-            L += [f"9006, {r[1]:.3f}, {r[2]:.3f}, {r[3]:.3f}, CEK_SISA_GARIS,str{r[0]},{r[4].decode('latin1')}",
+            d = r[4].decode('latin1').split(',')
+            info = f"CEK_SISA_GARIS str{r[0]}" + (f" ukur {d[1]}" if len(d) > 1 else '')
+            L += [f"9006, {r[1]:.3f}, {r[2]:.3f}, {r[3]:.3f}, {d[0]},{date},{info}",
                   '0, 0.000, 0.000, 0.000,']
         L.append('0, 0.000, 0.000, 0.000, END')
         open(os.path.splitext(new_path)[0] + '_CEK.str', 'w', newline='\r\n').write('\n'.join(L) + '\n')

@@ -5,6 +5,28 @@ import math, os, re, sys, collections
 CREST, TOE, SPOT, ROAD = 'CREST', 'TOE', 'SPOT', 'ROAD'   # internal point classes
 JUNC, BND, ROAD_EDGE, ROAD_CENTRE = 23, 1, 7, 77           # fixed string numbers
 
+LABEL = 'RTK_SMA'   # last description field; set from the panel / job file (LABEL=...)
+MONTHS = ('Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec')
+
+
+def surpac_date(y, m, d):
+    """26-Oct-26 with English month names, whatever the Windows language."""
+    return f'{d:02d}-{MONTHS[m - 1]}-{y % 100:02d}'
+
+
+def resolve_date(value, raw_files):
+    """DATE from the panel: 'auto'/empty = newest date in the file names, '2026-10-26' or
+    '26/10/2026' = that day, anything else (e.g. '26-Oct-26') is used as written."""
+    v = (value or '').strip()
+    m = re.fullmatch(r'(\d{4})-(\d{1,2})-(\d{1,2})', v) or None
+    if m: return surpac_date(int(m[1]), int(m[2]), int(m[3]))
+    m = re.fullmatch(r'(\d{1,2})/(\d{1,2})/(\d{4})', v)
+    if m: return surpac_date(int(m[3]), int(m[2]), int(m[1]))
+    if v and v.lower() != 'auto': return v
+    dates = [file_date(f) for f in raw_files if file_date(f)]
+    if dates: return surpac_date(*max(dates))
+    import datetime; t = datetime.date.today(); return surpac_date(t.year, t.month, t.day)
+
 # Check report as a Surpac .str (<out>_CEK.str): one string number per kind of finding, so
 # each kind can get its own colour in Surpac and be compared with the progress data.
 CEK_DOUBLE, CEK_TINGGI, CEK_ZIGZAG, CEK_JALAN, CEK_EXCA, CEK_SISA = 9001, 9002, 9003, 9004, 9005, 9006
@@ -231,7 +253,7 @@ def write_str(path, title, date, strings):
     for num, seg, closed in strings:
         pts = seg + ([seg[0]] if closed else [])
         for p in pts:
-            L.append(f"{num}, {p['n']:.3f}, {p['e']:.3f}, {p['z']:.3f}, {p['name']},{date},RTK_SMA")
+            L.append(f"{num}, {p['n']:.3f}, {p['e']:.3f}, {p['z']:.3f}, {p['name']},{date},{LABEL}")
         L.append('0, 0.000, 0.000, 0.000,')
     L.append('0, 0.000, 0.000, 0.000, END')
     open(path, 'w', newline='\r\n').write('\n'.join(L) + '\n')
@@ -497,26 +519,27 @@ def convert(raw_files, out_path, title, date, line_gap=8.0, area_link=12.0, k=8,
     write_report(out_path[:-4] + '_LAPORAN.txt', doubles, flags)
     items = []
     for p, q in doubles:
-        items.append((CEK_DOUBLE, [p], f"CEK_DOUBLE,{p['name']},sama dgn {q['name']} dz {p['z'] - q['z']:+.3f}m"))
+        items.append((CEK_DOUBLE, [p], f"CEK_DOUBLE sama dgn {q['name']} dz {p['z'] - q['z']:+.3f}m"))
     for p, dev, kind in flags:
         if not kind.startswith('zig-zag'):
-            items.append((CEK_TINGGI, [p], f"CEK_TINGGI,{p['name']},{kind} {dev:+.2f}m"))
+            items.append((CEK_TINGGI, [p], f"CEK_TINGGI {kind} {dev:+.2f}m"))
     for r in zig_runs:
-        items.append((CEK_ZIGZAG, r, f"CEK_ZIGZAG,{r[0]['name']}-{r[-1]['name']},mungkin 2 garis"))
+        items.append((CEK_ZIGZAG, r, f"CEK_ZIGZAG {r[0]['name']}-{r[-1]['name']} mungkin 2 garis"))
     if road and not road_ok:
-        items.append((CEK_JALAN, road, "CEK_JALAN,penampang tidak teratur"))
+        items.append((CEK_JALAN, road, "CEK_JALAN penampang tidak teratur"))
     write_check_str(out_path[:-4] + '_CEK.str', title + '_CEK', date, items)
     return strings, report, areas
 
 
 def write_check_str(path, title, date, items):
-    """items: (string number, [points], description). Written as a text .str for Surpac.
+    """items: (string number, [points], finding). Written as a text .str for Surpac with the same
+    description order as the progress files: D1 point, D2 date, D3 finding.
     Nothing is written when there is nothing to check."""
     if not items: return
     L = [f'{title},{date},0,0', '0,           0.000,           0.000,           0.000,           0.000,           0.000,           0.000']
-    for num, pts, desc in items:
+    for num, pts, info in items:
         for p in pts:
-            L.append(f"{num}, {p['n']:.3f}, {p['e']:.3f}, {p['z']:.3f}, {desc}")
+            L.append(f"{num}, {p['n']:.3f}, {p['e']:.3f}, {p['z']:.3f}, {p['name']},{date},{info}")
         L.append('0, 0.000, 0.000, 0.000,')
     L.append('0, 0.000, 0.000, 0.000, END')
     open(path, 'w', newline='\r\n').write('\n'.join(L) + '\n')

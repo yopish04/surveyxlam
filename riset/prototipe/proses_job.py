@@ -3,7 +3,8 @@ Reference implementation used to check the VBA port line by line.
 
 Job file (one item per line, '|' separated, files ';' separated):
   FOLDER_IN=<folder with .txt>      FOLDER_OUT=<folder for .str>
-  DATE=25-Oct-26                    TAG=251026
+  DATE=auto | 2026-10-25 | 25-Oct-26  TAG=251026 (optional, from DATE)
+  LABEL=RTK_SMA                     (last description field)
   AREA|pit_tofu3|harian|a.txt;b.txt
   JALAN|jalan|7
   EXCA|exa_ds|AREA                  (unit codes taken from all area files)
@@ -13,6 +14,12 @@ Names without a 6-digit date prefix get TAG_ in front.
 import sys, os, re
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import raw2str
+
+
+def tag_of(date):
+    """26-Oct-26 -> 261026"""
+    d, m, y = date.split('-')
+    return f'{int(d):02d}{raw2str.MONTHS.index(m[:3].title()) + 1:02d}{y[-2:]}'
 
 
 def full(tag, name):
@@ -28,7 +35,12 @@ def run(job_path):
             k, v = l.split('=', 1); cfg[k.strip()] = v.strip()
         else:
             rows.append([x.strip() for x in l.split('|')])
-    fin, fout, date, tag = cfg['FOLDER_IN'], cfg['FOLDER_OUT'], cfg['DATE'], cfg['TAG']
+    fin, fout = cfg['FOLDER_IN'], cfg['FOLDER_OUT']
+    raw2str.LABEL = cfg.get('LABEL', raw2str.LABEL) or raw2str.LABEL
+    all_files = [os.path.join(fin, f) for r in rows for f in (r[3] if r[0] == 'AREA' else
+                 (r[2] if r[0] == 'EXCA' else '')).split(';') if f and f != 'AREA']
+    date = raw2str.resolve_date(cfg.get('DATE'), all_files)
+    tag = cfg.get('TAG') or tag_of(date)
     os.makedirs(fout, exist_ok=True)
     area_files, road, gabung = [], [], []
     for r in rows:
@@ -54,7 +66,7 @@ def run(job_path):
             units, warn, spread = first_shots(files)
             raw2str.write_exca(os.path.join(fout, title + '.str'), title, date, units)
             raw2str.write_check_str(os.path.join(fout, title + '_CEK.str'), title + '_CEK', date,
-                [(raw2str.CEK_EXCA, [p], f"CEK_EXCA,{p['code']},tembakan {i + 1} dari {len(ps)}")
+                [(raw2str.CEK_EXCA, [p], f"CEK_EXCA tembakan {i + 1} dari {len(ps)}")
                  for ps in spread for i, p in enumerate(ps)])
             print(f'{title}.str: {len(units)} unit')
             for w in warn: print('   PERLU DIPILIH:', w)

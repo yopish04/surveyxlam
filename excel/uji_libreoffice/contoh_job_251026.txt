@@ -1,8 +1,8 @@
 # Contoh daftar pekerjaan tanggal 25-10-2026 (sama dengan isi panel Excel).
 FOLDER_IN=D:\Survey\Mentah\251026
 FOLDER_OUT=D:\Survey\STR\251026
-DATE=25-Oct-26
-TAG=251026
+DATE=auto
+LABEL=RTK_SMA
 AREA|pit_tofu3|harian|25-10-2026-PIT-TOFU-03.txt;25-10-2026DS-PIT-TF0325-10-2026DS-PIT-TF03_20261025090313.txt;25102026-PIT-TF03DS1.txt
 AREA|pit_tofu9|harian|25102026_PITTF9.txt;25102026_PIT_TF9.txt
 AREA|rehenling_ld_03|harian|20261025-rehenlidng-LD-03_20261025-rehenlidng-LD-03_20261025090038.txt;25-10-2026-REHENDLING-LD-03.txt

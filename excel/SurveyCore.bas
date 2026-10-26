@@ -6,7 +6,8 @@ Option Explicit
 '
 ' Job list (what the panel fills in), one item per line:
 '   FOLDER_IN=<folder with .txt>     FOLDER_OUT=<folder for .str>
-'   DATE=25-Oct-26                   TAG=251026
+'   DATE=auto | 2026-10-25 | 25/10/2026 | 25-Oct-26    (auto = newest date in file names)
+'   TAG=251026 (optional, made from DATE)           LABEL=RTK_SMA (last description field)
 '   AREA|pit_tofu3|harian|a.txt;b.txt      (harian: 2->5 3->6 500->600 602->602)
 '   AREA|waste_tf9|base|c.txt              (base:   2->2 3->3 500->500 602->602)
 '   JALAN|jalan|7                          (code 7 taken from all AREA files)
@@ -45,7 +46,9 @@ Private BufG() As String, NG As Long     ' gabung body (all areas)
 Private BufR() As String, NR As Long     ' jalan body (all areas)
 Private LogTxt As String
 
-Private gDate As String
+Private gDate As String      ' as written in the .str, e.g. 26-Oct-26
+Private gDateIn As String    ' as given by the panel / job file (auto, 2026-10-26, ...)
+Private gLabel As String     ' last description field, e.g. RTK_SMA
 Private gRoadCode As String
 
 ' =============================================================================
@@ -67,7 +70,8 @@ Public Sub RunJobFile(ByVal jobPath As String)
                 Select Case UCase(Trim(Left(s, InStr(s, "=") - 1)))
                     Case "FOLDER_IN": folderIn = Trim(Mid(s, InStr(s, "=") + 1))
                     Case "FOLDER_OUT": folderOut = Trim(Mid(s, InStr(s, "=") + 1))
-                    Case "DATE": gDate = Trim(Mid(s, InStr(s, "=") + 1))
+                    Case "DATE": gDateIn = Trim(Mid(s, InStr(s, "=") + 1))
+                    Case "LABEL": gLabel = Trim(Mid(s, InStr(s, "=") + 1))
                     Case "TAG": tag = Trim(Mid(s, InStr(s, "=") + 1))
                 End Select
             Else
@@ -86,6 +90,11 @@ Public Sub RunJobFile(ByVal jobPath As String)
     RunJob folderIn, folderOut, tag, kinds, names, args, files, nRows
 End Sub
 
+' The panel sets the date field ("auto", a day, or text) and the label before RunJob.
+Public Sub SetDateLabel(ByVal dateText As String, ByVal label As String)
+    gDateIn = dateText: gLabel = label
+End Sub
+
 ' The panel calls this directly with the rows it shows.
 Public Sub RunJob(ByVal folderIn As String, ByVal folderOut As String, ByVal tag As String, _
                   kinds() As String, names() As String, args() As String, files() As String, _
@@ -94,6 +103,14 @@ Public Sub RunJob(ByVal folderIn As String, ByVal folderOut As String, ByVal tag
     LogTxt = ""
     NG = 0: NR = 0
     gRoadCode = "7"
+    If Len(gLabel) = 0 Then gLabel = "RTK_SMA"
+    Dim allFiles As String
+    For i = 0 To nRows - 1
+        If kinds(i) = "AREA" Then allFiles = allFiles & ";" & files(i)
+        If kinds(i) = "EXCA" And UCase(args(i)) <> "AREA" Then allFiles = allFiles & ";" & args(i)
+    Next i
+    gDate = ResolveDate(gDateIn, allFiles)
+    If Len(tag) = 0 Then tag = TagOf(gDate)
     For i = 0 To nRows - 1
         If kinds(i) = "JALAN" And Len(args(i)) > 0 Then gRoadCode = args(i)
     Next i
@@ -920,7 +937,7 @@ End Sub
 
 Private Function PointLine(ByVal num As Long, ByVal p As Long) As String
     PointLine = CStr(num) & ", " & Fmt3(PN(p)) & ", " & Fmt3(PE(p)) & ", " & Fmt3(PZ(p)) & ", " & _
-                PName(p) & "," & gDate & ",RTK_SMA"
+                PName(p) & "," & gDate & "," & gLabel
 End Function
 
 Private Sub AddLine(ByVal which As Integer, ByVal s As String)
@@ -1126,6 +1143,81 @@ Private Function SplitFiles(ByVal s As String, ByVal folder As String, fl() As S
         If Len(Trim(parts(i))) > 0 Then fl(n) = JoinPath(folder, Trim(parts(i))): n = n + 1
     Next i
     SplitFiles = n
+End Function
+
+' ---- dates: always English month names (26-Oct-26), whatever the Windows language ----
+Public Function SurpacDate(ByVal y As Long, ByVal m As Long, ByVal d As Long) As String
+    SurpacDate = Right("0" & CStr(d), 2) & "-" & Mid("JanFebMarAprMayJunJulAugSepOctNovDec", (m - 1) * 3 + 1, 3) & _
+                 "-" & Right("0" & CStr(y Mod 100), 2)
+End Function
+
+' DATE from the panel: "auto"/empty = newest date in the file names (today if none),
+' "2026-10-26" or "26/10/2026" = that day, anything else is used as written.
+Private Function ResolveDate(ByVal v As String, ByVal fileList As String) As String
+    Dim p() As String, i As Long, best As Long, k As Long, names() As String
+    v = Trim(v)
+    p = Split(v, "-")
+    If UBound(p) = 2 Then
+        If Len(p(0)) = 4 And IsDigits(p(0)) And IsDigits(p(1)) And IsDigits(p(2)) Then
+            ResolveDate = SurpacDate(CLng(p(0)), CLng(p(1)), CLng(p(2))): Exit Function
+        End If
+    End If
+    p = Split(v, "/")
+    If UBound(p) = 2 Then
+        If Len(p(2)) = 4 And IsDigits(p(0)) And IsDigits(p(1)) And IsDigits(p(2)) Then
+            ResolveDate = SurpacDate(CLng(p(2)), CLng(p(1)), CLng(p(0))): Exit Function
+        End If
+    End If
+    If Len(v) > 0 And LCase(v) <> "auto" Then ResolveDate = v: Exit Function
+    names = Split(fileList, ";")
+    For i = 0 To UBound(names)
+        k = FileDate(names(i))
+        If k > best Then best = k
+    Next i
+    If best = 0 Then best = CLng(Year(Now)) * 10000 + CLng(Month(Now)) * 100 + CLng(Day(Now))
+    ResolveDate = SurpacDate(best \ 10000, (best \ 100) Mod 100, best Mod 100)
+End Function
+
+' Date written in a file name (26102026, 26-10-2026 or 20261026) as yyyymmdd, 0 if none.
+Private Function FileDate(ByVal name As String) As Long
+    Dim s As String, i As Long, j As Long, t As String, y As Long, m As Long, d As Long
+    i = InStrRev(name, "\"): If InStrRev(name, "/") > i Then i = InStrRev(name, "/")
+    s = Mid(name, i + 1)
+    s = Replace(Replace(Replace(Replace(s, "-", ""), "_", ""), ".", ""), " ", "")
+    i = 1
+    Do While i <= Len(s)
+        If IsDigits(Mid(s, i, 1)) Then
+            j = i
+            Do While j <= Len(s)
+                If Not IsDigits(Mid(s, j, 1)) Then Exit Do
+                j = j + 1
+            Loop
+            Do While j - i >= 8
+                t = Mid(s, i, 8)
+                y = CLng(Right(t, 4)): m = CLng(Mid(t, 3, 2)): d = CLng(Left(t, 2))
+                If Left(Right(t, 4), 2) = "20" And m >= 1 And m <= 12 And d >= 1 And d <= 31 Then
+                    FileDate = y * 10000 + m * 100 + d: Exit Function
+                End If
+                y = CLng(Left(t, 4)): m = CLng(Mid(t, 5, 2)): d = CLng(Right(t, 2))
+                If Left(t, 2) = "20" And m >= 1 And m <= 12 And d >= 1 And d <= 31 Then
+                    FileDate = y * 10000 + m * 100 + d: Exit Function
+                End If
+                i = i + 8
+            Loop
+            i = j
+        Else
+            i = i + 1
+        End If
+    Loop
+End Function
+
+' 26-Oct-26 -> 261026
+Private Function TagOf(ByVal dt As String) As String
+    Dim p() As String, m As Long
+    p = Split(dt, "-")
+    If UBound(p) <> 2 Then TagOf = Replace(dt, "-", ""): Exit Function
+    m = (InStr("JanFebMarAprMayJunJulAugSepOctNovDec", UCase(Left(p(1), 1)) & LCase(Mid(p(1), 2, 2))) + 2) \ 3
+    TagOf = Right("0" & p(0), 2) & Right("0" & CStr(m), 2) & Right(p(2), 2)
 End Function
 
 Private Function FullName(ByVal tag As String, ByVal name As String) As String
