@@ -27,13 +27,15 @@ def main(folder, out):
         print(f'{title}.str  <- {len(fs)} file, {len(areas)} area | ' +
               ', '.join(f'{k}: {v}' for k, v in rep.items() if v))
 
-    for shift, pts in raw2str.excavator_points(files).items():
+    warn = []
+    for shift, pts in raw2str.excavator_points(files, warn).items():
         if not pts: continue
         d = day if shift == 'ds' else day - datetime.timedelta(days=1)
         title = f"{d.strftime('%d%m%y')}_exa_{shift}"
         raw2str.write_exca(os.path.join(out, title + '.str'), title, sdate, pts)
         print(f'{title}.str  <- {len(pts)} unit')
 
+    for w in warn: print('  PERLU DIPILIH:', w)
     raw2str.write_str(os.path.join(out, 'gabung', tag + '.str'), tag, sdate, all_strings)
     print(f'gabung/{tag}.str  <- semua area')
     if skipped:

@@ -59,6 +59,54 @@ def runs_for(pts, kind, gap):
     return runs
 
 
+def _turn(a, b, c):
+    """Signed turning angle at b (degrees) for path a -> b -> c."""
+    t = math.degrees(_ang(b, c) - _ang(a, b))
+    return (t + 180) % 360 - 180
+
+
+def unzip_zigzag(run, min_off=0.3, min_pts=5, win=2):
+    """Two parallel lines shot alternately left/right (zig-zag) are split into two lines,
+    as done by hand. Each point's sideways offset from a smoothed centre line is measured;
+    a stretch where the side keeps flipping (left, right, left, ...) for at least min_pts
+    points becomes two lines: the left points and the right points, each in order."""
+    n = len(run)
+    if n < min_pts: return [run]
+    cen = []
+    for i in range(n):
+        w = run[max(0, i - win):i + win + 1]
+        cen.append((sum(p['e'] for p in w) / len(w), sum(p['n'] for p in w) / len(w)))
+    side = []
+    for i in range(n):
+        a, b = cen[max(0, i - 1)], cen[min(n - 1, i + 1)]
+        de, dn = b[0] - a[0], b[1] - a[1]
+        L = math.hypot(de, dn) or 1.0
+        off = (de * (run[i]['n'] - cen[i][1]) - dn * (run[i]['e'] - cen[i][0])) / L
+        side.append(0 if abs(off) < min_off else (1 if off > 0 else -1))
+    # a point is in a zig-zag stretch when, around it, the side flips at least half the time
+    half = 3
+    zig = [False] * n
+    for i in range(n):
+        w = [x for x in side[max(0, i - half):i + half + 1] if x]
+        flips = sum(1 for a, b in zip(w, w[1:]) if a != b)
+        zig[i] = len(w) >= 5 and flips >= (len(w) - 1) / 2 and w.count(1) >= 2 and w.count(-1) >= 2
+    out, start, i = [], 0, 0
+    while i < n:
+        if not zig[i]: i += 1; continue
+        j = i
+        while j + 1 < n and zig[j + 1]: j += 1
+        if j - i + 1 >= min_pts:
+            if i > start: out.append(run[start:i + 1])
+            seg, sd = run[i:j + 1], side[i:j + 1]
+            left = [p for p, x in zip(seg, sd) if x > 0]
+            right = [p for p, x in zip(seg, sd) if x <= 0]
+            out += [left, right]
+            start = j
+        i = j + 1
+    if start < n - 1 or not out: out.append(run[start:])
+    return [r for r in out if len(r) >= 2] or [run]
+
+
 def merge_runs(runs, gap):
     """Greedy: join nearest pair of free endpoints (<= gap). A junction (23) end is a natural
     line end, so it is not joined to another run's end unless it is the very same point."""
@@ -235,11 +283,14 @@ def file_date(name):
     return None
 
 
-def excavator_points(raw_files):
-    """Unit positions: one point per unit code, the LAST shot wins (as done manually).
+def excavator_points(raw_files, warn=None, spread_max=1.0):
+    """Unit positions: one point per unit code. The FIRST shot is used (what was chosen most
+    often by hand, 14 of 21 cases on 22-26 Oct). When the shots of one unit lie more than
+    spread_max apart they are probably different positions: the unit is added to `warn`
+    so it can be picked by hand.
     Night shift (NS) when the file name says NS or carries an earlier date than the
     newest file (last night's recording); otherwise day shift (DS)."""
-    shifts = {'ds': collections.OrderedDict(), 'ns': collections.OrderedDict()}
+    shots = {'ds': collections.OrderedDict(), 'ns': collections.OrderedDict()}
     newest = max((file_date(f) for f in raw_files if file_date(f)), default=None)
     for f in raw_files:
         named_ns = re.search(r'(^|[_\-\s])NS([_\-\s.]|$)', os.path.basename(f).upper())
@@ -247,9 +298,17 @@ def excavator_points(raw_files):
         shift = 'ns' if named_ns or older else 'ds'
         for p in read_raw(f):
             if 'EXCA' in classify(p['code']):
-                shifts[shift].pop(p['code'], None)
-                shifts[shift][p['code']] = dict(p, name=p['code'])
-    return {k: list(v.values()) for k, v in shifts.items()}
+                shots[shift].setdefault(p['code'], []).append(dict(p, name=p['code']))
+    out = {}
+    for shift, units in shots.items():
+        out[shift] = []
+        for code, ps in units.items():
+            out[shift].append(ps[0])
+            spread = max(d(a, b) for a in ps for b in ps)
+            if warn is not None and spread > spread_max:
+                warn.append(f"{shift.upper()} {code}: {len(ps)} tembakan berjarak sampai {spread:.1f} m "
+                            f"(dipakai tembakan pertama, titik {ps[0]['row'] + 1} di {ps[0]['file']})")
+    return out
 
 
 def write_exca(path, title, date, pts):
@@ -373,7 +432,7 @@ def _touch(p1, p2, p3, p4):
 
 
 def convert(raw_files, out_path, title, date, line_gap=8.0, area_link=12.0, k=8, profile=None,
-            follow=True, max_dev=6.0):
+            follow=True, max_dev=6.0, zigzag=False):
     num = NUMBERING[profile or detect_profile(raw_files)]
     pts, report, road = [], collections.Counter(), []
     for f in raw_files:
@@ -395,10 +454,14 @@ def convert(raw_files, out_path, title, date, line_gap=8.0, area_link=12.0, k=8,
     # per file keeps the instrument order meaningful
     by_file = collections.defaultdict(list)
     for p in pts: by_file[p['file']].append(p)
-    lines = {}
+    lines, zig_flags = {}, []
     for kind in (CREST, TOE):
         runs = []
-        for fp in by_file.values(): runs += runs_for(fp, kind, line_gap)
+        for fp in by_file.values():
+            for r in runs_for(fp, kind, line_gap):
+                parts = unzip_zigzag(r)
+                if len(parts) > 1: zig_flags.append((r[0], 0.0, f"zig-zag {r[0]['name']}..{r[-1]['name']}: mungkin 2 garis berdekatan"))
+                runs += parts if zigzag else [r]
         lines[kind] = merge_runs(runs, line_gap)
     areas = clusters(pts, area_link)
     hulls = [h for h in (concave_hull(a, k) for a in areas if len(a) >= 10) if h]
@@ -417,7 +480,8 @@ def convert(raw_files, out_path, title, date, line_gap=8.0, area_link=12.0, k=8,
             for r in runs_for(same, SPOT, 15.0):
                 strings.append((num['spot'].get(code, int(code)), r, False))
     write_str(out_path, title, date, strings)
-    flags = flag_heights(pts, lines)
+    flags = flag_heights(pts, lines) + zig_flags
+    report['garis zig-zag (dicek manual)'] = len(zig_flags)
     report['tinggi mencurigakan (dicek manual)'] = len(flags)
     write_report(out_path[:-4] + '_LAPORAN.txt', doubles, flags)
     return strings, report, areas
