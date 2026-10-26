@@ -121,3 +121,28 @@ python3 gambar_banding.py manual.str auto.str gambar.png "judul"
 ```
 
 Folder `hasil/` berisi data koordinat dan tidak ikut di-commit (lihat `.gitignore`).
+
+## Proses satu hari penuh
+
+Alur manual: beberapa `.txt` → masing-masing jadi `.str` → digabung per area di Surpac
+(`261026_pit_tofu9.str`, dst.) → semua area digabung jadi `str gabung/261026.str`.
+
+```
+python3 proses_harian.py <folder .txt hari itu> <folder output>
+```
+
+1. **Kelompokkan file per area** (`kelompok_area.py`):
+   - jenis area dari kata di nama file: PIT, REH/RH (rehandling), DUMP/DAMP/WSD/WASTE/WD
+     (dumpingan, satu file per hari), BASE/BES, PELEBARAN/LAMINATING, QUAR (quarry);
+     REC/EXA/EXC = posisi unit, GCP diabaikan;
+   - lokasi dari nama file: TF3/TF03/TOFU-03 → tofu3, LD-03 → ld03, TOS17 → tos17;
+   - file sejenis yang titiknya bertumpuk di lapangan (≤ 15 m) digabung, misalnya
+     `REHENDLING-TF03` yang diukur di dalam rehandling LD03.
+2. Setiap area diproses `raw2str.convert` → `<yymmdd>_<area>.str` + `_jalan.str` + `_LAPORAN.txt`.
+3. Posisi unit → `<yymmdd>_exa_ds.str` dan `<yymmdd kemarin>_exa_ns.str`.
+4. Semua area → `gabung/<yymmdd>.str`.
+
+Uji pengelompokan (`uji_kelompok.py`) terhadap pembagian manual 22–26 Okt:
+**52/52 file masuk ke area yang sama.** Satu hari diproses < 1 detik.
+Nama area otomatis (mis. `pelebaran_tos17`, `dumpingan`) bisa berbeda dari nama yang biasa
+dipakai (`fill_quarry_perluasan_tos9`, `waste_tf9`); nama ini nanti bisa diubah di panel.
