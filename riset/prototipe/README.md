@@ -44,6 +44,15 @@ Kolom deskripsi diisi nama titik (Point Name), lalu tanggal, lalu `RTK_SMA`.
 Sebagian selisih terjadi karena di versi manual ada titik crest/toe yang sengaja dibuang
 (salah tembak/duplikat), sedangkan prototipe masih memakainya.
 
+## Pembersihan data & posisi unit
+
+| Hal | Perlakuan | Alasan |
+|---|---|---|
+| Titik **double** (jarak ≤ 5 cm dan beda tinggi ≤ 5 cm) | **Dihapus otomatis**, yang pertama disimpan | Titik yang berjarak 20–50 cm tetap dipakai di versi manual, jadi batasnya dibuat ketat |
+| **Tinggi mencurigakan** (> 1,5 m dari tetangga pada garis yang sama / median spot sekitar) | **Tidak dihapus**, hanya dicatat di `*_LAPORAN.txt` untuk dicek manual | Supaya tidak ada data yang hilang |
+| **Posisi unit** (EX/EXA/EXC/Bolong) | Satu titik per unit, **tembakan terakhir** yang dipakai, string 1, deskripsi = kode unit | Sama dengan file `exa_ds` / `exa_ns` manual |
+| **DS / NS** | NS jika nama file berisi `NS` atau tanggal di nama file lebih lama dari file terbaru (rekaman semalam); selain itu DS | Hasil 26-10-2026: DS 8/8 dan NS 6/6 sama persis dengan manual |
+
 ## Menjalankan
 
 ```

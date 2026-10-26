@@ -1,6 +1,6 @@
 """Prototype: raw instrument txt -> Surpac str (crest/toe/spot/boundary), pure-Python
 algorithms so they can be ported to VBA. Evaluated against manually finished str."""
-import math, os, sys, collections
+import math, os, re, sys, collections
 
 CREST, TOE, SPOT, JUNC, BND = 5, 6, 602, 23, 1
 
@@ -170,6 +170,77 @@ def write_str(path, title, date, strings):
     open(path, 'w', newline='\r\n').write('\n'.join(L) + '\n')
 
 
+def remove_doubles(pts, tol_xy=0.05, tol_z=0.05):
+    """Only true doubles (same spot shot twice): keep the first, report the rest."""
+    kept, removed = [], []
+    cell = collections.defaultdict(list)
+    for p in pts:
+        cx, cy = int(p['e'] // 1), int(p['n'] // 1)
+        twin = None
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                for q in cell[(cx + dx, cy + dy)]:
+                    if d(p, q) <= tol_xy and abs(p['z'] - q['z']) <= tol_z:
+                        twin = q; break
+        if twin:
+            removed.append((p, twin)); continue
+        cell[(cx, cy)].append(p); kept.append(p)
+    return kept, removed
+
+
+def flag_heights(pts, lines, radius=10.0, max_dev=1.5):
+    """Suspicious elevations are only REPORTED, never deleted.
+    Crest/toe: compared with its neighbours on the same line.
+    Spot: compared with the median of nearby spot points."""
+    flags = []
+    for kind, runs in lines.items():
+        for r in runs:
+            for i in range(1, len(r) - 1):
+                ref = (r[i - 1]['z'] + r[i + 1]['z']) / 2
+                if abs(r[i]['z'] - ref) > max_dev:
+                    flags.append((r[i], r[i]['z'] - ref, 'crest' if kind == CREST else 'toe'))
+    spots = [p for p in pts if SPOT in p['cls']]
+    for p in spots:
+        near = sorted((q for q in spots if q is not p and d(p, q) <= radius), key=lambda q: d(p, q))[:8]
+        if len(near) >= 4:
+            zs = sorted(q['z'] for q in near); med = zs[len(zs) // 2]
+            if abs(p['z'] - med) > max_dev:
+                flags.append((p, p['z'] - med, 'spot'))
+    return flags
+
+
+def file_date(name):
+    """Date written in a file name: 26102026, 26-10-2026 or 20261026."""
+    s = re.sub(r'[-_. ]', '', os.path.basename(name))
+    for m in re.finditer(r'\d{8}', s):
+        t = m.group()
+        for y, mo, dd in ((t[4:], t[2:4], t[:2]), (t[:4], t[4:6], t[6:])):
+            if y.startswith('20') and 1 <= int(mo) <= 12 and 1 <= int(dd) <= 31:
+                return (int(y), int(mo), int(dd))
+    return None
+
+
+def excavator_points(raw_files):
+    """Unit positions: one point per unit code, the LAST shot wins (as done manually).
+    Night shift (NS) when the file name says NS or carries an earlier date than the
+    newest file (last night's recording); otherwise day shift (DS)."""
+    shifts = {'ds': collections.OrderedDict(), 'ns': collections.OrderedDict()}
+    newest = max((file_date(f) for f in raw_files if file_date(f)), default=None)
+    for f in raw_files:
+        named_ns = re.search(r'(^|[_\-\s])NS([_\-\s.]|$)', os.path.basename(f).upper())
+        older = file_date(f) and newest and file_date(f) < newest
+        shift = 'ns' if named_ns or older else 'ds'
+        for p in read_raw(f):
+            if 'EXCA' in classify(p['code']):
+                shifts[shift].pop(p['code'], None)
+                shifts[shift][p['code']] = dict(p, name=p['code'])
+    return {k: list(v.values()) for k, v in shifts.items()}
+
+
+def write_exca(path, title, date, pts):
+    write_str(path, title, date, [(1, [p], False) for p in pts])
+
+
 def convert(raw_files, out_path, title, date, line_gap=8.0, area_link=20.0, k=8):
     pts, report = [], collections.Counter()
     for f in raw_files:
@@ -178,6 +249,8 @@ def convert(raw_files, out_path, title, date, line_gap=8.0, area_link=20.0, k=8)
             if not p['cls']: report['tanpa kode (dilewati)'] += 1; continue
             if 'EXCA' in p['cls']: report['posisi unit EX (dipisah)'] += 1; continue
             pts.append(p)
+    pts, doubles = remove_doubles(pts)
+    report['titik double (dihapus)'] = len(doubles)
     strings = []
     # per file keeps the instrument order meaningful
     by_file = collections.defaultdict(list)
@@ -198,10 +271,30 @@ def convert(raw_files, out_path, title, date, line_gap=8.0, area_link=20.0, k=8)
     for fp in by_file.values():
         for r in runs_for(fp, SPOT, 15.0): strings.append((SPOT, r, False))
     write_str(out_path, title, date, strings)
+    flags = flag_heights(pts, lines)
+    report['tinggi mencurigakan (dicek manual)'] = len(flags)
+    write_report(out_path[:-4] + '_LAPORAN.txt', doubles, flags)
     return strings, report, areas
+
+
+def write_report(path, doubles, flags):
+    L = ['TITIK DOUBLE (dihapus otomatis, yang pertama disimpan)',
+         'file\tnama\tkode\tdobel_dengan\tjarak_m\tbeda_tinggi_m']
+    for p, q in doubles:
+        L.append(f"{p['file']}\t{p['name']}\t{p['code']}\t{q['name']}\t{d(p, q):.3f}\t{p['z'] - q['z']:+.3f}")
+    L += ['', 'TINGGI MENCURIGAKAN (TIDAK dihapus, silakan cek manual)',
+          'file\tnama\tkode\tjenis\tnorthing\teasting\televasi\tselisih_m']
+    for p, dev, kind in sorted(flags, key=lambda x: -abs(x[1])):
+        L.append(f"{p['file']}\t{p['name']}\t{p['code']}\t{kind}\t{p['n']:.3f}\t{p['e']:.3f}\t{p['z']:.3f}\t{dev:+.2f}")
+    open(path, 'w', newline='\r\n').write('\n'.join(L) + '\n')
 
 
 if __name__ == '__main__':
     out, title, date, *files = sys.argv[1:]
     s, rep, areas = convert(files, out, title, date)
     print(out, collections.Counter(n for n, _, _ in s), dict(rep), 'areas:', len(areas))
+    folder = os.path.dirname(out) or '.'
+    for shift, ex in excavator_points(files).items():
+        if ex:
+            write_exca(os.path.join(folder, f'{title}_exa_{shift}.str'), f'{title}_exa_{shift}', date, ex)
+            print(f'exa_{shift}:', [p['code'] for p in ex])
