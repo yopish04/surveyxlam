@@ -166,3 +166,30 @@ silang (`_simple`).
 | Sisi boundary yang sama persis dengan manual | 46 % | **64 %** |
 | Rata-rata IoU luas boundary | 0,962 | **0,967** |
 | Boundary yang saling silang | – | **0 / 38** |
+
+## Update progress global (file biner Surpac)
+
+File progress global per area disimpan Surpac dalam **format biner** (`surpac_bin.py`):
+dua baris header teks, 5 byte nol, lalu per titik `int32 nomor string` + `float64 Y, X, Z`
+(big-endian) + deskripsi berakhiran NUL; string 0 = pemisah, string 0 "END" = akhir file.
+Uji baca lalu tulis ulang kedua file global 26 Okt: **identik byte per byte**.
+
+Cara Surpac meng-update global (dipelajari dari `2026_10_26_update_topo_*.str`):
+- header mencatat `<global lama>.str OUTSIDE <boundary harian>.str`;
+- titik global lama di dalam boundary harian dibuang, **tanpa** titik potong baru, dan sisa
+  titik string tetap tersambung (0 titik lama tersisa di dalam boundary 26);
+- data harian ditambahkan tanpa string 1 (boundary);
+- string diurutkan per nomor, dan di dalam satu nomor data terbaru ditaruh paling depan.
+
+`update_global.py <global_lama.str> <global_baru.str> <harian1.str> [...]` meniru langkah
+itu dengan membaca file secara mengalir.
+
+| Uji | Hasil |
+|---|---|
+| TOFU 9 global 26 Okt (45 MB, 888.623 titik) | 888.622 titik sama persis dengan hasil Surpac, 2,4 detik |
+| TOFU 3 / LD01 global 26 Okt (16.788 titik) | 16.782 titik sama persis, < 0,1 detik |
+| Global biner tiruan 272 MB, 5,1 juta titik, 5 boundary | 11,5 detik |
+
+Global 25 Okt (sebelum update) tidak tersedia, jadi global lama direkonstruksi dari global
+26 Okt dengan mengeluarkan titik harian 26 Okt. Selisih beberapa titik berasal dari rapikan
+manual di Surpac (titik dipindah nomor string / garis baru disambung ke garis lama).
