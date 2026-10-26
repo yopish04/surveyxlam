@@ -55,7 +55,9 @@ def update(old_path, new_path, daily_paths, new_name=None, date=None):
     old_fields = old_head.decode('latin1').rstrip('\r\n').split(',')
     style = old_fields[-1] if old_fields[-1].lower().endswith('.ssi') else ''
     new_name = new_name or os.path.splitext(os.path.basename(new_path))[0]
-    date = date or old_fields[1]
+    if not date:                                   # date of the daily data, not of the old global
+        dh = open(daily_paths[0], encoding='latin1').readline().split(',')
+        date = dh[1].strip() if len(dh) > 1 and dh[1].strip() else old_fields[1]
     daily_names = ' '.join(os.path.basename(p) for p in daily_paths)
     head = f'{new_name},{date},{old_fields[0]}.str OUTSIDE {daily_names},{style}\r\n'.encode('latin1')
 
@@ -95,6 +97,14 @@ def update(old_path, new_path, daily_paths, new_name=None, date=None):
     write_daily_upto(float('inf'))
     w.close()
     st['sisa garis lama dekat boundary (cek manual)'] = len(check)
+    if check:
+        L = [f'{new_name}_CEK,{date},0,0',
+             '0,           0.000,           0.000,           0.000,           0.000,           0.000,           0.000']
+        for r in check:
+            L += [f"9006, {r[1]:.3f}, {r[2]:.3f}, {r[3]:.3f}, CEK_SISA_GARIS,str{r[0]},{r[4].decode('latin1')}",
+                  '0, 0.000, 0.000, 0.000,']
+        L.append('0, 0.000, 0.000, 0.000, END')
+        open(os.path.splitext(new_path)[0] + '_CEK.str', 'w', newline='\r\n').write('\n'.join(L) + '\n')
     with open(os.path.splitext(new_path)[0] + '_CEK.txt', 'w', newline='\r\n') as f:
         f.write(f'Sisa garis crest/toe lama yang terpotong, berjarak < {CHECK_DIST} m di luar boundary harian.\n'
                 'Tidak dihapus otomatis; cek di Surpac apakah perlu dihapus.\n'

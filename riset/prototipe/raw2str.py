@@ -5,6 +5,10 @@ import math, os, re, sys, collections
 CREST, TOE, SPOT, ROAD = 'CREST', 'TOE', 'SPOT', 'ROAD'   # internal point classes
 JUNC, BND, ROAD_EDGE, ROAD_CENTRE = 23, 1, 7, 77           # fixed string numbers
 
+# Check report as a Surpac .str (<out>_CEK.str): one string number per kind of finding, so
+# each kind can get its own colour in Surpac and be compared with the progress data.
+CEK_DOUBLE, CEK_TINGGI, CEK_ZIGZAG, CEK_JALAN, CEK_EXCA, CEK_SISA = 9001, 9002, 9003, 9004, 9005, 9006
+
 # String numbers per kind of area, learned from 22-26 Oct 2026 manual work.
 # Spot strings are keyed by the raw code; any other numeric code keeps its own number.
 NUMBERING = {
@@ -437,6 +441,7 @@ def convert(raw_files, out_path, title, date, line_gap=8.0, area_link=12.0, k=8,
     the caller) instead of writing <out>_jalan.str next to the area file."""
     num = NUMBERING[profile or detect_profile(raw_files)]
     pts, report, road = [], collections.Counter(), []
+    road_ok = True
     for f in raw_files:
         for p in read_raw(f):
             p['cls'] = classify(p['code'])
@@ -446,6 +451,7 @@ def convert(raw_files, out_path, title, date, line_gap=8.0, area_link=12.0, k=8,
             pts.append(p)
     if road:
         rs, ok = build_road(road)
+        road_ok = ok
         if road_sink is not None: road_sink += rs
         else: write_str(out_path[:-4] + '_jalan.str', title + '_jalan', date, rs)
         report['titik jalan (dipindah ke _jalan.str)'] = len(road)
@@ -457,13 +463,15 @@ def convert(raw_files, out_path, title, date, line_gap=8.0, area_link=12.0, k=8,
     # per file keeps the instrument order meaningful
     by_file = collections.defaultdict(list)
     for p in pts: by_file[p['file']].append(p)
-    lines, zig_flags = {}, []
+    lines, zig_flags, zig_runs = {}, [], []
     for kind in (CREST, TOE):
         runs = []
         for fp in by_file.values():
             for r in runs_for(fp, kind, line_gap):
                 parts = unzip_zigzag(r)
-                if len(parts) > 1: zig_flags.append((r[0], 0.0, f"zig-zag {r[0]['name']}..{r[-1]['name']}: mungkin 2 garis berdekatan"))
+                if len(parts) > 1:
+                    zig_flags.append((r[0], 0.0, f"zig-zag {r[0]['name']}..{r[-1]['name']}: mungkin 2 garis berdekatan"))
+                    zig_runs.append(r)
                 runs += parts if zigzag else [r]
         lines[kind] = merge_runs(runs, line_gap)
     areas = clusters(pts, area_link)
@@ -487,7 +495,31 @@ def convert(raw_files, out_path, title, date, line_gap=8.0, area_link=12.0, k=8,
     report['garis zig-zag (dicek manual)'] = len(zig_flags)
     report['tinggi mencurigakan (dicek manual)'] = len(flags)
     write_report(out_path[:-4] + '_LAPORAN.txt', doubles, flags)
+    items = []
+    for p, q in doubles:
+        items.append((CEK_DOUBLE, [p], f"CEK_DOUBLE,{p['name']},sama dgn {q['name']} dz {p['z'] - q['z']:+.3f}m"))
+    for p, dev, kind in flags:
+        if not kind.startswith('zig-zag'):
+            items.append((CEK_TINGGI, [p], f"CEK_TINGGI,{p['name']},{kind} {dev:+.2f}m"))
+    for r in zig_runs:
+        items.append((CEK_ZIGZAG, r, f"CEK_ZIGZAG,{r[0]['name']}-{r[-1]['name']},mungkin 2 garis"))
+    if road and not road_ok:
+        items.append((CEK_JALAN, road, "CEK_JALAN,penampang tidak teratur"))
+    write_check_str(out_path[:-4] + '_CEK.str', title + '_CEK', date, items)
     return strings, report, areas
+
+
+def write_check_str(path, title, date, items):
+    """items: (string number, [points], description). Written as a text .str for Surpac.
+    Nothing is written when there is nothing to check."""
+    if not items: return
+    L = [f'{title},{date},0,0', '0,           0.000,           0.000,           0.000,           0.000,           0.000,           0.000']
+    for num, pts, desc in items:
+        for p in pts:
+            L.append(f"{num}, {p['n']:.3f}, {p['e']:.3f}, {p['z']:.3f}, {desc}")
+        L.append('0, 0.000, 0.000, 0.000,')
+    L.append('0, 0.000, 0.000, 0.000, END')
+    open(path, 'w', newline='\r\n').write('\n'.join(L) + '\n')
 
 
 def write_report(path, doubles, flags):

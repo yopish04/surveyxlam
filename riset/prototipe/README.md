@@ -193,3 +193,20 @@ itu dengan membaca file secara mengalir.
 Global 25 Okt (sebelum update) tidak tersedia, jadi global lama direkonstruksi dari global
 26 Okt dengan mengeluarkan titik harian 26 Okt. Selisih beberapa titik berasal dari rapikan
 manual di Surpac (titik dipindah nomor string / garis baru disambung ke garis lama).
+
+## Laporan cek sebagai file .str (`*_CEK.str`)
+
+Selain laporan teks, setiap temuan juga ditulis ke file `.str` teks supaya bisa dibuka di
+Surpac bersama data progress dan dibandingkan langsung. Satu nomor string per jenis temuan,
+jadi tiap jenis bisa diberi warna sendiri atau disembunyikan:
+
+| String | Temuan | Ditulis oleh | Deskripsi (D1, D2, D3) |
+|---|---|---|---|
+| 9001 | titik double yang dihapus | area harian | `CEK_DOUBLE, <titik>, sama dgn <titik> dz` |
+| 9002 | tinggi mencurigakan (tidak dihapus) | area harian | `CEK_TINGGI, <titik>, crest/toe/spot selisih` |
+| 9003 | garis zig-zag, mungkin 2 garis berdekatan (digambar sebagai garis) | area harian | `CEK_ZIGZAG, <titik awal-akhir>, …` |
+| 9004 | jalan dengan penampang tidak teratur | area harian | `CEK_JALAN, …` |
+| 9005 | unit exca yang tembakannya berjauhan (semua tembakan) | exca | `CEK_EXCA, <unit>, tembakan i dari n` |
+| 9006 | sisa garis crest/toe lama di dekat boundary | update global | `CEK_SISA_GARIS, str<n>, <deskripsi asli>` |
+
+File `_CEK.str` hanya dibuat kalau ada temuan.

@@ -51,8 +51,11 @@ def run(job_path):
         if r[0] == 'EXCA':
             title = full(tag, r[1])
             files = area_files if r[2] == 'AREA' else [os.path.join(fin, f) for f in r[2].split(';') if f]
-            units, warn = first_shots(files)
+            units, warn, spread = first_shots(files)
             raw2str.write_exca(os.path.join(fout, title + '.str'), title, date, units)
+            raw2str.write_check_str(os.path.join(fout, title + '_CEK.str'), title + '_CEK', date,
+                [(raw2str.CEK_EXCA, [p], f"CEK_EXCA,{p['code']},tembakan {i + 1} dari {len(ps)}")
+                 for ps in spread for i, p in enumerate(ps)])
             print(f'{title}.str: {len(units)} unit')
             for w in warn: print('   PERLU DIPILIH:', w)
     os.makedirs(os.path.join(fout, 'gabung'), exist_ok=True)
@@ -66,13 +69,14 @@ def first_shots(files, spread_max=1.0):
         for p in raw2str.read_raw(f):
             if 'EXCA' in raw2str.classify(p['code']):
                 shots.setdefault(p['code'], []).append(dict(p, name=p['code']))
-    units, warn = [], []
+    units, warn, far = [], [], []
     for code, ps in shots.items():
         units.append(ps[0])
         spread = max(raw2str.d(a, b) for a in ps for b in ps)
         if spread > spread_max:
             warn.append(f'{code}: {len(ps)} tembakan berjarak sampai {spread:.1f} m (dipakai yang pertama)')
-    return units, warn
+            far.append(ps)
+    return units, warn, far
 
 
 if __name__ == '__main__':
