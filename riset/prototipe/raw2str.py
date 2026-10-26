@@ -432,7 +432,9 @@ def _touch(p1, p2, p3, p4):
 
 
 def convert(raw_files, out_path, title, date, line_gap=8.0, area_link=12.0, k=8, profile=None,
-            follow=True, max_dev=6.0, zigzag=False):
+            follow=True, max_dev=6.0, zigzag=False, road_sink=None):
+    """road_sink: a list -> road strings are appended there (one daily jalan file built by
+    the caller) instead of writing <out>_jalan.str next to the area file."""
     num = NUMBERING[profile or detect_profile(raw_files)]
     pts, report, road = [], collections.Counter(), []
     for f in raw_files:
@@ -444,7 +446,8 @@ def convert(raw_files, out_path, title, date, line_gap=8.0, area_link=12.0, k=8,
             pts.append(p)
     if road:
         rs, ok = build_road(road)
-        write_str(out_path[:-4] + '_jalan.str', title + '_jalan', date, rs)
+        if road_sink is not None: road_sink += rs
+        else: write_str(out_path[:-4] + '_jalan.str', title + '_jalan', date, rs)
         report['titik jalan (dipindah ke _jalan.str)'] = len(road)
         if not ok: report['jalan PERLU DICEK (penampang tidak teratur)'] = 1
 
