@@ -1,0 +1,2991 @@
+olevba 0.60.2 on Python 3.13.17 - http://decalage.info/python/oletools
+===============================================================================
+FILE: x2/xl/vbaProject.bin
+Type: OLE
+-------------------------------------------------------------------------------
+VBA MACRO ThisWorkbook.cls 
+in file: x2/xl/vbaProject.bin - OLE stream: 'VBA/ThisWorkbook'
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+(empty macro)
+-------------------------------------------------------------------------------
+VBA MACRO Sheet1.cls 
+in file: x2/xl/vbaProject.bin - OLE stream: 'VBA/Sheet1'
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+(empty macro)
+-------------------------------------------------------------------------------
+VBA MACRO Export.bas 
+in file: x2/xl/vbaProject.bin - OLE stream: 'VBA/Export'
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+Sub save_surpac(control As IRibbonControl)
+
+Dim asname As String
+If Range("A1") = "String" Then
+surpac_point
+Sheets("Data").Delete
+Else
+
+If Len(Range("F1")) < 7 Then
+    MsgBox "Penulisan Tanggal harus 8 Karakter"
+    Exit Sub
+End If
+
+
+Range("G1").FormulaR1C1 = "=MID(RC[-1],LEN(RC[-1])-5,2)&""/""&LEFT(RC[-1],LEN(RC[-1])-6)&""/""&RIGHT(RC[-1],2)"
+Range("G1").Value = Range("G1").Value
+Range("F1").Value = Range("G1").Value
+Range("F1:F2").NumberFormat = "dd-mmm-yy"
+
+Range("G1").Value = "RTK_SMA"
+Range("F2:G2").Value = Range("F1:G1").Value
+Range("F1:G2").AutoFill Destination:=Range("F1", Range("E1").End(xlDown).Offset(0, 2)), Type:=xlFillDefault
+
+
+
+
+ Range(Cells(1, 1), Cells(2, 1)).EntireRow.Insert
+    Range(Cells(1, 1), Cells(2, 7)).Value = 0
+
+
+Range(Range("A1").End(xlDown).Offset(1, 0), Range("A1").End(xlDown).Offset(1, 0).Offset(0, 4)).Value = 0
+    Range("A1").End(xlDown).Offset(0, 5).Value = "END"
+
+
+
+
+
+Dim varResult As Variant
+
+
+asname = LCase(Replace(Left(ActiveWorkbook.Name, InStrRev(ActiveWorkbook.Name, ".") - 1), " ", "_"))
+
+
+varResult = Application.GetSaveAsFilename(InitialFileName:=asname, FileFilter:="Surpac File(*.str), *.xlCSV", Title:="Save Surpac File")
+
+If varResult = False Then
+MsgBox "canceled"
+Exit Sub
+End If
+
+Application.DisplayAlerts = False
+ActiveWorkbook.SaveAs FILENAME:=varResult _
+        , FileFormat:=xlCSV, Password:="", WriteResPassword:="", _
+        ReadOnlyRecommended:=False, CreateBackup:=False
+        ActiveWindow.Close
+        
+End If
+
+End Sub
+
+
+Sub saveAsTOS(cotrol As IRibbonControl)
+    
+Dim wsName As String: wsName = "Daily Volume"
+If WorkSheetExists(wsName) Then
+    
+Set sourceWs = ActiveWorkbook.Sheets("Daily Volume")
+sourceWs.Copy
+Set newWb = ActiveWorkbook
+Name = "Daily Volume TOS Tofu"
+'sFleSaveName = Application.GetSaveAsFilename(InitialFileName:=Name, FileFilter:="Excel Files (*.xlsx), *.xlsx")
+Application.DisplayAlerts = False
+newWb.Sheets("Daily Volume").Parent.SaveAs "D:\Daily Record\New\" & Name & ".xlsx"
+newWb.Sheets("Daily Volume").Parent.Close False
+
+Else
+
+MsgBox "Open TOS File"
+
+End If
+End Sub
+
+
+
+
+
+-------------------------------------------------------------------------------
+VBA MACRO openfile.bas 
+in file: x2/xl/vbaProject.bin - OLE stream: 'VBA/openfile'
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+  Sub open_sokkia(control As IRibbonControl)
+
+  
+  Dim fpath As Variant
+    Dim wb As Excel.Workbook
+    Dim ws As Excel.Worksheet
+    Dim Text As String
+    On Error GoTo terminatemsg
+
+    Set wb = Excel.ActiveWorkbook
+    Set ws = Excel.ActiveSheet
+
+    fpath = Application.GetOpenFilename(FileFilter:="text Files(*.sdr; *.sdr), *.sdsr; *.sdr", Title:="open")
+
+    If fpath = False Then Exit Sub
+
+    Application.ScreenUpdating = False
+    Application.DisplayAlerts = False
+
+    Text = getTextfileData(fpath)
+    If Len(Text) Then
+           Workbooks.OpenText FILENAME:= _
+        fpath, Origin:=437, Startrow _
+        :=1, DataType:=xlFixedWidth, FieldInfo:=Array(Array(0, 1), Array(4, 1), Array( _
+        9, 1), Array(20, 1), Array(36, 1), Array(52, 1), Array(68, 1), Array(79, 1)), _
+        TrailingMinusNumbers:=True
+    Else
+        MsgBox fpath & " is empty", vbInformation, "Import Cancelled"
+        Exit Sub
+    End If
+
+ActiveSheet.AutoFilterMode = False
+Last = Range("A" & Rows.Count).End(xlUp).Row
+Set Rng = ActiveSheet.Range(Cells(1, 1), Cells(Last, 7))
+
+       
+
+Rng.AutoFilter Field:=1, Criteria1:="08TP"
+
+terminatemsg:
+    Application.ScreenUpdating = True
+    Application.DisplayAlerts = True
+    If Err.Number <> 0 Then MsgBox Err.Number & " " & Err.Description
+
+
+  End Sub
+Function getTextfileData(FILENAME As Variant) As String
+    Const ForReading = 1
+    Dim fso, MyFile
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    Set MyFile = fso.OpenTextFile(FILENAME, ForReading)
+    getTextfileData = MyFile.ReadAll
+    MyFile.Close
+End Function
+
+
+Sub open_rtk_sokkia(control As IRibbonControl)
+Dim arr As Variant
+Dim Rng As Range
+Dim rng2 As Range
+Dim rng3 As Range
+
+Dim i As Long
+Dim rngFil As Range
+
+ Dim vFileName
+
+  
+Application.DisplayAlerts = False
+     vFileName = Application.GetOpenFilename()
+
+    If vFileName = False Then
+         Application.ScreenUpdating = True
+    Exit Sub
+    End If
+
+    Application.ScreenUpdating = False
+
+
+    Workbooks.OpenText FILENAME:=vFileName, _
+        Origin:=xlMSDOS, Startrow:=1, DataType:=xlDelimited, TextQualifier:= _
+        xlTextQualifierNone, ConsecutiveDelimiter:=True, Tab:=True, Semicolon:=False, _
+        Comma:=True, Space:=False, Other:=False, OtherChar:="=", _
+        TrailingMinusNumbers:=True, Local:=True
+
+
+
+
+
+
+For i = 3 To 1 Step -1
+If Not IsNumeric(Range("A" & i).Value2) Then
+Rows(i).EntireRow.Delete
+End If
+Next i
+
+Columns(5).Cut
+Columns(1).Insert shift:=xlToRight
+Columns(2).Cut
+Columns(6).Insert shift:=xlToRight
+
+
+
+
+
+
+Last = Range("A" & Rows.Count).End(xlUp).Row
+Set Rng = ActiveSheet.Range(Cells(1, 1), Cells(Last, 1))
+
+
+For Each Cell In Rng
+If IsNumeric(Cell) = False Then
+Columns("A:A").AutoFilter
+    ActiveSheet.Range("$A$1:$A$5").AutoFilter Field:=1, Criteria1:="=*", _
+        Operator:=xlAnd
+End If
+
+Next Cell
+
+
+'
+'LastRow = Cells(Rows.Count, "A").End(xlUp).Row
+'
+'If Not IsNumeric(LastRow) Then
+'
+'
+'
+'
+'Set rng = Range("A1:A" & Rows.Count)
+'Set rng2 = Range("E1:E" & Rows.Count)
+'
+'v = rng
+'rng.Value = rng2.Value
+'rng2 = v
+'
+'
+'
+'Else
+'
+'Set rng = [A1]
+'Set rng = Range(rng, Cells(Rows.Count, rng.Column).End(xlUp))
+' rng.TextToColumns Destination:=rng, DataType:=xlDelimited, _
+'        TextQualifier:=xlDoubleQuote, _
+'        ConsecutiveDelimiter:=False, _
+'        Tab:=True, _
+'        Semicolon:=False, _
+'        Comma:=True, _
+'        Space:=True, _
+'        Other:=False, _
+'        FieldInfo:=Array(Array(1, xlGeneralFormat), Array(2, xlGeneralFormat), Array(3, xlGeneralFormat)), _
+'        TrailingMinusNumbers:=True
+'
+'Range("A:A").Cut Range("F:F")
+'Range("A:A").Delete
+'
+'End If
+
+
+End Sub
+
+Sub open_rtk_geopanel(control As IRibbonControl)
+Dim arr As Variant
+Dim Rng As Range
+Dim rng2 As Range
+Dim rng3 As Range
+
+Dim Cell As Range
+Dim i As Long
+Dim rngFil As Range
+
+ Dim vFileName
+
+  
+Application.DisplayAlerts = False
+     vFileName = Application.GetOpenFilename()
+
+    If vFileName = False Then
+         Application.ScreenUpdating = True
+    Exit Sub
+    End If
+
+    Application.ScreenUpdating = False
+
+
+    Workbooks.OpenText FILENAME:=vFileName, _
+        Origin:=xlMSDOS, Startrow:=1, DataType:=xlDelimited, TextQualifier:= _
+        xlTextQualifierNone, ConsecutiveDelimiter:=True, Tab:=True, Semicolon:=False, _
+        Comma:=True, Space:=True, Other:=False, OtherChar:="=", _
+        TrailingMinusNumbers:=True, Local:=True
+
+
+
+Rows(1).EntireRow.Delete
+
+
+
+
+Columns(1).Cut
+Columns(6).Insert shift:=xlToRight
+
+
+
+
+
+
+
+Last = Range("A" & Rows.Count).End(xlUp).Row
+Set Rng = ActiveSheet.Range(Cells(1, 1), Cells(Last, 1))
+
+
+For Each Cell In Rng
+If IsNumeric(Cell) = False Then
+Columns("A:A").AutoFilter
+    ActiveSheet.Range("$A$1:$A$5").AutoFilter Field:=1, Criteria1:="=*", _
+        Operator:=xlAnd
+End If
+
+Next Cell
+
+End Sub
+
+
+
+
+
+Sub open_TC(control As IRibbonControl)
+
+myFilePath = "D:\Daily Record\New\Survey vs TC.xlsx"
+    If FileInUse(myFilePath) Then
+        MsgBox "File has been open"
+    Else
+        Workbooks.Open "D:\Daily Record\New\Survey vs TC.xlsx"
+    End If
+End Sub
+
+
+Sub open_TOS(control As IRibbonControl)
+
+myFilePath = "D:\Daily Record\New\TOS.xlsx"
+    If FileInUse(myFilePath) Then
+        MsgBox "File has been open"
+    Else
+        Workbooks.Open "D:\Daily Record\New\TOS.xlsx"
+    End If
+End Sub
+
+Sub open_daily_volume_kr(control As IRibbonControl)
+
+myFilePath = "D:\Daily Record\daily volume tos KR.xlsx"
+    If FileInUse(myFilePath) Then
+        MsgBox "File has been open"
+    Else
+        Workbooks.Open "D:\Daily Record\daily volume tos KR.xlsx"
+    End If
+End Sub
+
+Sub open_daily_volume_tofu(control As IRibbonControl)
+
+myFilePath = "D:\Daily Record\New\Daily Volume TOS Tofu.xlsx"
+    If FileInUse(myFilePath) Then
+        MsgBox "File has been open"
+    Else
+        Workbooks.Open "D:\Daily Record\New\Daily Volume TOS Tofu.xlsx"
+    End If
+End Sub
+
+Sub open_mon_wd(control As IRibbonControl)
+
+myFilePath = "D:\Daily Record\Wastedam monitoring new.xlsx"
+    If FileInUse(myFilePath) Then
+        MsgBox "File has been open"
+    Else
+        Workbooks.Open "D:\Daily Record\Wastedam monitoring new.xlsx"
+    End If
+End Sub
+
+Sub open_mon_lim(control As IRibbonControl)
+
+myFilePath = "D:\Daily Record\Limonite Dump monitoring.xlsx"
+    If FileInUse(myFilePath) Then
+        MsgBox "File has been open"
+    Else
+        Workbooks.Open "D:\Daily Record\Limonite Dump monitoring.xlsx"
+    End If
+End Sub
+
+Sub open_sum_blast(control As IRibbonControl)
+
+
+myFilePath = "D:\Daily Record\Summary Blasting.xlsx"
+    If FileInUse(myFilePath) Then
+        MsgBox "File has been open"
+    Else
+        Workbooks.Open "D:\Daily Record\Summary Blasting.xlsx"
+    End If
+    
+End Sub
+
+
+Sub val_tos(control As IRibbonControl)
+
+Set wordapp = CreateObject("word.Application")
+myFilePath = "D:\Daily Record\BERITA ACARA  VALIDASI TOS SMA.docx"
+    If FileInUse(myFilePath) Then
+        MsgBox "File has been open"
+        Exit Sub
+    Else
+        wordapp.Documents.Open "D:\Daily Record\BERITA ACARA  VALIDASI TOS SMA.docx"
+        wordapp.Visible = True
+    End If
+    
+wordapp.Activate
+
+        'Clean up the Object when Finished
+        Set wordapp = Nothing
+End Sub
+
+Sub open_tos_balance_kr(control As IRibbonControl)
+
+myFilePath = "D:\Daily Record\Tos Balance KR.xlsx"
+    If FileInUse(myFilePath) Then
+        MsgBox "File has been open"
+    Else
+        Workbooks.Open "D:\Daily Record\Tos Balance KR.xlsx"
+    End If
+End Sub
+
+Sub open_tos_balance_tofu(control As IRibbonControl)
+
+myFilePath = "D:\Daily Record\Tos Balance Tofu.xlsx"
+    If FileInUse(myFilePath) Then
+        MsgBox "File has been open"
+    Else
+        Workbooks.Open "D:\Daily Record\Tos Balance Tofu.xlsx"
+    End If
+End Sub
+
+Sub creator(control As IRibbonControl)
+
+help.Show
+End Sub
+
+Sub openFolder(control As IRibbonControl)
+
+Shell "explorer.exe" & " " & "D:\Daily Record", vbNormalFocus
+End Sub
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-------------------------------------------------------------------------------
+VBA MACRO Dome.bas 
+in file: x2/xl/vbaProject.bin - OLE stream: 'VBA/Dome'
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+Sub FixCodeDome(control As IRibbonControl)
+Dim c As Range
+
+With Selection.SpecialCells(xlCellTypeVisible).Offset(0, 5)
+.FormulaR1C1 = "=REPLACE(REPLACE(REPLACE(RIGHT(SUBSTITUTE(SUBSTITUTE(SUBSTITUTE(SUBSTITUTE(SUBSTITUTE(SUBSTITUTE(SUBSTITUTE(UPPER(RC[-5]),""TGL"",""""),""TANGGAL"",""""),""-"",""""),""."",""""),""_"",""""),"" "",""""),""/"",""""),18),11,0,"" ""),7,0,""_""),4,0,""_"")"
+
+
+For Each c In Selection.SpecialCells(xlCellTypeVisible).Offset(0, 5)
+   
+    c.Value = c.Value
+    c.Offset(0, -1).Value2 = c.Value2
+
+    c.Offset(, -5).Value2 = 1
+    c.ClearContents
+    
+ 'c.Offset(0, -5) = "a"
+
+    If c.Value = c.Offset(1, 0) Then
+    c.Offset(1, 0).EntireRow.Delete
+    End If
+
+Next c
+
+
+
+'For Each c In Selection.SpecialCells(xlCellTypeVisible)
+'If c.Offset(0, 4) = c.Offset(1, 4) Then
+'    c.Offset(1, 4).EntireRow.Delete
+'    End If
+'
+'Next c
+
+
+
+End With
+End Sub
+
+
+
+
+-------------------------------------------------------------------------------
+VBA MACRO Monitoring.bas 
+in file: x2/xl/vbaProject.bin - OLE stream: 'VBA/Monitoring'
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+Sub Moni(control As IRibbonControl)
+
+Dim Lastcol As Long
+Dim Lastcol2 As Long
+Dim lastrow As Long
+Dim Rng As Range
+
+
+With Sheets("data")
+    
+Lastcol = .Cells(2, Columns.Count).End(xlToLeft).Column
+Lastcol2 = .Cells(2, Columns.Count).End(xlToLeft).Offset(0, 1).Column
+Lastcol3 = .Cells(26, Columns.Count).End(xlToLeft).Offset(0, 1).Column
+lastrow = .Cells(.Rows.Count, 1).End(xlUp).Row
+
+.Range(.Cells(2, Lastcol), .Cells(lastrow, Lastcol)).Copy .Cells(2, Lastcol2)
+
+
+
+
+End With
+
+
+
+Sheets("data").Cells(2, Lastcol2).Value = Sheets("rawdata").Cells(Rows.Count, "I").End(xlUp).Value
+
+
+If UCase(ActiveWorkbook.Name) Like "LIMONITE MONITORING NEW.XLSX" Then
+
+Sheets("data").Cells(2, Lastcol2).Value2 = Sheets("rawdata").Cells(Rows.Count, "I").End(xlUp).Value
+'LDM 05
+Set Rng = Sheets("data").Range(Sheets("data").Range("A1"), Sheets("data").Cells(5, Lastcol2))
+Sheets("Chart").ChartObjects("LDM 05").Chart.SetSourceData Source:=Rng
+
+'LDM 06A
+Set Rng = Sheets("data").Range(Sheets("data").Range("A7"), Sheets("data").Cells(11, Lastcol2))
+Sheets("Chart").ChartObjects("LDM 06A").Chart.SetSourceData Source:=Rng
+
+'LDM 07
+Set Rng = Sheets("data").Range(Sheets("data").Range("A13"), Sheets("data").Cells(17, Lastcol2))
+Sheets("Chart").ChartObjects("LDM 07").Chart.SetSourceData Source:=Rng
+
+'LDM 08
+Set Rng = Sheets("data").Range(Sheets("data").Range("A19"), Sheets("data").Cells(23, Lastcol2))
+Sheets("Chart").ChartObjects("LDM 08").Chart.SetSourceData Source:=Rng
+
+'LDM 09
+Set Rng = Sheets("data").Range(Sheets("data").Range("A25"), Sheets("data").Cells(29, Lastcol2))
+Sheets("Chart").ChartObjects("LDM 09").Chart.SetSourceData Source:=Rng
+
+End If
+
+
+
+If UCase(ActiveWorkbook.Name) Like "WASTEDAM MONITORING NEW.XLSX" Then
+
+'WDM01
+Set Rng = Sheets("data").Range(Sheets("data").Range("A1"), Sheets("data").Cells(5, Lastcol2))
+Sheets("Chart").ChartObjects("WSM01").Chart.SetSourceData Source:=Rng, PlotBy:=xlRows
+
+
+
+'WDM02
+Set Rng = Sheets("data").Range(Sheets("data").Range("A7"), Sheets("data").Cells(11, Lastcol2))
+Sheets("Chart").ChartObjects("WSM02").Chart.SetSourceData Source:=Rng, PlotBy:=xlRows
+
+
+'WDM03
+Set Rng = Sheets("data").Range(Sheets("data").Range("A13"), Sheets("data").Cells(17, Lastcol2))
+Sheets("Chart").ChartObjects("WSM03").Chart.SetSourceData Source:=Rng, PlotBy:=xlRows
+
+
+
+End If
+
+
+
+If UCase(ActiveWorkbook.Name) Like "TOS MONITORING.XLSX" Then
+
+'T01
+Set Rng = Sheets("data").Range(Sheets("data").Range("A1"), Sheets("data").Cells(5, Lastcol2))
+Sheets("Chart").ChartObjects("TOS01").Chart.SetSourceData Source:=Rng
+
+'T02
+Set Rng = Sheets("data").Range(Sheets("data").Range("A7"), Sheets("data").Cells(11, Lastcol2))
+Sheets("Chart").ChartObjects("T02").Chart.SetSourceData Source:=Rng
+
+'T03
+Set Rng = Sheets("data").Range(Sheets("data").Range("A13"), Sheets("data").Cells(17, Lastcol2))
+Sheets("Chart").ChartObjects("T03").Chart.SetSourceData Source:=Rng
+
+'T04
+Set Rng = Sheets("data").Range(Sheets("data").Range("A19"), Sheets("data").Cells(23, Lastcol2))
+Sheets("Chart").ChartObjects("T04").Chart.SetSourceData Source:=Rng
+
+'T05
+Set Rng = Sheets("data").Range(Sheets("data").Range("A25"), Sheets("data").Cells(29, Lastcol2))
+Sheets("Chart").ChartObjects("T05").Chart.SetSourceData Source:=Rng
+
+'T06
+Set Rng = Sheets("data").Range(Sheets("data").Range("A31"), Sheets("data").Cells(35, Lastcol2))
+Sheets("Chart").ChartObjects("T06").Chart.SetSourceData Source:=Rng
+
+
+End If
+
+End Sub
+
+
+
+
+
+
+
+-------------------------------------------------------------------------------
+VBA MACRO Module1.bas 
+in file: x2/xl/vbaProject.bin - OLE stream: 'VBA/Module1'
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+Sub rapikan(control As IRibbonControl)
+Columns(5).Cut
+Columns(1).Insert shift:=xlToRight
+Columns(5).Cut
+Columns(8).Insert shift:=xlToRight
+
+
+Columns(1).ColumnWidth = 9
+Columns(2).ColumnWidth = 14
+Columns(3).ColumnWidth = 10
+Columns(4).ColumnWidth = 10
+Columns(5).ColumnWidth = 10
+Columns(6).ColumnWidth = 10
+Columns(7).ColumnWidth = 10
+Columns(8).ColumnWidth = 10
+Columns(9).ColumnWidth = 10
+
+
+
+lastrow = Cells(Rows.Count, "A").End(xlUp).Row
+
+Range(Cells(1, 2), Cells(lastrow, 4)).NumberFormat = "0.00"
+Range(Cells(1, 5), Cells(lastrow, 5)).NumberFormat = "dd/mmm/yy"
+
+ActiveSheet.UsedRange.Replace What:="Volume", Replacement:="Vol"
+
+ActiveSheet.Columns("A:G").VerticalAlignment = xlCenter
+ActiveSheet.Columns("A:G").HorizontalAlignment = xlCenter
+ActiveSheet.Rows(1).Font.Bold = True
+ActiveSheet.Columns("A").ColumnWidth = 12
+
+Set Rng = Range(Cells(1, 1), Cells(lastrow, 7))
+    With Rng.Borders
+        .LineStyle = xlContinuous
+        .Color = vbBlack
+        .Weight = xlThin
+    End With
+
+
+
+lastrow = Cells(Rows.Count, "A").End(xlUp).Row
+
+
+
+For i = 2 To lastrow
+    searchString = "NG"
+        If InStr(1, Cells(i, 1), searchString) > 0 Then
+            Cells(i, 3).FormulaR1C1 = "=RC[-1]/1.19 "
+            Cells(i, 4).FormulaR1C1 = "=RC[-1]*1.743 "
+        ElseIf InStr(1, Cells(i, 2), searchString) = 0 Then
+            Cells(i, 3).FormulaR1C1 = "=RC[-1]/1.157 "
+            Cells(i, 4).FormulaR1C1 = "=RC[-1]*1.705 "
+        End If
+    Next i
+For i = 2 To lastrow
+    searchString = "BOULDER"
+    If InStr(1, Cells(i, 1), searchString) > 0 Then
+        Cells(i, 3).FormulaR1C1 = "=RC[-1]/1.3 "
+        Cells(i, 4).FormulaR1C1 = "=RC[-1]*2.015 "
+    End If
+Next i
+
+
+For i = 1 To lastrow Step 1
+    Range(Cells(1, 7), Cells(i, 7)).Replace What:="Grizzly", Replacement:="TOS 332", Lookat:=xlPart, _
+    searchorder:=xlByColumns, MatchCase:=False, searchformat:=False, _
+    ReplaceFormat:=False
+Next i
+
+
+
+End Sub
+
+
+Sub Numbering(control As IRibbonControl)
+    Dim Rng As Range
+    Dim WorkRng As Range
+    On Error Resume Next
+    xTitleId = "BP-Survey2"
+    Set WorkRng = Application.Selection
+    Set WorkRng = Application.InputBox("Range", xTitleId, WorkRng.Address, Type:=8)
+    Set WorkRng = WorkRng.Columns(1)
+    xIndex = 1
+    Set Rng = WorkRng.Range("A1")
+    Do While Not Intersect(Rng, WorkRng) Is Nothing
+        Rng.Value = xIndex
+        xIndex = xIndex + 1
+        Set Rng = Rng.MergeArea.Offset(1)
+    Loop
+End Sub
+
+
+Sub SummaryTOS(control As IRibbonControl)
+
+lastrow = Cells(Rows.Count, "B").End(xlUp).Row
+Dim searchString As String
+Columns("H:O").EntireColumn.Delete
+
+Dim namaFile As String
+
+namaFile = ActiveWorkbook.Name
+
+
+    
+
+If namaFile = "Tos Balance KR.xlsx" Or namaFile = "Tos Balance Tofu.xlsx" Then
+
+
+    Columns(8).ColumnWidth = 14
+    Columns(9).ColumnWidth = 14
+    Columns(10).ColumnWidth = 14
+    Columns(11).ColumnWidth = 14
+    Columns(12).ColumnWidth = 14
+    Columns(13).ColumnWidth = 14
+    Columns(14).ColumnWidth = 14
+    Columns(15).ColumnWidth = 14
+    Columns(16).ColumnWidth = 20
+    
+    ActiveSheet.Range("H1:P5").VerticalAlignment = xlCenter
+    ActiveSheet.Range("H1:P5").HorizontalAlignment = xlCenter
+    ActiveSheet.Range("H7:O9").HorizontalAlignment = xlCenter
+    ActiveSheet.Range("I1:P1").Font.Bold = True
+    ActiveSheet.Range("H2:H9").Font.Bold = True
+    ActiveSheet.Range("P2:P3").Font.Bold = True
+    ActiveSheet.Range("H5").Font.Bold = True
+    ActiveSheet.Range("H7:O7").Font.Bold = True
+    
+    lastrow2 = Cells(Rows.Count, "F").End(xlUp).Row
+    Range("G2").Formula2R1C1 = "=UNIQUE(RC[-1]:R" & lastrow2 & "C[-1])"
+    
+    Dim lastrowUnique As Long
+    
+    lastrowUnique = Cells(Rows.Count, "G").End(xlUp).Row
+    
+    Range("G2:G" & lastrowUnique).Copy
+    Range("H2").PasteSpecial xlPasteValues
+    Range("H2:H" & lastrowUnique).Copy
+    Range("I1").PasteSpecial Transpose:=True
+    
+    Application.DisplayAlerts = False
+    
+    Range("G2:h" & lastrowUnique).ClearContents
+    
+    Range("H2") = "Jumlah Dome"
+    Range("H3") = "Total WMT"
+    Range("H5") = "Boulder"
+
+    Dim lColumn As Long
+    
+    lColumn = Cells(1, Columns.Count).End(xlToLeft).Column
+    
+    For i = 9 To lColumn
+        Cells(2, i).FormulaR1C1 = "=COUNTIF(R2C6:R[" & lastrow - 2 & "]C6,R[-1]C)"
+        Cells(3, i).FormulaR1C1 = "=SUMIF(R2C6:R[" & lastrow - 2 & "]C6,R[-2]C,R2C5:R[" & lastrow - 2 & "]C5)"
+        Cells(5, 9).FormulaR1C1 = "=SUMIF(R2C2:R[" & lastrow - 2 & "]C2,""*RSB*"",R2C5:R[" & lastrow - 2 & "]C5)"
+'        Cells(8, 9).Formula2R1C1 = "=SUM(R[-6]C:R[-6]C[1])"
+'        Cells(9, 9).Formula2R1C1 = "=SUM(R[-6]C:R[-6]C[1])"
+    Next i
+    
+    Cells(1, lColumn + 1).Value = "Jumlah"
+    Cells(2, lColumn + 1).FormulaR1C1 = "=SUM(R2C9:R2C" & lColumn & ")"
+    Cells(3, lColumn + 1).FormulaR1C1 = "=SUM(R3C9:R3C" & lColumn & ")"
+    
+    'Range(Cells(2, 9), Cells(2, lColumn + 1)).NumberFormat = "0.000"
+    Range(Cells(2, 9), Cells(2, lColumn + 1)).NumberFormat = "General"
+    Range(Cells(3, 9), Cells(3, lColumn + 1)).NumberFormat = "#,##0.00"
+'    Range("I3:J3").NumberFormat = "#,##0.00"
+     Range("I5").NumberFormat = "#,##0.00"
+
+
+    Range("I2:P2").NumberFormat = "0"
+    'Range("I8:K8").NumberFormat = "0"
+    
+    For i = 2 To lastrow
+    Range(Cells(i, 1), Cells(lastrow, 5)).Interior.ColorIndex = 0
+    searchString = "NG"
+        If InStr(1, Cells(i, 2), searchString) > 0 Then
+            Cells(i, 4).FormulaR1C1 = "=RC[-1]/1.19 "
+            Cells(i, 5).FormulaR1C1 = "=RC[-1]*1.743 "
+            Range(Cells(i, 4), Cells(i, 5)).Interior.ColorIndex = 45
+        ElseIf InStr(1, Cells(i, 2), searchString) = 0 Then
+            Cells(i, 4).FormulaR1C1 = "=RC[-1]/1.157 "
+            Cells(i, 5).FormulaR1C1 = "=RC[-1]*1.705 "
+        End If
+    Next i
+     
+     For i = 2 To lastrow
+     searchString = "BOULDER"
+    If InStr(1, Cells(i, 2), searchString) > 0 Then
+        Cells(i, 4).FormulaR1C1 = "=RC[-1]/1.3 "
+        Cells(i, 5).FormulaR1C1 = "=RC[-1]*2.015 "
+        Range(Cells(i, 4), Cells(i, 5)).Interior.ColorIndex = 16
+    End If
+Next i
+     
+       Range("C2:E100").NumberFormat = "0.000"
+
+
+
+
+ElseIf Right(namaFile, 3) = "dbf" Then
+'If Range("A1") = "No_DOME" Then
+
+Dim lastrow3 As Long
+lastrow3 = Cells(Rows.Count, "G").End(xlUp).Row
+Range("H2").Formula2R1C1 = "=UNIQUE(RC[-1]:R" & lastrow3 & "C[-1])"
+
+
+ Dim lastrowUnique2 As Long
+    
+    lastrowUnique2 = Cells(Rows.Count, "G").End(xlUp).Row
+
+
+ Range("h2:h" & lastrowUnique2).Copy
+    Range("i2").PasteSpecial xlPasteValues
+    Range("i2:i" & lastrowUnique2).Copy
+    Range("k1").PasteSpecial Transpose:=True
+    
+    Application.DisplayAlerts = False
+    
+    Range("h2:i" & lastrowUnique2).ClearContents
+
+
+
+    
+    Columns(10).ColumnWidth = 14
+    Columns(11).ColumnWidth = 14
+    Columns(12).ColumnWidth = 14
+    Columns(13).ColumnWidth = 14
+    Columns(14).ColumnWidth = 14
+    Columns(15).ColumnWidth = 14
+    Columns(16).ColumnWidth = 14
+    Columns(17).ColumnWidth = 14
+    
+    ActiveSheet.Range("J1:R5").HorizontalAlignment = xlCenter
+    ActiveSheet.Range("J6:J16").HorizontalAlignment = xlCenter
+    'ActiveSheet.Range("K11:O11").HorizontalAlignment = xlCenter
+    ActiveSheet.Range("J2:J3").Font.Bold = True
+    ActiveSheet.Range("J6:J11").Font.Bold = True
+    ActiveSheet.Range("K1:R1").Font.Bold = True
+    ActiveSheet.Range("K5:Q5").Font.Bold = True
+    ActiveSheet.Range("J15:J16").Font.Bold = True
+    
+    Range("J2") = "Jumlah Dome"
+    Range("J3") = "Total WMT"
+    
+    Range("J6") = "VLGS"
+    Range("J7") = "LGS 1"
+    Range("J8") = "LGS 2"
+    Range("J9") = "HGS"
+    Range("J10") = "VHGS"
+    Range("J11") = "WST"
+    Range("J12") = "WA"
+    Range("J13") = "BOULDER"
+    
+    Range("J15") = "Total"
+    Range("J16") = "Cek"
+    
+    Dim lColumn2 As Long
+    Dim countCol As Long
+    
+    lColumn2 = Cells(1, Columns.Count).End(xlToLeft).Column
+    countCol = lColumn2 - 10
+    For i = 1 To countCol
+    Cells(2, 10 + i).FormulaR1C1 = "=COUNTIF(RC[" & -(3 + i) & "]:R[" & lastrow3 & "]C[" & -(3 + i) & "],R[-1]C)"
+'    Range("L2").FormulaR1C1 = "=COUNTIF(RC[-5]:R[" & lastrow - 2 & "]C[-5],""TOS -"")"
+'    Range("M2").FormulaR1C1 = "=COUNTIF(RC[-6]:R[" & lastrow - 2 & "]C[-6],""TOS KR 02"")"
+'    Range("N2").FormulaR1C1 = "=COUNTIF(RC[-7]:R[" & lastrow - 2 & "]C[-7],""TOS KR 05"")"
+'    Range("O2").FormulaR1C1 = "=COUNTIF(RC[-8]:R[" & lastrow - 2 & "]C[-8],""TOS KR 07"")"
+'    Range("P2").FormulaR1C1 = "=COUNTIF(RC[-9]:R[" & lastrow - 2 & "]C[-9],""TOS KR 04"")"
+'    Range("Q2").FormulaR1C1 = "=COUNTIF(RC[-10]:R[" & lastrow - 2 & "]C[-10],""TOS KR 08"")"
+    
+    Cells(3, 10 + i).FormulaR1C1 = "=SUMIF(R[-1]C[" & -(3 + i) & "]:R[" & lastrow3 - 2 & "]C[" & -(3 + i) & "],R[-2]C,R[-1]C[" & -(6 + i) & "]:R[" & lastrow3 - 2 & "]C[" & -(6 + i) & "])"
+'    Range("L3").FormulaR1C1 = "=SUMIF(R[-1]C[-5]:R[" & lastrow - 2 & "]C[-5],""TOS -"",R[-1]C[-8]:R[" & lastrow - 2 & "]C[-8])"
+'    Range("M3").FormulaR1C1 = "=SUMIF(R[-1]C[-6]:R[" & lastrow - 2 & "]C[-6],""TOS KR 02"",R[-1]C[-9]:R[" & lastrow - 2 & "]C[-9])"
+'    Range("N3").FormulaR1C1 = "=SUMIF(R[-1]C[-7]:R[" & lastrow - 2 & "]C[-7],""TOS KR 05"",R[-1]C[-10]:R[" & lastrow - 2 & "]C[-10])"
+'    Range("O3").FormulaR1C1 = "=SUMIF(R[-1]C[-8]:R[" & lastrow - 2 & "]C[-8],""TOS KR 07"",R[-1]C[-11]:R[" & lastrow - 2 & "]C[-11])"
+'    Range("P3").FormulaR1C1 = "=SUMIF(R[-1]C[-9]:R[" & lastrow - 2 & "]C[-9],""TOS KR 04"",R[-1]C[-12]:R[" & lastrow - 2 & "]C[-12])"
+'    Range("Q3").FormulaR1C1 = "=SUMIF(R[-1]C[-10]:R[" & lastrow - 2 & "]C[-10],""TOS KR 08"",R[-1]C[-13]:R[" & lastrow - 2 & "]C[-13])"
+    
+    Cells(2, lColumn2 + 1).FormulaR1C1 = "=sum(RC11:RC" & lColumn2 & ")"
+    Cells(3, lColumn2 + 1).FormulaR1C1 = "=sum(R[-1]C4:R[" & lastrow3 - 2 & "]C4)"
+    
+    'Penjumlahan Material
+    Cells(5, 10 + i).FormulaR1C1 = "=R[-4]C"
+
+    
+    'TOS KR 06 + -
+    Cells(6, 10 + i).Formula2R1C1 = "=SUMIFS(R[-4]C[" & -(6 + i) & "]:R[" & lastrow3 - 2 & "]C[" & -(6 + i) & "],R[-4]C[" & -(4 + i) & "]:R[" & lastrow3 - 2 & "]C[" & -(4 + i) & "],RC10,R[-4]C[" & -(3 + i) & "]:R[" & lastrow3 - 2 & "]C[" & -(3 + i) & "],R[-1]C" & 10 + i & ")"
+    Cells(7, 10 + i).Formula2R1C1 = "=SUMIFS(R[-5]C[" & -(6 + i) & "]:R[" & lastrow3 - 2 & "]C[" & -(6 + i) & "],R[-5]C[" & -(4 + i) & "]:R[" & lastrow3 - 2 & "]C[" & -(4 + i) & "],RC10,R[-5]C[" & -(3 + i) & "]:R[" & lastrow3 - 2 & "]C[" & -(3 + i) & "],R[-2]C" & 10 + i & ")"
+    Cells(8, 10 + i).Formula2R1C1 = "=SUMIFS(R[-6]C[" & -(6 + i) & "]:R[" & lastrow3 - 2 & "]C[" & -(6 + i) & "],R[-6]C[" & -(4 + i) & "]:R[" & lastrow3 - 2 & "]C[" & -(4 + i) & "],RC10,R[-6]C[" & -(3 + i) & "]:R[" & lastrow3 - 2 & "]C[" & -(3 + i) & "],R[-3]C" & 10 + i & ")"
+    Cells(9, 10 + i).Formula2R1C1 = "=SUMIFS(R[-7]C[" & -(6 + i) & "]:R[" & lastrow3 - 2 & "]C[" & -(6 + i) & "],R[-7]C[" & -(4 + i) & "]:R[" & lastrow3 - 2 & "]C[" & -(4 + i) & "],RC10,R[-7]C[" & -(3 + i) & "]:R[" & lastrow3 - 2 & "]C[" & -(3 + i) & "],R[-4]C" & 10 + i & ")"
+    Cells(10, 10 + i).Formula2R1C1 = "=SUMIFS(R[-8]C[" & -(6 + i) & "]:R[" & lastrow3 - 2 & "]C[" & -(6 + i) & "],R[-8]C[" & -(4 + i) & "]:R[" & lastrow3 - 2 & "]C[" & -(4 + i) & "],RC10,R[-8]C[" & -(3 + i) & "]:R[" & lastrow3 - 2 & "]C[" & -(3 + i) & "],R[-5]C" & 10 + i & ")"
+    Cells(11, 10 + i).Formula2R1C1 = "=SUMIFS(R[-9]C[" & -(6 + i) & "]:R[" & lastrow3 - 2 & "]C[" & -(6 + i) & "],R[-9]C[" & -(4 + i) & "]:R[" & lastrow3 - 2 & "]C[" & -(4 + i) & "],RC10,R[-9]C[" & -(3 + i) & "]:R[" & lastrow3 - 2 & "]C[" & -(3 + i) & "],R[-6]C" & 10 + i & ")"
+    Cells(12, 10 + i).Formula2R1C1 = "=SUMIFS(R[-10]C[" & -(6 + i) & "]:R[" & lastrow3 - 2 & "]C[" & -(6 + i) & "],R[-10]C[" & -(4 + i) & "]:R[" & lastrow3 - 2 & "]C[" & -(4 + i) & "],"""",R[-10]C[" & -(3 + i) & "]:R[" & lastrow3 - 2 & "]C[" & -(3 + i) & "],R[-7]C" & 10 + i & ")-R[1]C"
+    Cells(13, 10 + i).Formula2R1C1 = "=SUMIFS(R[-11]C[" & -(6 + i) & "]:R[" & lastrow3 - 2 & "]C[" & -(6 + i) & "],R[-11]C[-10]:R[" & lastrow3 - 2 & "]C[-10],""*RSB*"",R[-11]C[-4]:R[" & lastrow - 2 & "]C[-4],R[-8]C" & 10 + i & ")"
+    Cells(15, 10 + i).Formula2R1C1 = "=SUM(R[-9]C" & 10 + i & ":R[-2]C" & 10 + i & ")"
+    Cells(16, 10 + i).Formula2R1C1 = "=R[-13]C"
+  Next i
+'    'TOS KR 02 + KR 05
+'                Range("M6").Formula2R1C1 = "=SUMIFS(R[-4]C[" & -(8 + i) & "]:R[" & lastrow - 2 & "]C[-9],R[-4]C[-7]:R[" & lastrow - 2 & "]C[-7],RC[-3],R[-4]C[-6]:R[" & lastrow - 2 & "]C[-6],""TOS KR 02"")+SUMIFS(R[-4]C[-9]:R[" & lastrow - 2 & "]C[-9],R[-4]C[-7]:R[" & lastrow - 2 & "]C[-7],RC[-3],R[-4]C[-6]:R[" & lastrow - 2 & "]C[-6],""TOS KR 05"")"
+'    Range("M7").Formula2R1C1 = "=SUMIFS(R[-5]C[" & -(8 + i) & "]:R[" & lastrow - 2 & "]C[-9],R[-5]C[-7]:R[" & lastrow - 2 & "]C[-7],RC[-3],R[-5]C[-6]:R[" & lastrow - 2 & "]C[-6],""TOS KR 02"")+SUMIFS(R[-5]C[-9]:R[" & lastrow - 2 & "]C[-9],R[-5]C[-7]:R[" & lastrow - 2 & "]C[-7],RC[-3],R[-5]C[-6]:R[" & lastrow - 2 & "]C[-6],""TOS KR 05"")"
+'    Range("M8").Formula2R1C1 = "=SUMIFS(R[-6]C[" & -(8 + i) & "]:R[" & lastrow - 2 & "]C[-9],R[-6]C[-7]:R[" & lastrow - 2 & "]C[-7],RC[-3],R[-6]C[-6]:R[" & lastrow - 2 & "]C[-6],""TOS KR 02"")+SUMIFS(R[-6]C[-9]:R[" & lastrow - 2 & "]C[-9],R[-6]C[-7]:R[" & lastrow - 2 & "]C[-7],RC[-3],R[-6]C[-6]:R[" & lastrow - 2 & "]C[-6],""TOS KR 05"")"
+'    Range("M9").Formula2R1C1 = "=SUMIFS(R[-7]C[" & -(8 + i) & "]:R[" & lastrow - 2 & "]C[-9],R[-7]C[-7]:R[" & lastrow - 2 & "]C[-7],RC[-3],R[-7]C[-6]:R[" & lastrow - 2 & "]C[-6],""TOS KR 02"")+SUMIFS(R[-7]C[-9]:R[" & lastrow - 2 & "]C[-9],R[-7]C[-7]:R[" & lastrow - 2 & "]C[-7],RC[-3],R[-7]C[-6]:R[" & lastrow - 2 & "]C[-6],""TOS KR 05"")"
+'    Range("M10").Formula2R1C1 = "=SUMIFS(R[-8]C[" & -(8 + i) & "]:R[" & lastrow - 2 & "]C[-9],R[-8]C[-7]:R[" & lastrow - 2 & "]C[-7],RC[-3],R[-8]C[-6]:R[" & lastrow - 2 & "]C[-6],""TOS KR 02"")+SUMIFS(R[-8]C[-9]:R[" & lastrow - 2 & "]C[-9],R[-8]C[-7]:R[" & lastrow - 2 & "]C[-7],RC[-3],R[-8]C[-6]:R[" & lastrow - 2 & "]C[-6],""TOS KR 05"")"
+'    Range("M11").Formula2R1C1 = "=SUMIFS(R[-9]C[" & -(8 + i) & "]:R[" & lastrow - 2 & "]C[-9],R[-9]C[-7]:R[" & lastrow - 2 & "]C[-7],RC[-3],R[-9]C[-6]:R[" & lastrow - 2 & "]C[-6],""TOS KR 02"")+SUMIFS(R[-9]C[-9]:R[" & lastrow - 2 & "]C[-9],R[-9]C[-7]:R[" & lastrow - 2 & "]C[-7],RC[-3],R[-9]C[-6]:R[" & lastrow - 2 & "]C[-6],""TOS KR 05"")"
+'    Range("M12").Formula2R1C1 = "=SUMIFS(R[-10]C[" & -(8 + i) & "]:R[" & lastrow - 2 & "]C[-9],R[-10]C[-7]:R[" & lastrow - 2 & "]C[-7],"""",R[-10]C[-6]:R[" & lastrow - 2 & "]C[-6],""TOS KR 02"")+SUMIFS(R[-10]C[-9]:R[" & lastrow - 2 & "]C[-9],R[-10]C[-7]:R[" & lastrow - 2 & "]C[-7],"""",R[-10]C[-6]:R[" & lastrow - 2 & "]C[-6],""TOS KR 05"")-R[1]C"
+'    Range("M13").Formula2R1C1 = "=SUMIFS(R[-11]C[" & -(8 + i) & "]:R[" & lastrow - 2 & "]C[-9],R[-11]C[-12]:R[" & lastrow - 2 & "]C[-12],""*RSB*"",R[-11]C[-6]:R[" & lastrow - 2 & "]C[-6],""TOS KR 02"")+SUMIFS(R[-11]C[-9]:R[" & lastrow - 2 & "]C[-9],R[-11]C[-12]:R[" & lastrow - 2 & "]C[-12],""*RSB*"",R[-11]C[-6]:R[" & lastrow - 2 & "]C[-6],""TOS KR 05"")"
+'    Range("M15").Formula2R1C1 = "=SUM(R[-9]C:R[-2]C)"
+'    Range("M16").Formula2R1C1 = "=R[-13]C+R[-13]C[1]"
+'
+'    'TOS KR 04 + KR 03
+'    Range("O6").Formula2R1C1 = "=SUMIFS(R[-4]C[-11]:R[" & lastrow - 2 & "]C[-11],R[-4]C[-9]:R[" & lastrow - 2 & "]C[-9],RC[-5],R[-4]C[-8]:R[" & lastrow - 2 & "]C[-8],""TOS KR 04"")+SUMIFS(R[-4]C[-11]:R[" & lastrow - 2 & "]C[-11],R[-4]C[-9]:R[" & lastrow - 2 & "]C[-9],RC[-5],R[-4]C[-8]:R[" & lastrow - 2 & "]C[-8],""TOS KR 07"")"
+'    Range("O7").Formula2R1C1 = "=SUMIFS(R[-5]C[-11]:R[" & lastrow - 2 & "]C[-11],R[-5]C[-9]:R[" & lastrow - 2 & "]C[-9],RC[-5],R[-5]C[-8]:R[" & lastrow - 2 & "]C[-8],""TOS KR 04"")+SUMIFS(R[-5]C[-11]:R[" & lastrow - 2 & "]C[-11],R[-5]C[-9]:R[" & lastrow - 2 & "]C[-9],RC[-5],R[-5]C[-8]:R[" & lastrow - 2 & "]C[-8],""TOS KR 07"")"
+'    Range("O8").Formula2R1C1 = "=SUMIFS(R[-6]C[-11]:R[" & lastrow - 2 & "]C[-11],R[-6]C[-9]:R[" & lastrow - 2 & "]C[-9],RC[-5],R[-6]C[-8]:R[" & lastrow - 2 & "]C[-8],""TOS KR 04"")+SUMIFS(R[-6]C[-11]:R[" & lastrow - 2 & "]C[-11],R[-6]C[-9]:R[" & lastrow - 2 & "]C[-9],RC[-5],R[-6]C[-8]:R[" & lastrow - 2 & "]C[-8],""TOS KR 07"")"
+'    Range("O9").Formula2R1C1 = "=SUMIFS(R[-7]C[-11]:R[" & lastrow - 2 & "]C[-11],R[-7]C[-9]:R[" & lastrow - 2 & "]C[-9],RC[-5],R[-7]C[-8]:R[" & lastrow - 2 & "]C[-8],""TOS KR 04"")+SUMIFS(R[-7]C[-11]:R[" & lastrow - 2 & "]C[-11],R[-7]C[-9]:R[" & lastrow - 2 & "]C[-9],RC[-5],R[-7]C[-8]:R[" & lastrow - 2 & "]C[-8],""TOS KR 07"")"
+'    Range("O10").Formula2R1C1 = "=SUMIFS(R[-8]C[-11]:R[" & lastrow - 2 & "]C[-11],R[-8]C[-9]:R[" & lastrow - 2 & "]C[-9],RC[-5],R[-8]C[-8]:R[" & lastrow - 2 & "]C[-8],""TOS KR 04"")+SUMIFS(R[-8]C[-11]:R[" & lastrow - 2 & "]C[-11],R[-8]C[-9]:R[" & lastrow - 2 & "]C[-9],RC[-5],R[-8]C[-8]:R[" & lastrow - 2 & "]C[-8],""TOS KR 07"")"
+'    Range("O11").Formula2R1C1 = "=SUMIFS(R[-9]C[-11]:R[" & lastrow - 2 & "]C[-11],R[-9]C[-9]:R[" & lastrow - 2 & "]C[-9],RC[-5],R[-9]C[-8]:R[" & lastrow - 2 & "]C[-8],""TOS KR 04"")+SUMIFS(R[-9]C[-11]:R[" & lastrow - 2 & "]C[-11],R[-9]C[-9]:R[" & lastrow - 2 & "]C[-9],RC[-5],R[-9]C[-8]:R[" & lastrow - 2 & "]C[-8],""TOS KR 07"")"
+'    Range("O12").Formula2R1C1 = "=SUMIFS(R[-10]C[-11]:R[" & lastrow - 2 & "]C[-11],R[-10]C[-9]:R[" & lastrow - 2 & "]C[-9],"""",R[-10]C[-8]:R[" & lastrow - 2 & "]C[-8],""TOS KR 04"")+SUMIFS(R[-10]C[-11]:R[" & lastrow - 2 & "]C[-11],R[-10]C[-9]:R[" & lastrow - 2 & "]C[-9],"""",R[-10]C[-8]:R[" & lastrow - 2 & "]C[-8],""TOS KR 07"")-R[1]C"
+'    Range("O13").Formula2R1C1 = "=SUMIFS(R[-11]C[-11]:R[" & lastrow - 2 & "]C[-11],R[-11]C[-14]:R[" & lastrow - 2 & "]C[-14],""*RSB*"",R[-11]C[-8]:R[" & lastrow - 2 & "]C[-8],""TOS KR 04"")+SUMIFS(R[-11]C[-11]:R[" & lastrow - 2 & "]C[-11],R[-11]C[-14]:R[" & lastrow - 2 & "]C[-14],""*RSB*"",R[-11]C[-8]:R[" & lastrow - 2 & "]C[-8],""TOS KR 07"")"
+'    Range("O15").Formula2R1C1 = "=SUM(R[-9]C:R[-2]C)"
+'    Range("O16").Formula2R1C1 = "=R[-13]C+R[-13]C[1]"
+''    Range("Q16").Formula2R1C1 = "=SUM(RC[-6]:RC[-2])"
+'
+'
+'    'TOS KR 08
+'    Range("Q6").Formula2R1C1 = "=SUMIFS(R[-4]C[-13]:R[" & lastrow - 2 & "]C[-13],R[-4]C[-11]:R[" & lastrow - 2 & "]C[-11],RC[-7],R[-4]C[-10]:R[" & lastrow - 2 & "]C[-10],""TOS KR 08"")+SUMIFS(R[-4]C[-13]:R[" & lastrow - 2 & "]C[-13],R[-4]C[-11]:R[" & lastrow - 2 & "]C[-11],RC[-7],R[-4]C[-10]:R[" & lastrow - 2 & "]C[-10],""TOS KR 08"")"
+'    Range("Q7").Formula2R1C1 = "=SUMIFS(R[-5]C[-13]:R[" & lastrow - 2 & "]C[-13],R[-5]C[-11]:R[" & lastrow - 2 & "]C[-11],RC[-7],R[-5]C[-10]:R[" & lastrow - 2 & "]C[-10],""TOS KR 08"")+SUMIFS(R[-5]C[-13]:R[" & lastrow - 2 & "]C[-13],R[-5]C[-11]:R[" & lastrow - 2 & "]C[-11],RC[-7],R[-5]C[-10]:R[" & lastrow - 2 & "]C[-10],""TOS KR 08"")"
+'    Range("Q8").Formula2R1C1 = "=SUMIFS(R[-6]C[-13]:R[" & lastrow - 2 & "]C[-13],R[-6]C[-11]:R[" & lastrow - 2 & "]C[-11],RC[-7],R[-6]C[-10]:R[" & lastrow - 2 & "]C[-10],""TOS KR 08"")+SUMIFS(R[-6]C[-13]:R[" & lastrow - 2 & "]C[-13],R[-6]C[-11]:R[" & lastrow - 2 & "]C[-11],RC[-7],R[-6]C[-10]:R[" & lastrow - 2 & "]C[-10],""TOS KR 08"")"
+'    Range("Q9").Formula2R1C1 = "=SUMIFS(R[-7]C[-13]:R[" & lastrow - 2 & "]C[-13],R[-7]C[-11]:R[" & lastrow - 2 & "]C[-11],RC[-7],R[-7]C[-10]:R[" & lastrow - 2 & "]C[-10],""TOS KR 08"")+SUMIFS(R[-7]C[-13]:R[" & lastrow - 2 & "]C[-13],R[-7]C[-11]:R[" & lastrow - 2 & "]C[-11],RC[-7],R[-7]C[-10]:R[" & lastrow - 2 & "]C[-10],""TOS KR 08"")"
+'    Range("Q10").Formula2R1C1 = "=SUMIFS(R[-8]C[-13]:R[" & lastrow - 2 & "]C[-13],R[-8]C[-11]:R[" & lastrow - 2 & "]C[-11],RC[-7],R[-8]C[-10]:R[" & lastrow - 2 & "]C[-10],""TOS KR 08"")+SUMIFS(R[-8]C[-13]:R[" & lastrow - 2 & "]C[-13],R[-8]C[-11]:R[" & lastrow - 2 & "]C[-11],RC[-7],R[-8]C[-10]:R[" & lastrow - 2 & "]C[-10],""TOS KR 08"")"
+'    Range("Q11").Formula2R1C1 = "=SUMIFS(R[-9]C[-13]:R[" & lastrow - 2 & "]C[-13],R[-9]C[-11]:R[" & lastrow - 2 & "]C[-11],RC[-7],R[-9]C[-10]:R[" & lastrow - 2 & "]C[-10],""TOS KR 08"")+SUMIFS(R[-9]C[-13]:R[" & lastrow - 2 & "]C[-13],R[-9]C[-11]:R[" & lastrow - 2 & "]C[-11],RC[-7],R[-9]C[-10]:R[" & lastrow - 2 & "]C[-10],""TOS KR 08"")"
+'    Range("Q12").Formula2R1C1 = "=SUMIFS(R[-10]C[-13]:R[" & lastrow - 2 & "]C[-13],R[-10]C[-11]:R[" & lastrow - 2 & "]C[-11],"""",R[-10]C[-10]:R[" & lastrow - 2 & "]C[-10],""TOS KR 08"")-R[1]C"
+'    Range("Q13").Formula2R1C1 = "=SUMIFS(R[-11]C[-13]:R[" & lastrow - 2 & "]C[-13],R[-11]C[-16]:R[" & lastrow - 2 & "]C[-16],""*RSB*"",R[-11]C[-10]:R[" & lastrow - 2 & "]C[-10],""TOS KR 08"")+SUMIFS(R[-11]C[-13]:R[" & lastrow - 2 & "]C[-13],R[-11]C[-16]:R[" & lastrow - 2 & "]C[-16],""*RSB*"",R[-11]C[-10]:R[" & lastrow - 2 & "]C[-10],""TOS KR 08"")"
+'    Range("Q15").Formula2R1C1 = "=SUM(R[-9]C:R[-2]C)"
+'    Range("Q16").Formula2R1C1 = "=R[-13]C"
+    
+
+    Cells(15, lColumn2 + 1).Formula2R1C1 = "=SUM(RC11:RC[-1])"
+ 
+    
+
+    Range(Cells(3, 11), Cells(3, lColumn2)).NumberFormat = "0.000"
+
+     Range(Cells(3, 11), Cells(3, lColumn2)).NumberFormat = "#,##0.00"
+
+  
+    Range(Cells(6, 11), Cells(16, lColumn2)).NumberFormat = "#,##0.00"
+    
+    
+    ActiveSheet.Range(Cells(2, lColumn2 + 1), Cells(3, lColumn2 + 1)).Font.Bold = True
+    ActiveSheet.Cells(15, lColumn2 + 1).Font.Bold = True
+    
+
+    
+    
+    
+    End If
+    
+  
+
+End Sub
+
+
+
+Sub AddNewSheet(control As IRibbonControl)
+    Dim test As Worksheet
+    Sheets(Sheets.Count).Copy after:=Sheets(Sheets.Count)
+    Set test = ActiveSheet
+    'test.Name = "copied sheet!"
+    
+    lastrow = Cells(Rows.Count, "A").End(xlUp).Row
+    ActiveSheet.Range("B1:B" & lastrow).HorizontalAlignment = xlLeft
+End Sub
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-------------------------------------------------------------------------------
+VBA MACRO cek.bas 
+in file: x2/xl/vbaProject.bin - OLE stream: 'VBA/cek'
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+Sub compare_cols(control As IRibbonControl)
+
+If Range("A1").Value2 = "No" Then
+
+    Dim i As Integer, j As Integer
+    Dim lastrow As Integer
+
+ Application.DisplayAlerts = False
+     vFileName = Application.GetOpenFilename(FileFilter:="DBF Files(*.dbf; *.dbf), *.dbf; *.dbf", Title:="open")
+
+    If vFileName = False Then
+         Application.ScreenUpdating = True
+    Exit Sub
+    End If
+
+    Application.ScreenUpdating = False
+
+
+    Workbooks.OpenText FILENAME:=vFileName
+    Set wkb = ActiveWorkbook
+'================================================================================================================ Rapikan
+Columns(5).Cut
+Columns(1).Insert shift:=xlToRight
+Columns(5).Cut
+Columns(8).Insert shift:=xlToRight
+Columns(1).ColumnWidth = 9
+Columns(2).ColumnWidth = 14
+Columns(3).ColumnWidth = 10
+Columns(4).ColumnWidth = 10
+Columns(5).ColumnWidth = 10
+Columns(6).ColumnWidth = 10
+Columns(7).ColumnWidth = 10
+Columns(8).ColumnWidth = 10
+Columns(9).ColumnWidth = 10
+lastrow = Cells(Rows.Count, "A").End(xlUp).Row
+Range(Cells(1, 2), Cells(lastrow, 4)).NumberFormat = "0.00"
+Range(Cells(1, 5), Cells(lastrow, 5)).NumberFormat = "dd/mmm/yy"
+ActiveSheet.UsedRange.Replace What:="Volume", Replacement:="Vol"
+ActiveSheet.Columns("A:G").VerticalAlignment = xlCenter
+ActiveSheet.Columns("A:G").HorizontalAlignment = xlCenter
+ActiveSheet.Rows(1).Font.Bold = True
+ActiveSheet.Columns("A").ColumnWidth = 12
+Set Rng = Range(Cells(1, 1), Cells(lastrow, 7))
+    With Rng.Borders
+        .LineStyle = xlContinuous
+        .Color = vbBlack
+        .Weight = xlThin
+    End With
+lastrow = Cells(Rows.Count, "A").End(xlUp).Row
+For i = 2 To lastrow
+    searchString = "NG"
+        If InStr(1, Cells(i, 1), searchString) > 0 Then
+            Cells(i, 3).FormulaR1C1 = "=RC[-1]/1.19 "
+            Cells(i, 4).FormulaR1C1 = "=RC[-1]*1.743 "
+        ElseIf InStr(1, Cells(i, 2), searchString) = 0 Then
+            Cells(i, 3).FormulaR1C1 = "=RC[-1]/1.157 "
+            Cells(i, 4).FormulaR1C1 = "=RC[-1]*1.705 "
+        End If
+    Next i
+For i = 2 To lastrow
+    searchString = "BOULDER"
+    If InStr(1, Cells(i, 1), searchString) > 0 Then
+        Cells(i, 3).FormulaR1C1 = "=RC[-1]/1.3 "
+        Cells(i, 4).FormulaR1C1 = "=RC[-1]*2.015 "
+    End If
+Next i
+
+For i = 1 To lastrow Step 1
+    Range(Cells(1, 7), Cells(i, 7)).Replace What:="Grizzly", Replacement:="TOS 332", Lookat:=xlPart, _
+    searchorder:=xlByColumns, MatchCase:=False, searchformat:=False, _
+    ReplaceFormat:=False
+Next i
+'============================================================================================================================================ end rapikan
+
+lastrowdbf = Cells(Rows.Count, 1).End(xlUp).Row
+ Range("A1:G" & lastrowdbf).Copy
+ 
+ 
+Set TosBalance = Workbooks.Open("D:\Daily Record\Tos Balance.xlsx")
+Set tb = TosBalance.Sheets(Sheets.Count)
+
+
+tb.Cells(1, 13).PasteSpecial xlPasteValues
+
+  wkb.Close SaveChanges:=False
+
+With tb
+    .Columns("M").ColumnWidth = 14
+    .Columns("N:S").ColumnWidth = 10
+    .Columns("H").Delete
+    .Range("H1").Value2 = "LCM"
+    .Range("I1").Value2 = "BCM"
+    .Range("J1").Value2 = "WMT"
+    .Range("K1").Value2 = "Lokasi"
+    
+    lastrowTosBalance = .Cells(.Rows.Count, 2).End(xlUp).Row
+    
+    For i = 2 To lastrowTosBalance
+        .Cells(i, 8).FormulaR1C1 = "=VLOOKUP(RC[-6],R2C12:R" & lastrowTosBalance & "C18,2,0)"
+        .Cells(i, 9).FormulaR1C1 = "=VLOOKUP(RC[-7],R2C12:R" & lastrowTosBalance & "C18,3,0)"
+        .Cells(i, 10).FormulaR1C1 = "=VLOOKUP(RC[-8],R2C12:R" & lastrowTosBalance & "C18,4,0)"
+        .Cells(i, 11).FormulaR1C1 = "=VLOOKUP(RC[-9],R2C12:R" & lastrowTosBalance & "C18,7,0)"
+    Next i
+    .Range(.Cells(2, 8), Cells(lastrowTosBalance, 11)).Value2 = .Range(.Cells(2, 8), Cells(lastrowTosBalance, 11)).Value2
+     .Range(.Cells(1, 8), Cells(lastrowTosBalance, 11)).HorizontalAlignment = xlCenter
+    .Columns("L:R").Delete
+End With
+
+Else
+If Range("A1").Value2 = "No_DOME" Then
+compareTosBalance
+End If
+
+End If
+End Sub
+
+
+Sub matchData(control As IRibbonControl)
+
+
+If Range("A1").Value2 = "No" Then
+
+Dim i As Integer, j As Integer
+    Dim lastrow As Integer
+
+ Application.DisplayAlerts = False
+     vFileName = Application.GetOpenFilename(FileFilter:="DBF Files(*.dbf; *.dbf), *.dbf; *.dbf", Title:="open")
+
+    If vFileName = False Then
+         Application.ScreenUpdating = True
+    Exit Sub
+    End If
+
+    Application.ScreenUpdating = False
+
+
+    Workbooks.OpenText FILENAME:=vFileName
+    Set wkb = ActiveWorkbook
+'================================================================================================================ Rapikan
+Columns(5).Cut
+Columns(1).Insert shift:=xlToRight
+Columns(5).Cut
+Columns(8).Insert shift:=xlToRight
+Columns(1).ColumnWidth = 9
+Columns(2).ColumnWidth = 14
+Columns(3).ColumnWidth = 10
+Columns(4).ColumnWidth = 10
+Columns(5).ColumnWidth = 10
+Columns(6).ColumnWidth = 10
+Columns(7).ColumnWidth = 10
+Columns(8).ColumnWidth = 10
+Columns(9).ColumnWidth = 10
+lastrow = Cells(Rows.Count, "A").End(xlUp).Row
+Range(Cells(1, 2), Cells(lastrow, 4)).NumberFormat = "0.00"
+Range(Cells(1, 5), Cells(lastrow, 5)).NumberFormat = "dd/mmm/yy"
+ActiveSheet.UsedRange.Replace What:="Volume", Replacement:="Vol"
+ActiveSheet.Columns("A:G").VerticalAlignment = xlCenter
+ActiveSheet.Columns("A:G").HorizontalAlignment = xlCenter
+ActiveSheet.Rows(1).Font.Bold = True
+ActiveSheet.Columns("A").ColumnWidth = 12
+Set Rng = Range(Cells(1, 1), Cells(lastrow, 7))
+    With Rng.Borders
+        .LineStyle = xlContinuous
+        .Color = vbBlack
+        .Weight = xlThin
+    End With
+lastrow = Cells(Rows.Count, "A").End(xlUp).Row
+For i = 2 To lastrow
+    searchString = "NG"
+        If InStr(1, Cells(i, 1), searchString) > 0 Then
+            Cells(i, 3).FormulaR1C1 = "=RC[-1]/1.19 "
+            Cells(i, 4).FormulaR1C1 = "=RC[-1]*1.743 "
+        ElseIf InStr(1, Cells(i, 2), searchString) = 0 Then
+            Cells(i, 3).FormulaR1C1 = "=RC[-1]/1.157 "
+            Cells(i, 4).FormulaR1C1 = "=RC[-1]*1.705 "
+        End If
+    Next i
+For i = 2 To lastrow
+    searchString = "BOULDER"
+    If InStr(1, Cells(i, 1), searchString) > 0 Then
+        Cells(i, 3).FormulaR1C1 = "=RC[-1]/1.3 "
+        Cells(i, 4).FormulaR1C1 = "=RC[-1]*2.015 "
+    End If
+Next i
+
+For i = 1 To lastrow Step 1
+    Range(Cells(1, 7), Cells(i, 7)).Replace What:="Grizzly", Replacement:="TOS 332", Lookat:=xlPart, _
+    searchorder:=xlByColumns, MatchCase:=False, searchformat:=False, _
+    ReplaceFormat:=False
+Next i
+'============================================================================================================================================ end rapikan
+
+lastrowdbf = Cells(Rows.Count, 1).End(xlUp).Row
+ Range("A1:G" & lastrowdbf).Copy
+ 
+ 
+Set TosBalance = Workbooks.Open("D:\Daily Record\Tos Balance.xlsx")
+Set tb = TosBalance.Sheets(Sheets.Count)
+
+
+tb.Cells(1, 9).PasteSpecial xlPasteValues
+
+  wkb.Close SaveChanges:=False
+
+
+
+With tb
+
+    
+    lastrowTb = .Cells(.Rows.Count, 2).End(xlUp).Row
+    
+    For i = 2 To lastrowTb
+        .Cells(i, 8).Value2 = i - 1
+        .Cells(i, 16).FormulaR1C1 = "=IFERROR(MATCH(RC[-7],R2C2:R" & lastrowTb & "C2,0),0)"
+        .Cells(i, 17).FormulaR1C1 = "=IFERROR(MATCH(RC[-7],R2C3:R" & lastrowTb & "C3,0),0)"
+        .Cells(i, 18).FormulaR1C1 = "=IFERROR(MATCH(RC[-7],R2C4:R" & lastrowTb & "C4,0),0)"
+        .Cells(i, 19).FormulaR1C1 = "=IFERROR(MATCH(RC[-7],R2C5:R" & lastrowTb & "C5,0),0)"
+        .Cells(i, 20).FormulaR1C1 = "=IFERROR(VLOOKUP(RC[-11],R2C2:R" & lastrowTb & "C6,5,0),0)"
+    Next i
+    
+    
+    For i = 2 To lastrowTb
+        If .Cells(i, 16).Value2 = 0 Then
+            .Cells(i, 9).Interior.Color = vbRed
+        End If
+        
+        If .Cells(i, 17).Value2 = 0 Then
+            .Cells(i, 10).Interior.Color = vbRed
+        End If
+        
+        If .Cells(i, 18).Value2 = 0 Then
+            .Cells(i, 11).Interior.Color = vbRed
+        End If
+        
+        If .Cells(i, 19).Value2 = 0 Then
+            .Cells(i, 12).Interior.Color = vbRed
+        End If
+        
+        If .Cells(i, 20).Value2 = 0 Then
+            .Cells(i, 15).Interior.Color = vbRed
+        End If
+        
+        
+    Next i
+   
+   .Range(.Cells(1, 8), .Cells(lastrowTb, 20)).HorizontalAlignment = xlCenter
+   
+       .Columns("P:T").EntireColumn.Delete
+End With
+
+
+Else
+
+If Range("A1").Value2 = "No_DOME" Then
+MatchTosBalance
+End If
+
+End If
+
+
+End Sub
+
+
+Sub compareTosBalance()
+
+Set wkb = ActiveWorkbook
+Set TosBalance = Workbooks.Open("D:\Daily Record\Tos Balance.xlsx")
+Set tb = TosBalance.Sheets(Sheets.Count)
+
+lastrowTb = tb.Cells(tb.Rows.Count, 2).End(xlUp).Row
+
+Range("A1:F" & lastrowTb).Copy
+wkb.Sheets(1).Range("I1").PasteSpecial
+Application.CutCopyMode = False
+
+With wkb.Sheets(1)
+    .Columns("J:N").ColumnWidth = 15
+    .Columns("J:N").HorizontalAlignment = xlCenter
+    .Activate
+End With
+
+End Sub
+
+
+Sub MatchTosBalance()
+Set wkb = ActiveWorkbook
+Set TosBalance = Workbooks.Open("D:\Daily Record\Tos Balance.xlsx")
+Set tb = TosBalance.Sheets(Sheets.Count)
+
+lastrowTb = tb.Cells(tb.Rows.Count, 2).End(xlUp).Row
+
+Range("A1:F" & lastrowTb).Copy
+wkb.Sheets(1).Range("I1").PasteSpecial xlPasteValues
+Application.CutCopyMode = False
+
+With wkb.Sheets(1)
+    lastrowdbf = .Cells(.Rows.Count, 1).End(xlUp).Row
+    .Columns("J:N").ColumnWidth = 15
+    .Columns("J:N").HorizontalAlignment = xlCenter
+    
+    For i = 2 To lastrowdbf
+    .Cells(i, 15).FormulaR1C1 = "=IFERROR(MATCH(RC[-5],R2C1:R" & lastrowdbf & "C1,0),0)"
+    .Cells(i, 16).FormulaR1C1 = "=IFERROR(MATCH(RC[-5],R2C2:R" & lastrowdbf & "C2,0),0)"
+    .Cells(i, 17).FormulaR1C1 = "=IFERROR(MATCH(RC[-5],R2C3:R" & lastrowdbf & "C3,0),0)"
+    .Cells(i, 18).FormulaR1C1 = "=IFERROR(MATCH(RC[-5],R2C4:R" & lastrowdbf & "C4,0),0)"
+    .Cells(i, 19).FormulaR1C1 = "=IFERROR(VLOOKUP(RC[-9],R2C1:R" & lastrowdbf & "C7,7,0),0)"
+    Next i
+    
+    For i = 2 To lastrowdbf
+        If .Cells(i, 15).Value2 = 0 Then
+            .Cells(i, 10).Interior.Color = vbRed
+        End If
+        
+        If .Cells(i, 16).Value2 = 0 Then
+            .Cells(i, 11).Interior.Color = vbRed
+        End If
+        
+        If .Cells(i, 17).Value2 = 0 Then
+            .Cells(i, 12).Interior.Color = vbRed
+        End If
+        
+        If .Cells(i, 18).Value2 = 0 Then
+            .Cells(i, 13).Interior.Color = vbRed
+        End If
+        
+        If .Cells(i, 19).Value2 = 0 Then
+            .Cells(i, 14).Interior.Color = vbRed
+        End If
+        
+    Next i
+    
+    .Columns("O:S").EntireColumn.Delete
+    
+End With
+    
+End Sub
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Sub UnmergeMulCells()
+    Set myRange = Application.Selection
+    Set myRange = Application.InputBox("Select one Range which contain merged Cells", "Bp-Survey2", myRange.Address, Type:=8)
+
+    For Each mycell In myRange
+        If mycell.MergeCells Then
+            With mycell.MergeArea
+                .UnMerge
+                .Formula = mycell.Formula
+            End With
+        End If
+    Next
+End Sub
+
+
+Sub Merge_Same_Cells()
+
+Application.DisplayAlerts = False
+
+Set myRange = Application.Selection
+Set myRange = Application.InputBox("Select one Range which contain merged Cells", "Bp-Survey2", myRange.Address, Type:=8)
+    
+Dim Rng As Range
+
+MergeCells:
+
+For Each Rng In myRange
+
+If Rng.Value = Rng.Offset(1, 0).Value And Rng.Value <> "" Then
+Range(Rng, Rng.Offset(1, 0)).Merge
+Range(Rng, Rng.Offset(1, 0)).HorizontalAlignment = xlCenter
+Range(Rng, Rng.Offset(1, 0)).VerticalAlignment = xlCenter
+GoTo MergeCells
+End If
+Next
+
+
+End Sub
+
+
+Sub offsetMerge()
+    Set myRange = Application.Selection
+    Set myRange = Application.InputBox("Select one Range which contain merged Cells", "Bp-Survey2", myRange.Address, Type:=8)
+
+    For Each mycell In myRange
+        If mycell.MergeCells Then
+            With mycell.MergeArea
+                mycell.Offset(0, -1).Resize(mycel.Rows.Count).Address
+            End With
+        End If
+    Next
+End Sub
+
+
+
+
+ Sub MergeB()
+    ' Merge Category (Column B) where sequentially matching rows exist while staying within the range of merged cells in Administration (Column A)
+    ' Turn off screen updating
+    Application.Calculation = xlCalculationManual
+    Application.ScreenUpdating = False
+    Application.DisplayAlerts = False
+    On Error Resume Next
+    Dim Current As Worksheet
+    Dim lrow As Long
+    Dim k As Long
+    Dim j As Long
+    Dim bRow As Long
+    Dim endRow As Long
+        For Each Current In ActiveWorkbook.Worksheets
+        bRow = 2
+        lrow = Cells(Rows.Count, 2).End(xlUp).Row
+        endRow = Cells(Rows.Count, 2).End(xlUp).Row
+MergeAgain:
+        Set rngMerge = Current.Range("B" & bRow & ":B" & lrow)
+                    For Each Cell In rngMerge
+                    If Cell.Offset(0, -1).MergeCells Then
+                        k = Cell.Offset(0, -1).MergeArea.Count
+                        j = Cell.Offset(0, -1).MergeArea.Row
+                        lastmergerow = j + k - 1
+                        m = k - 1
+                    End If
+                    Dim i As Integer
+                        For i = 1 To m
+                            If Cell.Value = Cell.Offset(1, 0).Value And IsEmpty(Cell) = False And bRow < lastmergerow Then
+                                Range(Cell, Cell.Offset(1, 0)).Merge
+                                bRow = bRow + 1
+                            Else
+                                bRow = bRow + 1
+                                lrow = lastmergerow
+                                If bRow > endRow Then
+                                    GoTo NextSheet
+                                End If
+                                If bRow > lrow Then
+                                    lrow = endRow
+                                End If
+                                GoTo MergeAgain
+                            End If
+                        Next i
+                                bRow = lastmergerow + 1
+                                lrow = endRow
+                                GoTo MergeAgain
+                    Next
+NextSheet:
+                Next Current
+    ' Turn screen updating back on
+    Application.Calculation = xlCalculationAutomatic
+    Application.ScreenUpdating = True
+    Application.DisplayAlerts = True
+    
+    End Sub
+
+
+
+Sub cariString(control As IRibbonControl)
+    Dim ws As Worksheet
+    Dim match As Range
+    Dim findMe As String
+    Dim findOffset As String
+    Dim lastrow As Integer
+    lastRow1 = ActiveSheet.Range("A:A").Rows.Count
+    lastrow = ActiveSheet.Cells(lastRow1, 1).End(xlUp).Row
+
+    Set ws = ThisWorkbook.ActiveSheet
+  
+    
+    For i = 1 To lastrow
+      Source = ActiveSheet.Cells(i, 1).Value
+    findstring = ActiveSheet.Cells(i, 3)
+
+    Set match = ws.Cells.Find(What:=findstring, LookIn:=xlValues)
+    findOffset = match.Offset(, 2).Value
+    Cells(i, 4).Value = findOffset
+    
+    Next i
+End Sub
+
+
+-------------------------------------------------------------------------------
+VBA MACRO FromExcel.bas 
+in file: x2/xl/vbaProject.bin - OLE stream: 'VBA/FromExcel'
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+Option Explicit
+
+Sub inputKoordinat(control As IRibbonControl)
+ Application.DisplayAlerts = False
+
+    On Error Resume Next
+    Sheets("Data").Delete
+    On Error GoTo 0
+
+   Sheets.Add after:=Sheets(Sheets.Count)
+    Sheets(Sheets.Count).Name = "Data"
+    ActiveWindow.Zoom = 80
+    'cek_expired
+    Sheets("Data").Select
+
+    With Sheets("Data")
+        .Cells(1, 1) = "    "
+        .Cells(1, 2) = "Northing"
+        .Cells(1, 3) = "Easting"
+        .Cells(1, 4) = "Elevasi"
+        .Cells(1, 5) = "No"
+        .Cells(1, 6) = "Kode"
+        
+        .Range(Cells(1, 2), Cells(1, 3)).ColumnWidth = 12
+        .Range(Cells(1, 1), Cells(1, 6)).Font.Bold = True
+        .Range(Cells(1, 1), Cells(1, 6)).HorizontalAlignment = xlCenter
+        .Range(Cells(1, 1), Cells(1, 6)).Interior.ColorIndex = 45
+      
+    End With
+End Sub
+
+Sub surpac_point()
+If sheetExists("Data") = False Or Range("A1") <> "String" Or Range("B1") <> "Northing" Or Range("C1") <> "Easting" Then
+    MsgBox "Klik Input Koordinat Terlebih dahulu", vbExclamation, "Prasaja Tips"
+    Exit Sub
+End If
+
+If Sheets("Data").Range("A2") = "" Or Sheets("Data").Range("B2") = "" Or Sheets("Data").Range("C2") = "" Then
+    MsgBox "Masukan nilai koordinat", vbExclamation, "Prasaja Tips"
+    Exit Sub
+End If
+
+
+pt2srpc_point
+surpac_save
+
+
+End Sub
+Sub pt2srpc()
+  Dim i As Integer
+  Dim lastrow As Long
+  Dim LBstr As String
+  
+   Sheets("Data").Copy
+ActiveSheet.Name = "Data"
+  With Sheets("Data")
+    If .Cells(1, 1).Value = "String" Then .Cells(1, 1).EntireRow.Delete
+  
+        For i = 1 To .Cells(.Rows.Count, 1).End(xlUp).Row
+        
+            'delete Patok B dan LB
+  
+            lastrow = Range("A" & Rows.Count).End(xlUp).Row
+            LBstr = Right(.Cells(i, 1), 2)
+    
+
+  
+            'delete LB
+            If LBstr = "LB" Then
+                .Range(Cells(i, 1), Cells(i, 1)).EntireRow.Delete
+            End If
+
+
+        Next i
+
+            For i = 1 To .Cells(.Rows.Count, 1).End(xlUp).Row
+  
+                If (Not (IsNumeric(Cells(i, 1)))) Then
+                    .Cells(i, 5).Value = .Cells(i, 1).Value
+                    .Cells(i, 1).Value = 16
+                End If
+                
+            Next i
+  End With
+    'delete blank row
+    On Error Resume Next
+    Columns("A").SpecialCells(xlCellTypeBlanks).EntireRow.Delete
+    
+     'delete duplicate
+    Range("A:F").RemoveDuplicates Columns:=5, Header:=xlNo
+  End Sub
+
+
+
+  Sub pt2srpc_point()
+     Sheets("Data").Copy
+ActiveSheet.Name = "Data"
+  With Sheets("Data")
+    If .Cells(1, 1).Value = "String" Then .Cells(1, 1).EntireRow.Delete
+  End With
+ 
+    With Sheets("Data")
+    Columns("A:A").Insert shift:=xlToLeft
+    Range("A1") = 1
+    Range("A2") = 3
+    Range("A1:A2").AutoFill Destination:=Range("A1", Range("B1").End(xlDown).Offset(0, -1)), Type:=xlFillDefault
+    
+    Range("H1") = 2
+    Range("H2") = 4
+    Range("I1:M1") = 0
+    Range("H1:H2").AutoFill Destination:=Range("H1", Range("A1").End(xlDown).Offset(0, 7)), Type:=xlFillDefault
+    Range("I1:M1").AutoFill Destination:=Range("I1", Range("A1").End(xlDown).Offset(0, 12)), Type:=xlFillDefault
+
+    
+    Range("H1", Range("M1").End(xlDown)).Cut Destination:=Range("A3").End(xlDown).Offset(1, 0)
+    
+    Range(Range("A1").End(xlDown), Range("G1")).Sort Key1:=Range("A1"), Order1:=xlAscending, Header:=xlGuess, _
+    OrderCustom:=1, MatchCase:=False, Orientation:=xlTopToBottom
+    
+    Columns("A").Delete shift:=xlToLeft
+    
+    Range(Cells(1, 1), Cells(2, 1)).EntireRow.Insert
+    Range(Cells(1, 1), Cells(2, 6)).Value = 0
+    
+    Range(Range("A1").End(xlDown).Offset(1, 0), Range("A1").End(xlDown).Offset(1, 0).Offset(0, 3)).Value = 0
+    Range("A1").End(xlDown).Offset(0, 4).Value = "END"
+    
+    
+    End With
+  End Sub
+  
+  
+  Sub surpac_save()
+Dim varResult As Variant
+
+varResult = Application.GetSaveAsFilename(FileFilter:="Surpac File(*.str), *.xlCSV", Title:="Save Surpac File", InitialFileName:="D:\")
+
+If varResult = False Then
+MsgBox "canceled"
+Exit Sub
+End If
+
+Application.DisplayAlerts = False
+ActiveWorkbook.SaveAs FILENAME:=varResult _
+        , FileFormat:=xlCSV, Password:="", WriteResPassword:="", _
+        ReadOnlyRecommended:=False, CreateBackup:=False
+        ActiveWindow.Close
+
+End Sub
+
+
+
+-------------------------------------------------------------------------------
+VBA MACRO Fungsi.bas 
+in file: x2/xl/vbaProject.bin - OLE stream: 'VBA/Fungsi'
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+Option Explicit
+Function sheetExists(sheetToFind As String) As Boolean
+    Dim Sheet As Object
+    sheetExists = False
+        For Each Sheet In Worksheets
+            If sheetToFind = Sheet.Name Then
+                sheetExists = True
+                Exit Function
+            End If
+        Next Sheet
+End Function
+
+Public Function FileInUse(sFileName) As Boolean
+    On Error Resume Next
+    Open sFileName For Binary Access Read Lock Read As #1
+    Close #1
+    FileInUse = IIf(Err.Number > 0, True, False)
+    On Error GoTo 0
+End Function
+
+Public Function PtInPoly(Polygon As Range, Xcoord As Double, Ycoord As Double) As Boolean
+  Dim x As Long, m As Double, b As Double, Poly As Variant, NumSidesCrossed As Long
+  Poly = Polygon
+  For x = 1 To UBound(Poly) - 1
+    If Poly(x, 1) > Xcoord Xor Poly(x + 1, 1) > Xcoord Then
+      m = (Poly(x + 1, 2) - Poly(x, 2)) / (Poly(x + 1, 1) - Poly(x, 1))
+      b = (Poly(x, 2) * Poly(x + 1, 1) - Poly(x, 1) * Poly(x + 1, 2)) / (Poly(x + 1, 1) - Poly(x, 1))
+      If m * Xcoord + b > Ycoord Then NumSidesCrossed = NumSidesCrossed + 1
+    End If
+  Next
+  PtInPoly = NumSidesCrossed Mod 2
+End Function
+
+
+Function WorkSheetExists(ByVal strName As String) As Boolean
+   On Error Resume Next
+   WorkSheetExists = Not ActiveWorkbook.Worksheets(strName) Is Nothing
+End Function
+-------------------------------------------------------------------------------
+VBA MACRO Filter.bas 
+in file: x2/xl/vbaProject.bin - OLE stream: 'VBA/Filter'
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+Sub filterTOSKR4(control As IRibbonControl)
+Dim lastrow As Long
+
+With ActiveSheet
+ lastrow = .Cells(.Rows.Count, "A").End(xlUp).Row
+ 
+If Range("A1").Value = "No" Then
+ .AutoFilterMode = False
+    .Range("F1:F" & lastrow).AutoFilter , Field:=1, Criteria1:="TOS KR 04"
+ElseIf Range("A1").Value = "No_DOME" Then
+ .AutoFilterMode = False
+    .Range("G1:H" & lastrow).AutoFilter , Field:=1, Criteria1:="TOS KR 04"
+End If
+End With
+End Sub
+
+Sub filterTOSKR6(control As IRibbonControl)
+Dim lastrow As Long
+
+With ActiveSheet
+ lastrow = .Cells(.Rows.Count, "A").End(xlUp).Row
+ 
+ If Range("A1").Value = "No" Then
+ .AutoFilterMode = False
+    .Range("F1:F" & lastrow).AutoFilter , Field:=1, Criteria1:="TOS KR 06"
+ ElseIf Range("A1").Value = "No_DOME" Then
+ .AutoFilterMode = False
+    .Range("G1:H" & lastrow).AutoFilter , Field:=1, Criteria1:="TOS KR 06"
+ End If
+End With
+End Sub
+
+
+Sub filterTOSKR2(control As IRibbonControl)
+Dim lastrow As Long
+
+With ActiveSheet
+ lastrow = .Cells(.Rows.Count, "A").End(xlUp).Row
+ 
+ If Range("A1").Value = "No" Then
+ .AutoFilterMode = False
+    .Range("F1:F" & lastrow).AutoFilter , Field:=1, Criteria1:="TOS KR 02"
+ ElseIf Range("A1").Value = "No_DOME" Then
+ .AutoFilterMode = False
+    .Range("G1:H" & lastrow).AutoFilter , Field:=1, Criteria1:="TOS KR 02"
+ End If
+End With
+End Sub
+
+
+Sub filterTOSKR7(control As IRibbonControl)
+Dim lastrow As Long
+
+With ActiveSheet
+ lastrow = .Cells(.Rows.Count, "A").End(xlUp).Row
+ 
+ If Range("A1").Value = "No" Then
+ .AutoFilterMode = False
+    .Range("F1:F" & lastrow).AutoFilter , Field:=1, Criteria1:="TOS KR 07"
+ ElseIf Range("A1").Value = "No_DOME" Then
+ .AutoFilterMode = False
+    .Range("G1:H" & lastrow).AutoFilter , Field:=1, Criteria1:="TOS KR 07"
+ End If
+End With
+End Sub
+
+Sub filterTOSMTM01(control As IRibbonControl)
+Dim lastrow As Long
+
+With ActiveSheet
+ lastrow = .Cells(.Rows.Count, "A").End(xlUp).Row
+ 
+ If Range("A1").Value = "No" Then
+ .AutoFilterMode = False
+    .Range("F1:F" & lastrow).AutoFilter , Field:=1, Criteria1:="TOS MTM 01"
+ ElseIf Range("A1").Value = "No_DOME" Then
+ .AutoFilterMode = False
+    .Range("G1:H" & lastrow).AutoFilter , Field:=1, Criteria1:="TOS MTM 01"
+ End If
+End With
+End Sub
+Sub filterTOSPPP02(control As IRibbonControl)
+Dim lastrow As Long
+
+With ActiveSheet
+ lastrow = .Cells(.Rows.Count, "A").End(xlUp).Row
+ 
+ If Range("A1").Value = "No" Then
+ .AutoFilterMode = False
+    .Range("F1:F" & lastrow).AutoFilter , Field:=1, Criteria1:="TOS PPP 02"
+
+ ElseIf Range("A1").Value = "No_DOME" Then
+ .AutoFilterMode = False
+    .Range("G1:H" & lastrow).AutoFilter , Field:=1, Criteria1:="TOS PPP 02"
+ End If
+End With
+End Sub
+
+Sub filterTOSPPP01(control As IRibbonControl)
+Dim lastrow As Long
+
+With ActiveSheet
+ lastrow = .Cells(.Rows.Count, "A").End(xlUp).Row
+ 
+ If Range("A1").Value = "No" Then
+ .AutoFilterMode = False
+    .Range("F1:F" & lastrow).AutoFilter , Field:=1, Criteria1:="TOS PPP 01"
+
+ ElseIf Range("A1").Value = "No_DOME" Then
+ .AutoFilterMode = False
+    .Range("G1:H" & lastrow).AutoFilter , Field:=1, Criteria1:="TOS PPP 01"
+ End If
+End With
+End Sub
+
+Sub filterTOSSMA01(control As IRibbonControl)
+Dim lastrow As Long
+
+With ActiveSheet
+ lastrow = .Cells(.Rows.Count, "A").End(xlUp).Row
+ 
+ If Range("A1").Value = "No" Then
+ .AutoFilterMode = False
+    .Range("F1:F" & lastrow).AutoFilter , Field:=1, Criteria1:="TOS TF SMA 01"
+
+ ElseIf Range("A1").Value = "No_DOME" Then
+ .AutoFilterMode = False
+    .Range("G1:H" & lastrow).AutoFilter , Field:=1, Criteria1:="TOS TF SMA 01"
+ End If
+End With
+End Sub
+
+Sub filterTOSSMA02(control As IRibbonControl)
+Dim lastrow As Long
+
+With ActiveSheet
+ lastrow = .Cells(.Rows.Count, "A").End(xlUp).Row
+ 
+ If Range("A1").Value = "No" Then
+ .AutoFilterMode = False
+    .Range("F1:F" & lastrow).AutoFilter , Field:=1, Criteria1:="TOS TF SMA 02"
+
+ ElseIf Range("A1").Value = "No_DOME" Then
+ .AutoFilterMode = False
+    .Range("G1:H" & lastrow).AutoFilter , Field:=1, Criteria1:="TOS TF SMA 02"
+ End If
+End With
+End Sub
+
+Sub filterTOSSMA03(control As IRibbonControl)
+Dim lastrow As Long
+
+With ActiveSheet
+ lastrow = .Cells(.Rows.Count, "A").End(xlUp).Row
+ 
+ If Range("A1").Value = "No" Then
+ .AutoFilterMode = False
+    .Range("F1:F" & lastrow).AutoFilter , Field:=1, Criteria1:="TOS TF SMA 03"
+
+ ElseIf Range("A1").Value = "No_DOME" Then
+ .AutoFilterMode = False
+    .Range("G1:H" & lastrow).AutoFilter , Field:=1, Criteria1:="TOS TF SMA 03"
+ End If
+End With
+End Sub
+Sub unfilter(control As IRibbonControl)
+ActiveSheet.AutoFilterMode = False
+End Sub
+
+
+
+-------------------------------------------------------------------------------
+VBA MACRO Sheet27.cls 
+in file: x2/xl/vbaProject.bin - OLE stream: 'VBA/Sheet27'
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+(empty macro)
+-------------------------------------------------------------------------------
+VBA MACRO Sheet2.cls 
+in file: x2/xl/vbaProject.bin - OLE stream: 'VBA/Sheet2'
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+(empty macro)
+-------------------------------------------------------------------------------
+VBA MACRO Sheet3.cls 
+in file: x2/xl/vbaProject.bin - OLE stream: 'VBA/Sheet3'
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+(empty macro)
+-------------------------------------------------------------------------------
+VBA MACRO Sheet4.cls 
+in file: x2/xl/vbaProject.bin - OLE stream: 'VBA/Sheet4'
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+(empty macro)
+-------------------------------------------------------------------------------
+VBA MACRO help.frm 
+in file: x2/xl/vbaProject.bin - OLE stream: 'VBA/help'
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+Private Sub btCancel_Click()
+Unload Me
+End Sub
+-------------------------------------------------------------------------------
+VBA MACRO surpac.bas 
+in file: x2/xl/vbaProject.bin - OLE stream: 'VBA/surpac'
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+Sub clockwise(control As IRibbonControl)
+Dim arr As Variant
+Dim Rng As Range
+Dim rng2 As Range
+Dim rng3 As Range
+
+Dim i As Long
+Dim rngFil As Range
+
+ Dim vFileName
+
+  
+Application.DisplayAlerts = False
+     vFileName = Application.GetOpenFilename(FileFilter:="text Files(*.str; *.str), *.str; *.str", Title:="open")
+
+    If vFileName = False Then
+         Application.ScreenUpdating = True
+    Exit Sub
+    End If
+
+    Application.ScreenUpdating = False
+
+
+    Workbooks.OpenText FILENAME:=vFileName, _
+        Origin:=xlMSDOS, Startrow:=1, DataType:=xlDelimited, TextQualifier:= _
+        xlTextQualifierNone, ConsecutiveDelimiter:=True, Tab:=True, Semicolon:=False, _
+        Comma:=True, Space:=False, Other:=False, OtherChar:="=", _
+        TrailingMinusNumbers:=True, Local:=True
+        
+'Northing
+    For i = 2 To ActiveSheet.Cells(ActiveSheet.Rows.Count, 1).End(xlUp).Row - 2
+        If Cells(i, 1) <> 0 Then
+            Cells(i, 8).FormulaR1C1 = "=RC[-6]+R[-1]C[-6]"
+        End If
+    Next i
+
+    lMulai = 3
+    For x = 4 To Range("A" & Rows.Count).End(xlUp).Row
+        If Cells(x, 1) = 0 Then
+            Cells(lMulai, 8).Formula = "=" & Cells(lMulai, 2).Address & "+" & Cells(x - 2, 2).Address
+            lMulai = x + 1  'blok berikutnya
+        End If
+    Next x
+
+'Easting
+  For i = 2 To ActiveSheet.Cells(ActiveSheet.Rows.Count, 1).End(xlUp).Row - 2
+        If Cells(i, 1) <> 0 Then
+            Cells(i, 9).FormulaR1C1 = "=RC[-6]-R[-1]C[-6]"
+        End If
+    Next i
+
+    lMulai = 3
+    For x = 4 To Range("A" & Rows.Count).End(xlUp).Row
+        If Cells(x, 1) = 0 Then
+            Cells(lMulai, 9).Formula = "=" & Cells(lMulai, 3).Address & "-" & Cells(x - 2, 3).Address
+            
+
+        'delete loop point
+            Range(Cells(lMulai - 2, 8), Cells(lMulai - 2, 9)).ClearContents
+            
+            
+            lMulai = x + 1  'blok berikutnya
+        End If
+    Next x
+
+
+
+'multiple result
+
+    For i = 2 To ActiveSheet.Cells(ActiveSheet.Rows.Count, 1).End(xlUp).Row - 2
+        If Cells(i, 9) <> 0 Then
+            Cells(i, 10).FormulaR1C1 = "=RC[-2]*R[]C[-1]"
+        End If
+    Next i
+    
+'Result
+        s = 1
+        For i = 3 To Range("A" & Rows.Count).End(xlUp).Row - 1
+            If Cells(i, 3) = 0 Then
+                Cells(i, 11).Formula = "=Sum(" & Cells(s, 10).Address & ":" & Cells(i - 1, 10).Address & ")"
+                s = i + 1  'blok berikutnya
+            End If
+        Next i
+    
+reverse
+    
+End Sub
+
+
+Sub reverse()
+
+Dim selection1 As Range
+Dim selection2 As Range
+
+Mulai = 3
+    For i = 3 To Range("A" & Rows.Count).End(xlUp).Row
+        If Cells(i, 11) < 0 Then
+            Cells(2, 11).Value2 = "Start"
+            Cells(i, 11).End(xlUp).Offset(1, -10).Value2 = 1
+            Cells(i, 11).End(xlUp).Offset(2, -10).Value2 = 2
+            
+            'Set selection1 = Range(Cells(i, 11).End(xlUp).Offset(-1, 0) & ":" & Cells(i, 11).End(xlUp))
+            'Set selection2 = Range(Cells(i, 11).End(xlUp).Offset(-1, 0) & ":" & Cells(i, 11).Offset(-1, 0))
+            Range(Cells(i, 11).End(xlUp).Offset(1, -10), Cells(i, 11).End(xlUp).Offset(2, -10)).AutoFill Destination:=Range(Cells(i, 11).End(xlUp).Offset(1, -10), Cells(i, 11).Offset(-1, -10)), Type:=xlFillDefault
+            'Range(Cells(i, 11).End(xlUp).Offset(1, -10), Cells(i, 11).Offset(-1, -10)).Value2 = 2
+            'Range(Cells(i, 11).End(xlUp).Offset(1, 0), Cells(i, 11).Offset(-1, 0)).Value2 = "A"
+            'Range(Cells(i + 1, 11).End(xlUp) & ":" & Cells(i - 1, 11)).Value2 = "A"
+            'Cells(i, 11).Offset(-1, -4).Value = "A"
+            
+            
+            Range(Cells(i, 11).End(xlUp).Offset(1, -10), Cells(i, 11).Offset(-1, -4)).Sort Key1:=Cells(i, 11).End(xlUp).Offset(1, -10), Order1:=xlDescending, Header:=xlNo
+            Range(Cells(i, 11).End(xlUp).Offset(1, -10), Cells(i, 11).Offset(-1, -10)).Value2 = 1
+          
+            
+        End If
+    Next i
+    
+
+  
+             Range(Columns(8), Columns(11)).Delete
+             
+             
+             
+ varResult = Application.GetSaveAsFilename(InitialFileName:=ActiveWorkbook.Name, FileFilter:="Surpac File(*.str), *.xlCSV", Title:="Save Surpac File")
+
+
+Application.DisplayAlerts = False
+ActiveWorkbook.SaveAs FILENAME:=varResult _
+        , FileFormat:=xlCSV, Password:="", WriteResPassword:="", _
+        ReadOnlyRecommended:=False, CreateBackup:=False
+        
+ActiveWorkbook.Saved = True
+ActiveWorkbook.Close
+
+
+End Sub
+
+    
+Sub id_tos(control As IRibbonControl)
+Dim arr As Variant
+Dim Rng As Range
+Dim rng2 As Range
+Dim rng3 As Range
+
+Dim i As Long
+Dim rngFil As Range
+
+Dim tosFileName
+Dim bdyFileName
+
+Dim tosBook As Workbook
+Dim bdyBook As Workbook
+Dim tosSheet As Worksheet
+
+Dim lastrow As Long
+Dim lastrowbdy As Long
+  
+Application.DisplayAlerts = False
+     tosFileName = Application.GetOpenFilename(FileFilter:="text Files(*.str; *.str), *.str; *.str", Title:="open")
+
+    If tosFileName = False Then
+         Application.ScreenUpdating = True
+    Exit Sub
+    End If
+
+    Application.ScreenUpdating = False
+
+
+    Workbooks.OpenText FILENAME:=tosFileName, _
+        Origin:=xlMSDOS, Startrow:=1, DataType:=xlDelimited, TextQualifier:= _
+        xlTextQualifierNone, ConsecutiveDelimiter:=True, Tab:=True, Semicolon:=False, _
+        Comma:=True, Space:=False, Other:=False, OtherChar:="=", _
+        TrailingMinusNumbers:=True, Local:=True
+        
+Dim xRg As Range
+
+lastrow = Cells(Rows.Count, "A").End(xlUp).Row
+
+Set xRg = Range("A1:A" & lastrow)
+xRg.AutoFilter 1, "<>1"
+ 
+xRg.Offset(1, 0).SpecialCells(xlCellTypeVisible).EntireRow.Delete
+ActiveSheet.AutoFilterMode = False
+Rows(1).EntireRow.Delete
+
+Columns("F:G").EntireColumn.Delete
+Columns("A").Delete
+
+Set tosBook = ActiveWorkbook
+
+Application.DisplayAlerts = False
+     bdyFileName = Application.GetOpenFilename(FileFilter:="text Files(*.str; *.str), *.str; *.str", Title:="open")
+
+    If bdyFileName = False Then
+         Application.ScreenUpdating = True
+    Exit Sub
+    End If
+
+    Application.ScreenUpdating = False
+
+
+    Workbooks.OpenText FILENAME:=bdyFileName, _
+        Origin:=xlMSDOS, Startrow:=1, DataType:=xlDelimited, TextQualifier:= _
+        xlTextQualifierNone, ConsecutiveDelimiter:=True, Tab:=True, Semicolon:=False, _
+        Comma:=True, Space:=False, Other:=False, OtherChar:="=", _
+        TrailingMinusNumbers:=True, Local:=True
+
+Set bdyBook = ActiveWorkbook
+
+For Each tosSheet In tosBook.Sheets
+    tosSheet.Copy after:=bdyBook.Sheets(1)
+Next
+tosBook.Close SaveChanges:=False
+
+Sheets(1).Select
+Rows("1").EntireRow.Delete
+Columns("A").EntireColumn.Delete
+Columns("D:F").EntireColumn.Delete
+
+Sheets(2).Select
+Sheets(2).Name = "ID"
+
+Sheets(1).Select
+
+lastrow = Cells(Rows.Count, "A").End(xlUp).Row
+
+'delete 0 paling bawah
+Range(Cells(lastrow, 1), Cells(lastrow, 1)).EntireRow.Delete
+
+Range(Cells(1, 1), Cells(lastrow, 3)).Copy Sheets(2).Cells(1, 6)
+
+Sheets(1).Delete
+
+Columns("E").Value2 = Columns("G").Value2
+Columns("G").Value2 = Columns("F").Value2
+Columns("F").Value2 = Columns("E").Value2
+Columns("E").ClearContents
+
+Columns("E").Value2 = Columns("A").Value2
+Columns("A").Value2 = Columns("B").Value2
+Columns("B").Value2 = Columns("E").Value2
+Columns("E").ClearContents
+
+id_tos_lanjut
+
+End Sub
+
+'Sub a()
+'
+'lastrowbdy = Cells(Rows.Count, "A").End(xlUp).Row
+'lastrow = Cells(Rows.Count, "F").End(xlUp).Row
+'
+'Dim colId As Long
+'Dim lMulai As Long
+'lMulai = 2 '
+'colId = 8
+'    For x = 1 To lastrowbdy
+'        For y = 1 To lastrow
+'            If Cells(y, 6) <> 0 Then
+'                Cells(y + 1, colId + x).FormulaR1C1 = "=(RC[" & -x - 1 & "]-R" & x & "C2)*(R[-1]C[" & -x - 2 & "]-R" & x & "C1)-(R[-1]C[" & -x - 1 & "]-R" & x & "C2)*(RC[" & -x - 2 & "]-R" & x & "C1)"
+'                'lMulai = x + 1  'blok berikutnya
+'                'colId = x + 1
+'
+'            End If
+'        Next y
+'    Next x
+'End Sub
+
+
+Sub id_tos_lanjut()
+
+Dim s As Long
+Dim i As Long
+Dim lastrow As Long
+Dim lastrowbdy As Long
+Dim z As Long
+
+lastrowbdy = Cells(Rows.Count, "A").End(xlUp).Row
+lastrow = Cells(Rows.Count, "F").End(xlUp).Row
+   
+   s = 3
+   z = 1
+   On Error Resume Next
+    For z = lastrowbdy To 1 Step -1
+        For i = lastrow To 1 Step -1
+            
+            If Cells(i, 6) = 0 Then
+                Cells(i, 8 + z).ClearContents
+                 
+                'Cells(i + 1, 9).Formula = "=SIGN(MA6X(" & Cells(i + 2, 9).Address & ":" & Cells(s - 2, 9).Address & "))-SIGN(MIN(" & Cells(i + 2, 9).Address & ":" & Cells(s - 2, 9).Address & "))<2"
+                Cells(i + 1, 8 + z).Formula = "=PtInPoly(" & Cells(i + 1, 6).Address & ":" & Cells(s - 2, 7).Address & "," & Cells(0 + z, 1) & "," & Cells(0 + z, 2) & ")"
+                'Cells(i + 1, 8 + z).Formula = "=SIGN(MAX(" & Cells(i + 2, 8 + z).Address & ":" & Cells(s - 1, 8 + z).Address & "))-SIGN(MIN(" & Cells(i + 2, 8 + z).Address & ":" & Cells(s - 1, 8 + z).Address & "))<2"
+                    
+                'Cells(i + 1, 8 + z).Formula = "=" & Cells(s - 1, 8 + z).Address
+                'Cells(i, 11).Formula = "=Sum(" & Cells(s, 10).Address & ":" & Cells(i - 1, 10).Address & ")"
+                s = i + 1
+            End If
+        Next i
+    Next z
+    
+Range(Cells(lastrow, 6), Cells(lastrow + 1, 9)).ClearContents
+   n = 1
+   
+   
+    For i = 1 To lastrow
+        If Cells(i, 6) = 0 Then
+            Cells(i + 1, 5) = n
+            n = n + 1
+        End If
+    Next i
+    
+  Columns("E").EntireColumn.Insert
+
+
+For i = 1 To lastrowbdy
+    Cells(i, 5).FormulaR1C1 = "=TRIM(RC[-1])"
+    Cells(i, 4).Value2 = Cells(i, 5).Value2
+Next i
+
+For i = 1 To lastrowbdy
+    Cells(i, 5).FormulaR1C1 = "=INDEX(R1C[1]:R[" & lastrow & "]C[" & 4 + i & "],MATCH(TRUE,R1C[" & 4 + i & "]:R[" & lastrow & "]C[" & 4 + i & "],0),1)"
+    Cells(i, 5).Value2 = Cells(i, 5).Value2
+Next i
+
+Range(Cells(1, 6), Cells(1, 9 + lastrowbdy)).EntireColumn.Delete
+
+Columns("A").EntireColumn.Insert
+Columns("A").Value2 = Columns("C").Value2
+Columns("C").Value2 = Columns("B").Value2
+Columns("B").Value2 = Columns("A").Value2
+Columns("A").Value2 = Columns("F").Value2
+Columns("F").ClearContents
+
+Range("A1", Range("E1").End(xlDown)).Sort Key1:=Range("A1"), Order1:=xlAscending, Header:=xlNo
+
+
+Dim varResult As Variant
+
+
+asname = "Id"
+
+
+varResult = Application.GetSaveAsFilename(InitialFileName:=asname, FileFilter:="Excel File (*.xlsx), *.xlsx", Title:="Save Surpac File")
+    
+If varResult = False Then
+MsgBox "canceled"
+Exit Sub
+End If
+
+Application.DisplayAlerts = False
+ActiveWorkbook.SaveAs FILENAME:=varResult _
+        , FileFormat:=51, Password:="", WriteResPassword:="", _
+        ReadOnlyRecommended:=False, CreateBackup:=False
+        ActiveWindow.Close
+        
+
+End Sub
+
+
+
+-------------------------------------------------------------------------------
+VBA MACRO ConvertKoordinat.bas 
+in file: x2/xl/vbaProject.bin - OLE stream: 'VBA/ConvertKoordinat'
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+Option Explicit
+Dim prjTM As New clsTranverseMercator
+
+Sub inputConv(control As IRibbonControl)
+Application.DisplayAlerts = False
+
+    On Error Resume Next
+    Sheets("Convert Koordinat").Delete
+    On Error GoTo 0
+
+   Sheets.Add after:=Sheets(Sheets.Count)
+    Sheets(Sheets.Count).Name = "Convert Koordinat"
+    ActiveWindow.Zoom = 80
+    'cek_expired
+    Sheets("Convert Koordinat").Select
+
+    With Sheets("Convert Koordinat")
+        .Cells(1, 1) = "Easting/X/Lat(Decimal)"
+        .Cells(1, 2) = "Northing/Y/Long(Decimal)"
+        .Columns("A:B").HorizontalAlignment = xlCenter
+        .Range(Cells(1, 1), Cells(1, 2)).ColumnWidth = 25
+        .Range(Cells(1, 1), Cells(1, 2)).Font.Bold = True
+        .Range(Cells(1, 1), Cells(1, 2)).Interior.ColorIndex = 45
+        
+      
+    End With
+
+End Sub
+Function TransverseMercatorGetCentralMeridian(ByVal LongDegree As Double, _
+    ByVal LebarZone As Double) As Double
+    TransverseMercatorGetCentralMeridian = _
+    prjTM.GetCentralMeridian(LongDegree, LebarZone)
+End Function
+
+Function TransverseMercatorToNorthEast(DatumType As Integer, LatDegree As Double, _
+                LongDegree As Double, ViewType As Integer) As Double
+
+'selecting datum's parameter:
+    Dim FalseEasting As Double, FalseNorthing As Double
+    Dim k0 As Double, a_ellips As Double, inv_f As Double
+    Dim LebarZone As Double
+
+    Select Case DatumType
+        Case 0 'ID 74
+            FalseEasting = 500000
+            If LatDegree < 0 Then ' Southern Equator
+                FalseNorthing = 10000000
+            Else
+                FalseNorthing = 0
+            End If
+    
+            k0 = 0.9996
+            a_ellips = 6378160
+            inv_f = 298.247
+            LebarZone = 6
+        
+        Case 1 'UTM
+    
+            FalseEasting = 500000
+            If LatDegree < 0 Then ' Southern Equator
+                FalseNorthing = 10000000
+            Else
+                FalseNorthing = 0
+            End If
+    
+            k0 = 0.9996
+            a_ellips = 6378137
+            inv_f = 298.2572236
+            LebarZone = 6
+    
+        Case 2 'TM3
+    
+            FalseEasting = 200000
+            FalseNorthing = 1500000
+    
+            k0 = 0.9999
+            a_ellips = 6378137
+            inv_f = 298.2572236
+            LebarZone = 3
+    End Select
+'end selecteng datum
+
+'start projecting
+    Dim North As Double, East As Double
+    
+    Dim CentralMeridian As Double
+    CentralMeridian = prjTM.GetCentralMeridian(LongDegree, LebarZone)
+    
+    prjTM.TransverseMercator _
+    CentralMeridian, LatDegree, LongDegree, _
+    k0, a_ellips, inv_f, FalseEasting, FalseNorthing, North, East
+'end projecting
+
+'Displaying North or East Coordinates
+'ViewType=0, Display NORTH : ViewType=ELSE, Display EAST
+
+    If ViewType = 0 Then
+        TransverseMercatorToNorthEast = North
+    Else
+        TransverseMercatorToNorthEast = East
+    End If
+'end Display
+
+End Function
+
+Function TransverseMercatorToLatLong(DatumType As Integer, _
+    North As Double, East As Double, _
+    NorthEquator As Integer, _
+    ByVal CentralMeridian As Double, _
+    ViewType As Integer) As Double
+
+'selecting datum's parameter:
+    Dim FalseEasting As Double, FalseNorthing As Double
+    Dim k0 As Double, a_ellips As Double, inv_f As Double
+    Dim LebarZone As Double
+    
+    Select Case DatumType
+        Case 0 'ID 74
+            FalseEasting = 500000
+            If NorthEquator = 0 Then
+                FalseNorthing = 10000000 'south equator
+            Else
+                FalseNorthing = 0 'north equator
+            End If
+    
+            k0 = 0.9996
+            a_ellips = 6378160
+            inv_f = 298.247
+            LebarZone = 6
+        
+        Case 1 'UTM
+    
+            FalseEasting = 500000
+            If NorthEquator = 0 Then
+                FalseNorthing = 10000000 ' south equator
+            Else
+                FalseNorthing = 0 'north equator
+            End If
+    
+            k0 = 0.9996
+            a_ellips = 6378137
+            inv_f = 298.2572236
+            LebarZone = 6
+    
+        Case 2 'TM3
+    
+            FalseEasting = 200000
+            FalseNorthing = 1500000
+    
+            k0 = 0.9996
+            a_ellips = 6378137
+            inv_f = 298.2572236
+            LebarZone = 3
+    End Select
+'end selecteng datum
+
+'start projecting
+    Dim LATITUDE As Double, LONGITUDE As Double
+    prjTM.InversTransverseMercator _
+    CentralMeridian, LATITUDE, LONGITUDE, _
+    k0, a_ellips, inv_f, FalseEasting, FalseNorthing, North, East
+'end projecting
+
+'Displaying LATITUDE or LONGITUDE
+'ViewType=0, Display LATITUDE: ViewType=1, Display LONGITUDE
+    If ViewType = 0 Then
+        TransverseMercatorToLatLong = LATITUDE
+    Else
+        TransverseMercatorToLatLong = LONGITUDE
+    End If
+End Function
+
+'****************************************************************
+'*********************End Transverse Mercator************************
+'****************************************************************
+
+Sub ConvertToUtm(control As IRibbonControl)
+Dim i As Integer
+Sheets("Convert Koordinat").Select
+
+With Sheets("Convert Koordinat")
+
+Columns("D:O").Delete
+.Cells(1, 4) = "Easting"
+.Cells(1, 5) = "Northing"
+.Cells(1, 6) = "Zone"
+.Cells(1, 7) = "Hemisphere"
+.Range(Cells(1, 4), Cells(1, 5)).ColumnWidth = 25
+.Cells(1, 6).ColumnWidth = 10
+.Cells(1, 7).ColumnWidth = 15
+.Range(Cells(1, 4), Cells(1, 7)).Font.Bold = True
+.Columns("A:G").HorizontalAlignment = xlCenter
+.Range(Cells(1, 4), Cells(1, 5)).Interior.ColorIndex = 43
+
+
+Application.ScreenUpdating = True
+For i = 2 To Cells(Rows.Count, 1).End(xlUp).Row
+
+If .Cells(i, 1).Value2 >= 1000 Then
+MsgBox "Cek Kembali Input Koordinat (Harus Lat/Long)", vbInformation, "Cancelled"
+Exit Sub
+End If
+
+If .Cells(i, 1).Value2 > .Cells(i, 2).Value2 Then
+MsgBox "Nilai Easting/X/Lat dan Northing/Y/Long Terbalik", vbInformation, "Cancelled"
+Exit Sub
+End If
+
+.Cells(i, 4).FormulaR1C1 = "=ROUND(TransverseMercatorToNorthEast(1,RC[-3],RC[-2],1),3)"
+.Cells(i, 5).FormulaR1C1 = "=ROUND(TransverseMercatorToNorthEast(1,RC[-4],RC[-3],0),3)"
+.Cells(2, 6).FormulaR1C1 = "=TRUNC((RC[-4]/6)+31) "
+.Cells(2, 7).FormulaR1C1 = "=IF(RC[-6]<-8,""L"",IF(RC[-6]<0,""M"",IF(RC[-6]<8,""N"",IF(RC[-6]<16,""P"",IF(RC[-6]<24,""Q"",IF(RC[-6]<32,""R"",IF(RC[-6]<40,""S"",IF(RC[-6]<48,""T"",J5))))))))"
+.Range(Cells(i, 4), Cells(i, 5)).Value2 = .Range(Cells(i, 4), Cells(i, 7)).Value2
+.Range(Cells(2, 6), Cells(2, 7)).Value2 = .Range(Cells(2, 6), Cells(i, 7)).Value2
+Next
+
+End With
+End Sub
+
+Sub UTMtoGeografis(control As IRibbonControl)
+
+Dim smAa As Double
+Dim smIa As Double
+Dim Eccentricity As Double
+Dim Excentric As Double
+Dim e As Double
+Dim c As Double
+Dim zone As Integer
+Dim hemisphere As String
+
+
+Dim BandLat As String
+Dim Banda72a16 As String
+Dim Banda8a48 As String
+Dim Banda65a48 As String
+Dim Fi As Double
+Dim Ni As Double
+Dim FiEnRadianes As Double
+Dim MeridianCentral As Integer
+Dim YAlSurDelEcuador As Double
+Dim a As Double
+Dim A1 As Double
+Dim A2 As Double
+Dim J2 As Double
+Dim J4 As Double
+Dim J6 As Double
+Dim Alfa As Double
+Dim Beta As Double
+Dim Gamma As Double
+Dim Bfi As Double
+Dim b As Double
+Dim Zeta As Double
+Dim Xi As Double
+Dim Eta As Double
+Dim senHXi As Double
+Dim DeltaLambda As Double
+Dim Tau As Double
+Dim easting As Double
+Dim northing As Double
+Dim i As Integer
+
+smAa = 6378137
+smIa = 6356752.31424518
+Eccentricity = 8.18191908426203E-02
+Excentric = 8.20944379496945E-02
+e = 6.73949674227624E-03
+c = 6399593.62575849
+zone = 52
+hemisphere = "N"
+
+With Sheets("Convert Koordinat")
+
+
+Columns("D:O").Delete
+.Cells(1, 4) = "Lat (Decimal Degree)"
+.Cells(1, 5) = "Long (Decimal Degree)"
+.Range(Cells(1, 4), Cells(1, 5)).ColumnWidth = 25
+.Range(Cells(1, 4), Cells(1, 5)).Font.Bold = True
+.Columns("A:O").HorizontalAlignment = xlCenter
+.Range(Cells(1, 4), Cells(1, 5)).Interior.ColorIndex = 43
+
+.Cells(1, 7) = "Lat(D)"
+.Cells(1, 8) = "Lat(M)"
+.Cells(1, 9) = "Lat(S)"
+.Cells(1, 10) = "Long(D)"
+.Cells(1, 11) = "Long(M)"
+.Cells(1, 12) = "Long(S)"
+
+.Cells(1, 14) = "Latitude (DMS)"
+.Cells(1, 15) = "Longitude (DMS)"
+.Range(Cells(1, 14), Cells(1, 15)).ColumnWidth = 25
+.Range(Cells(1, 14), Cells(1, 15)).Font.Bold = True
+
+.Range(Cells(1, 14), Cells(1, 15)).Interior.ColorIndex = 42
+.Range(Cells(1, 7), Cells(1, 12)).Interior.ColorIndex = 41
+
+For i = 2 To Cells(Rows.Count, 1).End(xlUp).Row
+
+If .Cells(i, 1).Value2 <= 1000 Then
+MsgBox "Cek Kembali Input Koordinat (Harus Lat/Long)", vbInformation, "Cancelled"
+
+Exit Sub
+End If
+
+If .Cells(i, 1).Value2 < .Cells(i, 2).Value2 Then
+MsgBox "Nilai Easting/X/Lat dan Northing/Y/Long Terbalik", vbInformation, "Cancelled"
+Exit Sub
+End If
+
+easting = .Cells(i, 1)
+northing = .Cells(i, 2)
+
+
+
+'==================== YAlSurDelEcuador ===========================
+If hemisphere = "S" Then
+    YAlSurDelEcuador = northing - 10000000
+Else
+    YAlSurDelEcuador = northing
+End If
+
+'==================== Fi ===========================
+Fi = YAlSurDelEcuador / (6366197.724 * 0.9996)
+
+'==================== Ni ===========================
+Ni = (c / (1 + e * (Cos(Fi)) ^ 2) ^ (1 / 2)) * 0.9996
+
+'==================== a ===========================
+a = (easting - 500000) / Ni
+
+'==================== Zeta ===========================
+Zeta = ((e * a ^ 2) / 2) * (Cos(Fi)) ^ 2
+
+'==================== Xi ===========================
+Xi = a * (1 - (Zeta / 3))
+
+'==================== senHXi ===========================
+senHXi = (Exp(Xi) - Exp(-Xi)) / 2
+
+'==================== A1 ===========================
+A1 = Sin(2 * Fi)
+'==================== A2 ===========================
+A2 = A1 * (Cos(Fi)) ^ 2
+'==================== J2 ===========================
+J2 = Fi + (A1 / 2)
+'==================== J4 ===========================
+J4 = (3 * J2 + A2) / 4
+'==================== J6 ===========================
+J6 = (5 * J4 + A2 * (Cos(Fi)) ^ 2) / 3
+'==================== Alfa ===========================
+Alfa = (3 / 4) * e
+'==================== Beta ===========================
+Beta = (5 / 3) * (Alfa) ^ 2
+'==================== Gamma ===========================
+Gamma = (35 / 27) * (Alfa) ^ 3
+
+'==================== B(Fi) ===========================
+Bfi = 0.9996 * c * (Fi - (Alfa * J2) + (Beta * J4) - (Gamma * J6))
+
+'==================== b ===========================
+b = (YAlSurDelEcuador - Bfi) / Ni
+
+'==================== Eta ===========================
+Eta = b * (1 - Zeta) + Fi
+
+'==================== Delta Lambda ===========================
+DeltaLambda = Atn(senHXi / Cos(Eta))
+
+'==================== Tau ===========================
+Tau = Atn(Cos(DeltaLambda) * Tan(Eta))
+
+'==================== FiEnRadianes ===========================
+FiEnRadianes = Fi + (1 + e * (Cos(Fi)) ^ 2 - (3 / 2) * e * Sin(Fi) * Cos(Fi) * (Tau - Fi)) * (Tau - Fi)
+
+'==================== MeridianCentral ===========================
+MeridianCentral = 6 * zone - 183
+
+
+
+.Cells(i, 4) = (FiEnRadianes / WorksheetFunction.Pi) * 180
+.Cells(i, 5) = (DeltaLambda / WorksheetFunction.Pi) * 180 + MeridianCentral
+.Cells(i, 7).FormulaR1C1 = "=TRUNC(RC[-3],0)"
+.Cells(i, 8).FormulaR1C1 = "=TRUNC((RC[-4] - RC[-1]) * 60, 0)"
+.Cells(i, 9).FormulaR1C1 = "=ROUND((((RC[-5]-RC[-2])*60)-RC[-1])*60,3)"
+
+
+.Cells(i, 10).FormulaR1C1 = "=TRUNC(RC[-5],0)"
+.Cells(i, 11).FormulaR1C1 = "=TRUNC((RC[-6] - RC[-1]) * 60, 0)"
+.Cells(i, 12).FormulaR1C1 = "=ROUND((((RC[-7]-RC[-2])*60)-RC[-1])*60,3)"
+Range(Cells(i, 7), Cells(i, 12)).Value2 = Range(Cells(i, 7), Cells(i, 12)).Value2
+
+.Cells(i, 14).FormulaR1C1 = "=CONCATENATE(RC[-7], ""º "",RC[-6],""' "",RC[-5],""''"")"
+.Cells(i, 15).FormulaR1C1 = "=CONCATENATE(RC[-5], ""º "",RC[-4],""' "",RC[-3],""''"")"
+
+Next
+
+End With
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+End Sub
+-------------------------------------------------------------------------------
+VBA MACRO clsTranverseMercator.cls 
+in file: x2/xl/vbaProject.bin - OLE stream: 'VBA/clsTranverseMercator'
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+'source : http://www.posc.org/Epicentre.2_2/DataModel/ExamplesofUsage/eu_cs34.html
+'class: Traverse Mercator
+'1. First Code April 19, 2006 by znl (zainul_ulum@cbn.net.id)
+Option Explicit
+Function GetCentralMeridian(Bujur As Double, ByVal WidthZone As Double) As Double
+        GetCentralMeridian = WidthZone * (Int(Bujur / WidthZone) + 0.5)
+End Function
+
+Function DegreeToRadian(AngleDegree As Double) As Double
+    Dim Phi As Double
+    Phi = 4 * Atn(1)
+    DegreeToRadian = AngleDegree * Phi / 180
+End Function
+Function RadianToDegree(AngleRadian As Double) As Double
+    Dim Phi As Double
+    Phi = 4 * Atn(1)
+    RadianToDegree = AngleRadian * 180 / Phi
+End Function
+Sub TransverseMercator( _
+    CentralMeridian As Double, LATITUDE As Double, LONGITUDE As Double, _
+    ScaleFactor As Double, a_ellips As Double, inv_f As Double, _
+    FalseEast As Double, FalseNorth As Double, _
+    North As Double, East As Double)
+
+    Dim Lr As Double, Lg As Double 'Lr:Latitude in radian,Lg:Longitude in Radian
+    Dim dB As Double 'dB:central meridian in radian
+    
+    Lr = DegreeToRadian(LATITUDE)
+    Lg = DegreeToRadian(LONGITUDE)
+    dB = DegreeToRadian(CentralMeridian)
+    
+    Dim f As Double, e2 As Double, e4 As Double, e6 As Double
+    Dim e_2 As Double
+    
+    f = 1 / inv_f
+    e2 = 2 * f - f ^ 2: e4 = e2 * e2: e6 = e4 * e2
+    e_2 = e2 / (1 - e2)
+
+    Dim T As Double, c As Double, a As Double, m As Double
+    Dim T2 As Double, C2 As Double, v As Double
+    
+    T = Tan(Lr) * Tan(Lr)
+    T2 = T * T
+    c = e_2 * Cos(Lr) * Cos(Lr)
+    C2 = c * c
+    a = (Lg - dB) * Cos(Lr)
+
+    Dim MA As Double, MB As Double, MC As Double, MD As Double
+    MA = (1 - (e2 / 4) - (3 * e4 / 64) - (5 * e6 / 256)) * Lr
+    MB = ((3 * e2 / 8) + (3 * e4 / 32) + (45 * e6 / 1024)) * Sin(2 * Lr)
+    MC = ((15 * e4 / 256) + (45 * e6 / 1024)) * Sin(4 * Lr)
+    MD = (35 * e6 / 3072) * Sin(6 * Lr)
+    
+    m = a_ellips * (MA - MB + MC - MD)
+    v = a_ellips / Sqr(1 - e2 * Sin(Lr) * Sin(Lr))
+
+    Dim A2 As Double, A3 As Double, A4 As Double, A5 As Double, A6 As Double
+    Dim x As Double, Y As Double
+    Dim X1 As Double, X2 As Double
+    Dim Y1 As Double, Y2 As Double
+    
+    A2 = a * a
+    A3 = A2 * a
+    A4 = A3 * a
+    A5 = A4 * a
+    A6 = A5 * a
+    
+    X1 = (1 - T + c) * A3 / 6
+    X2 = (5 - 18 * T + T2 + 72 * c - 58 * e_2) * A5 / 120
+    
+    x = ScaleFactor * v * (a + X1 + X2)
+    
+    Y1 = (5 - T + 9 * c + 4 * C2) * A4 / 24
+    Y2 = (61 - 58 * T + T2 + 600 * c - 330 * e_2) * A6 / 720
+
+    Y = ScaleFactor * (m + v * Tan(Lr) * (A2 / 2 + Y1 + Y2))
+
+    North = FalseNorth + Y
+    East = FalseEast + x
+    
+End Sub
+
+Sub InversTransverseMercator(CentralMeridian As Double, LATITUDE As Double, LONGITUDE As Double, _
+    ScaleFactor As Double, a_ellips As Double, inv_f As Double, _
+    FalseEast As Double, FalseNorth As Double, _
+    North As Double, East As Double)
+    
+    Dim f As Double, e2 As Double, e4 As Double, e6 As Double
+    
+    f = 1 / inv_f
+    e2 = 2 * f - f ^ 2
+    e4 = e2 * e2
+    e6 = e4 * e2
+    
+    Dim M1 As Double, MiuA As Double, Miu As Double
+    
+    M1 = (North - FalseNorth) / ScaleFactor
+    MiuA = 1 - e2 / 4 - (3 * e4) / 64 - (5 * e6) / 256
+    Miu = M1 / (a_ellips * MiuA)
+    
+    Dim e_ As Double, e_2 As Double, e_3 As Double, e_4 As Double
+    
+    e_ = (1 - Sqr(1 - e2)) / (1 + Sqr(1 - e2))
+    e_2 = e_ * e_
+    e_3 = e_2 * e_
+    e_4 = e_3 * e_
+    
+    Dim Lf As Double, LfA As Double, LfB As Double, LfC As Double, LfD As Double
+    
+    LfA = ((3 * e_ / 2) - (27 * e_3 / 32)) * Sin(2 * Miu)
+    LfB = ((21 * e_2 / 16) - (55 * e_4 / 32)) * Sin(4 * Miu)
+    LfC = ((151 * e_3 / 96)) * Sin(6 * Miu)
+    LfD = ((1097 * e_4 / 512)) * Sin(8 * Miu)
+    
+    Lf = Miu + LfA + LfB + LfC + LfD
+
+    Dim v_ As Double, p_ As Double
+    
+    v_ = a_ellips / Sqr(1 - e2 * Sin(Lf) * Sin(Lf))
+    p_ = a_ellips * (1 - e2) / ((1 - e2 * Sin(Lf) * Sin(Lf)) ^ 1.5)
+    
+    Dim T_ As Double, C_ As Double, D As Double, e_a2 As Double, T_2 As Double
+    
+    T_ = Tan(Lf) * Tan(Lf)
+    e_a2 = e2 / (1 - e2)
+    C_ = e_a2 * Cos(Lf) * Cos(Lf)
+    D = (East - FalseEast) / (v_ * ScaleFactor)
+    T_2 = T_ * T_
+
+    Dim D2 As Double, D3 As Double, D4 As Double, D5 As Double, D6 As Double
+    D2 = D * D
+    D3 = D2 * D
+    D4 = D3 * D
+    D5 = D4 * D
+    D6 = D5 * D
+    
+    Dim C_2 As Double
+    C_2 = C_ * C_
+    
+    Dim LatitudeA As Double, LatitudeB As Double, LatitudeC As Double
+    LatitudeA = D2 / 2
+    LatitudeB = (5 + 3 * T_ + 10 * C_ - 4 * C_2 - 9 * e_a2) * D4 / 24
+    LatitudeC = (61 + 90 * T_ + 298 * C_ + 45 * T_2 - 252 * e_a2 - 3 * C_2) * D6 / 720
+    
+    Dim Lr As Double
+    Lr = Lf - v_ * Tan(Lf) * (LatitudeA - LatitudeB + LatitudeC) / p_
+    
+    LATITUDE = RadianToDegree(Lr)
+    
+    Dim LongA As Double, LongB As Double, Lg As Double, dB As Double
+    LongA = (1 + 2 * T_ + C_) * D3 / 6
+    LongB = (5 - 2 * C_ + 28 * T_ - 3 * C_2 + 8 * e_a2 + 24 * T_2) * D5 / 120
+
+    dB = DegreeToRadian(CentralMeridian)
+    
+    Lg = dB + (D - LongA + LongB) / Cos(Lf)
+
+    LONGITUDE = RadianToDegree(Lg)
+
+End Sub
+-------------------------------------------------------------------------------
+VBA MACRO insertDome.bas 
+in file: x2/xl/vbaProject.bin - OLE stream: 'VBA/insertDome'
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+Sub insertDometoDvAndST(control As IRibbonControl)
+With ActiveSheet
+lastRow1 = .Cells(.Rows.Count, 1).End(xlUp).Row
+lastrow = .Cells(.Rows.Count, 6).End(xlUp).Row
+
+Set DailyVolume = Workbooks.Open("D:\Daily Record\daily volume tos KR.xlsx")
+Set Sh = DailyVolume.Sheets("TOS")
+
+lstrw = Sh.Cells(Sh.Rows.Count, "E").End(xlUp).Row
+.Range(.Cells(lastRow1 + 1, 2), .Cells(lastrow, 5)).Copy _
+    Sh.Cells(lstrw + 1, 6)
+lstrw2 = Sh.Cells(Sh.Rows.Count, "F").End(xlUp).Row
+
+
+With Sh
+.Range(.Cells(lstrw, 5), .Cells(lstrw, 10)).Copy
+.Range(.Cells(lstrw + 1, 5), .Cells(lstrw2, 10)).PasteSpecial xlPasteFormats
+
+Application.CutCopyMode = False
+  'Tanggal
+.Range(.Cells(lstrw + 1, 5), .Cells(lstrw2, 5)).Value2 = Format(.Cells(lstrw, 5).Value2 + 1, "dd-mmm-yy")
+'hit
+.Range(.Cells(lstrw + 1, 10), .Cells(lstrw2, 10)).Value2 = Format(.Cells(lstrw, 5).Value2 + 2, "dd/mm/yy")
+.Range(.Cells(lstrw + 1, 11), .Cells(lstrw2, 11)).Formula = "=SUBSTITUTE(concatenate(RC[-1],""hit""),""/"","""")"
+.Range(.Cells(lstrw + 1, 10), .Cells(lstrw2, 10)).Value2 = .Range(.Cells(lstrw + 1, 11), .Cells(lstrw2, 11)).Value2
+.Range(.Cells(lstrw + 1, 10), .Cells(lstrw2, 10)).Value2 = .Range(.Cells(lstrw + 1, 10), .Cells(lstrw2, 10)).Value2
+.Range(.Cells(lstrw + 1, 11), .Cells(lstrw2, 11)).Value2 = ""
+    .Cells(lstrw2, 11).FormulaR1C1 = "=SUM(R[-" & lstrw2 - lstrw - 1 & "]C[-3]:RC[-3])"
+End With
+
+
+.Range("A1:F" & lastrow).Sort .Range("F1"), xlAscending, Header:=xlYes
+
+For i = 1 To lastrow
+    If .Cells(i, 1).Value2 = "" Then
+        .Cells(i, 2).HorizontalAlignment = xlRight
+    End If
+Next i
+
+For i = 1 To lastrow - 1
+    .Cells(1 + i, 1).Value2 = i
+Next i
+
+'copy to Survey Truck Count
+Set SurveyTCount = Workbooks.Open("D:\Daily Record\Survey vs TC.xlsx")
+Set stc = SurveyTCount.Sheets("Volume Record")
+
+lstrw3 = stc.Cells(stc.Rows.Count, "AI").End(xlUp).Row
+a = stc.Cells(lstrw3, "AI").Value2
+b = .Cells(lstrw2, 11).Value2
+ stc.Cells(lstrw3, "AI").Value2 = Sh.Cells(lstrw2, 11).Value2
+
+DailyVolume.Close SaveChanges:=True
+SurveyTCount.Close SaveChanges:=True
+
+End With
+
+
+
+End Sub
+
+Sub snb_DBF_uitlezen(c09)
+Dim sp(35)
+Application.ScreenUpdating = False
+
+If Cells(13, 1) <> "" Then ThisWorkbook.A_schoon
+
+Open c09 For Binary As #1
+c00 = Input(LOF(1), #1)
+Close #1
+
+For j = 1 To 12
+
+End With
+End Sub
+
+Private Sub knop_inlezen_Click()
+c00 = Application.GetOpenFilename("Files (*.dbf),*.dbf")
+If VarType(c00) <> 11 Then snb_DBF_uitlezen c00
+End Sub
+
+-------------------------------------------------------------------------------
