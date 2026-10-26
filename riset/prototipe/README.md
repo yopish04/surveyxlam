@@ -66,16 +66,31 @@ Tidak bisa diuji: `241026_dumpingan` dan `241026_pit_tofu9`, karena file mentahn
 (`24102026-Dumpingan WSDM-TF01.txt`, `24102026_pitDS_TF09C.txt`) rusak di arsip.
 Di `251026_pit_tofu3`, dua area yang bersentuhan (< 8 m) masih tergabung jadi satu.
 
-## Nomor string berbeda per jenis area (temuan 24–26 Okt)
+## Nomor string data progress harian (dikonfirmasi pengguna)
 
-| Jenis area (dari nama file) | Crest (kode 2) | Toe (kode 3) | Spot kode 500 | Spot kode 602 |
-|---|---|---|---|---|
-| Pit, rehandling, quarry | 5 | 6 | **600** (24–25 Okt) / **602** (26 Okt) | 602 |
-| Dumping, waste, pelebaran | 2 | 3 | 500 | — |
-| Jalan (kode 7) | string 7, 77, boundary 1 | | | |
+Data **progress harian**: `2 → 5`, `3 → 6`, `500 → 602`, `602 → 602`, `23 → 5 + 6 + 23`,
+boundary `1`. Nomor lain yang ditemukan di file 24–25 Okt (600, dan 2/3/500 di file
+dumping/waste) berasal dari data **progress area**, bukan data harian. Prototipe ini
+mengikuti aturan harian.
 
-Boundary selalu string 1, titik `23` selalu string 23. Prototipe saat ini selalu memakai
-5/6/602; tabel ini perlu dikonfirmasi lalu dijadikan pengaturan per jenis area.
+## Jalan (kode 7)
+
+Titik kode 7 **dikeluarkan** dari file utama dan dibuat file sendiri `<judul>_jalan.str`,
+sama seperti cara manual.
+
+Di lapangan jalan ditembak per **penampang melintang 5 titik**: tepi luar, tepi dalam,
+tengah, tepi dalam, tepi luar. Prototipe:
+1. memotong urutan titik kode 7 menjadi penampang berisi 5 titik;
+2. mengurutkan titik dalam setiap penampang berdasarkan jarak tegak lurus terhadap arah jalan;
+3. menyambung posisi yang sama antar penampang: tepi → string **7**, tengah → string **77**;
+4. boundary **1** = penampang pertama + tepi terluar + penampang terakhir.
+
+| Tanggal | Hasil |
+|---|---|
+| 25 Okt (20 titik, 4 penampang) | **100 % sama** dengan manual: garis 7 (12/12), 77 (3/3), boundary (14/14) |
+| 24 Okt (46 titik, ada simpangan/cabang) | Tidak bisa disusun otomatis → ditandai **"jalan PERLU DICEK"** di laporan |
+
+Jumlah titik per penampang (5) nanti menjadi pengaturan.
 
 ## Pembersihan data & posisi unit
 

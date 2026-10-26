@@ -2,7 +2,8 @@
 algorithms so they can be ported to VBA. Evaluated against manually finished str."""
 import math, os, re, sys, collections
 
-CREST, TOE, SPOT, JUNC, BND = 5, 6, 602, 23, 1
+CREST, TOE, SPOT, JUNC, BND = 5, 6, 602, 23, 1   # daily progress numbering
+ROAD_EDGE, ROAD_CENTRE, ROAD = 7, 77, 'ROAD'
 
 
 def read_raw(path):
@@ -21,6 +22,7 @@ def classify(code):
     if code == '3': return {TOE}
     if code == '23': return {CREST, TOE, JUNC}
     if code in ('500', '602'): return {SPOT}
+    if code == '7': return {ROAD}        # road: moved to its own jalan.str
     if code == '': return set()          # no code -> skipped, reported
     return {'EXCA'}                      # EX..., EXA_..., Bolong: unit positions
 
@@ -241,14 +243,72 @@ def write_exca(path, title, date, pts):
     write_str(path, title, date, [(1, [p], False) for p in pts])
 
 
+# ---------------------------------------------------------------- road (code 7)
+def _axis(chunk):
+    """Principal direction of a cross-section (2D PCA)."""
+    me = sum(p['e'] for p in chunk) / len(chunk); mn = sum(p['n'] for p in chunk) / len(chunk)
+    see = sum((p['e'] - me) ** 2 for p in chunk); snn = sum((p['n'] - mn) ** 2 for p in chunk)
+    sen = sum((p['e'] - me) * (p['n'] - mn) for p in chunk)
+    th = 0.5 * math.atan2(2 * sen, see - snn)
+    ue, un = math.cos(th), math.sin(th)
+    resid = max(abs(-(p['e'] - me) * un + (p['n'] - mn) * ue) for p in chunk)
+    return (me, mn), (ue, un), resid
+
+
+def road_sections(seq, n_fixed=None):
+    """Road is shot as cross-sections of n points each (field habit: 5). With n_fixed=None,
+    pick n (3..7) whose consecutive chunks are the straightest lines across the road."""
+    best = None
+    for n in ([n_fixed] if n_fixed else range(3, 8)):
+        if len(seq) < 2 * n: continue
+        chunks = [seq[i:i + n] for i in range(0, len(seq) - len(seq) % n, n)]
+        score = sum(_axis(c)[2] for c in chunks) / len(chunks) + 0.5 * (len(seq) % n)
+        if best is None or score < best[0]: best = (score, n, chunks)
+    return best
+
+
+def build_road(seq, n_fixed=5, max_resid=1.0):
+    """Returns (strings, ok). Same lateral position in every cross-section -> one line;
+    middle position -> 77 (centre), boundary = first section + outer edges + last section.
+    ok=False (check by hand) when points don't split evenly into straight cross-sections,
+    e.g. at a junction."""
+    best = road_sections(seq, n_fixed)
+    if not best: return [(ROAD_EDGE, seq, False)], False
+    score, n, chunks = best
+    ok = len(seq) % n == 0 and max(_axis(c)[2] for c in chunks) <= max_resid
+    ordered, prev_axis = [], None
+    centres = [_axis(c)[0] for c in chunks]
+    for i, c in enumerate(chunks):
+        (me, mn), _, _ = _axis(c)
+        # signed distance across the road (left of the road direction = negative)
+        j0, j1 = max(0, i - 1), min(len(chunks) - 1, i + 1)
+        de, dn = centres[j1][0] - centres[j0][0], centres[j1][1] - centres[j0][1]
+        L = math.hypot(de, dn) or 1.0
+        ordered.append(sorted(c, key=lambda p: ((p['e'] - me) * dn - (p['n'] - mn) * de) / L))
+    strings = []
+    for lane in range(n):
+        line = [sec[lane] for sec in ordered]
+        strings.append((ROAD_CENTRE if n % 2 and lane == n // 2 else ROAD_EDGE, line, False))
+    ring = ordered[0] + [sec[-1] for sec in ordered[1:]] + ordered[-1][::-1][1:] + [sec[0] for sec in ordered[-2:0:-1]]
+    strings.insert(0, (BND, ring, True))
+    return strings, ok
+
+
 def convert(raw_files, out_path, title, date, line_gap=8.0, area_link=12.0, k=8):
-    pts, report = [], collections.Counter()
+    pts, report, road = [], collections.Counter(), []
     for f in raw_files:
         for p in read_raw(f):
             p['cls'] = classify(p['code'])
             if not p['cls']: report['tanpa kode (dilewati)'] += 1; continue
             if 'EXCA' in p['cls']: report['posisi unit EX (dipisah)'] += 1; continue
+            if ROAD in p['cls']: road.append(p); continue
             pts.append(p)
+    if road:
+        rs, ok = build_road(road)
+        write_str(out_path[:-4] + '_jalan.str', title + '_jalan', date, rs)
+        report['titik jalan (dipindah ke _jalan.str)'] = len(road)
+        if not ok: report['jalan PERLU DICEK (penampang tidak teratur)'] = 1
+
     pts, doubles = remove_doubles(pts)
     report['titik double (dihapus)'] = len(doubles)
     strings = []
