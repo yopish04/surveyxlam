@@ -241,7 +241,7 @@ def write_exca(path, title, date, pts):
     write_str(path, title, date, [(1, [p], False) for p in pts])
 
 
-def convert(raw_files, out_path, title, date, line_gap=8.0, area_link=20.0, k=8):
+def convert(raw_files, out_path, title, date, line_gap=8.0, area_link=12.0, k=8):
     pts, report = [], collections.Counter()
     for f in raw_files:
         for p in read_raw(f):

@@ -11,7 +11,7 @@ def readstr(f):
         cur.append((int(p[0]),float(p[1]),float(p[2])))
     return segs
 man,aut,out,title=sys.argv[1:5]
-C={1:('#d62728','Boundary (1)',1.6),5:('#1f77b4','Crest (5)',1.1),6:('#2ca02c','Toe (6)',1.1),602:('#bbbbbb','Spot (602)',0.5),23:('#9467bd','Junction (23)',0)}
+C={2:('#1f77b4','Crest (2)',1.1),3:('#2ca02c','Toe (3)',1.1),600:('#bbbbbb','Spot (600)',0.5),500:('#bbbbbb','Spot (500)',0.5),1:('#d62728','Boundary (1)',1.6),5:('#1f77b4','Crest (5)',1.1),6:('#2ca02c','Toe (6)',1.1),602:('#bbbbbb','Spot (602)',0.5),23:('#9467bd','Junction (23)',0)}
 fig,axs=plt.subplots(1,2,figsize=(16,8),sharex=True,sharey=True)
 for ax,f,t in ((axs[0],man,'Manual (kerja Anda)'),(axs[1],aut,'Otomatis (prototipe)')):
     seen=set()

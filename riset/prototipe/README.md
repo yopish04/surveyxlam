@@ -24,7 +24,7 @@ Kolom deskripsi diisi nama titik (Point Name), lalu tanggal, lalu `RTK_SMA`.
 2. **Garis crest/toe:** titik dengan kode yang sama dan berurutan saat ditembak disambung.
    Garis diputus kalau berganti kode atau jaraknya > 8 m. Potongan garis lalu digabung
    lewat ujung terdekat (≤ 8 m). Titik `23` diperlakukan sebagai ujung garis alami.
-3. **Area:** titik dikelompokkan kalau jaraknya ≤ 20 m satu sama lain. Area yang terpisah
+3. **Area:** titik dikelompokkan kalau jaraknya ≤ 12 m satu sama lain. Area yang terpisah
    otomatis menjadi kelompok sendiri.
 4. **Boundary:** *concave hull* k-nearest-neighbour (Moreira & Santos) per area, hanya memakai
    titik yang sudah ada (sama seperti cara manual).
@@ -43,6 +43,39 @@ Kolom deskripsi diisi nama titik (Point Name), lalu tanggal, lalu `RTK_SMA`.
 "Cocok" artinya sambungan antar dua titik yang sama persis dengan sambungan manual.
 Sebagian selisih terjadi karena di versi manual ada titik crest/toe yang sengaja dibuang
 (salah tembak/duplikat), sedangkan prototipe masih memakainya.
+
+## Uji 3 hari (24, 25, 26 Okt 2026), batas antar-area 12 m
+
+`python3 evaluasi_semua.py <folder24> <folder25> <folder26>`
+
+| Tanggal | File | Area (manual / auto) | IoU boundary | Crest | Toe |
+|---|---|---|---|---|---|
+| 24 | pit_tofu3 | 2 / 2 | 0,93 | 94 % | 88 % |
+| 24 | rehendling_ld03 | 1 / 1 | 0,98 | 89 % | 88 % |
+| 24 | rehenling_ld05 | 1 / 1 | 0,98 | 86 % | 81 % |
+| 25 | base_pelebaran-tos09 | 1 / 1 | 0,90 | 93 % | 94 % |
+| 25 | pit_tofu3 | 6 / 5 | 0,95 | 91 % | 90 % |
+| 25 | pit_tofu9 | 2 / 2 | 0,98 | 77 % | 92 % |
+| 25 | quari_tf1 | 2 / 2 | 0,98 | 95 % | 89 % |
+| 25 | rehenling_ld_03 | 1 / 1 | 0,95 | 92 % | 89 % |
+| 25 | waste_tf9 | 1 / 1 | 0,98 | 87 % | 79 % |
+| 26 | 4 file (lihat tabel di atas) | 9 / 9 | 0,96–0,97 | 90–97 % | 84–95 % |
+| | **Total 13 file** | **12/13 sama** | **rata-rata 0,96** | **91 %** | **89 %** |
+
+Tidak bisa diuji: `241026_dumpingan` dan `241026_pit_tofu9`, karena file mentahnya
+(`24102026-Dumpingan WSDM-TF01.txt`, `24102026_pitDS_TF09C.txt`) rusak di arsip.
+Di `251026_pit_tofu3`, dua area yang bersentuhan (< 8 m) masih tergabung jadi satu.
+
+## Nomor string berbeda per jenis area (temuan 24–26 Okt)
+
+| Jenis area (dari nama file) | Crest (kode 2) | Toe (kode 3) | Spot kode 500 | Spot kode 602 |
+|---|---|---|---|---|
+| Pit, rehandling, quarry | 5 | 6 | **600** (24–25 Okt) / **602** (26 Okt) | 602 |
+| Dumping, waste, pelebaran | 2 | 3 | 500 | — |
+| Jalan (kode 7) | string 7, 77, boundary 1 | | | |
+
+Boundary selalu string 1, titik `23` selalu string 23. Prototipe saat ini selalu memakai
+5/6/602; tabel ini perlu dikonfirmasi lalu dijadikan pengaturan per jenis area.
 
 ## Pembersihan data & posisi unit
 
