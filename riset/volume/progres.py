@@ -28,6 +28,7 @@ def baca(path):
     raw = open(path, 'rb').read()
     i1 = raw.index(b'\n') + 1; i2 = raw.index(b'\n', i1) + 1
     head = raw[:i1].decode('latin1').rstrip('\r\n').split(',')
+    axis = raw[i1:i2].decode('latin1').rstrip('\r\n')
     rest = raw[i2:]
     binary = rest[:5] == b'\x00' * 5
     segs, cur = [], []
@@ -57,23 +58,23 @@ def baca(path):
             d = ','.join(p[4:]).lstrip(' ')
             cur.append((num, float(p[1]), float(p[2]), float(p[3]), d))
     if cur: segs.append(cur)
-    return dict(head=head, binary=binary, segs=segs)
+    return dict(head=head, axis=axis, binary=binary, segs=segs)
 
 
 AXIS = '0,           0.000,           0.000,           0.000,           0.000,           0.000,           0.000'
 
 
-def tulis(path, head, segs, binary):
+def tulis(path, head, segs, binary, axis=AXIS):
     h = ','.join(head)
     if binary:
-        out = bytearray((h + '\r\n' + AXIS + '\r\n').encode('latin1')); out += b'\x00' * 5
+        out = bytearray((h + '\r\n' + axis + '\r\n').encode('latin1')); out += b'\x00' * 5
         for s in segs:
             for num, y, x, z, d in s:
                 out += REC.pack(num, y, x, z); out += d.encode('latin1') + b'\x00'
             out += REC.pack(0, 0, 0, 0) + b'\x00'
         out += REC.pack(0, 0, 0, 0) + b'END\x00'
         open(path, 'wb').write(out); return
-    L = [h, AXIS]
+    L = [h, axis]
     for s in segs:
         for num, y, x, z, d in s:
             L.append(f'{num}, {y:.3f}, {x:.3f}, {z:.3f}, {d}')
@@ -293,6 +294,18 @@ def _titik_pada(B, keep, gone):
             keep[3] + t * (gone[3] - keep[3]), 'POTONG,' + keep[4])
 
 
+def kepala(head, nama, tgl):
+    """Header file hasil: nama dan tanggal baru, field lain dari file asal."""
+    h = list(head) + ['0', '0']
+    return [nama, tgl] + h[2:max(4, len(head))]
+
+
+def tulis_cek(path, nama, tgl, cekl):
+    """Titik ujung garis lama terpotong dekat boundary -> string 9006 (untuk dicek di Surpac)."""
+    segs = [[(9006, r[1], r[2], r[3], 'CEK,' + r[4])] for r in cekl]
+    tulis(path, [nama + '_CEK', tgl, '0', '0'], segs, False)
+
+
 # ----------------------------------------------------------------------------- 2. boundary
 def _area(r):
     a = 0.0
@@ -467,8 +480,35 @@ def _awal_seperti_surpac(ring, B0, key):
     return ring, g
 
 
-def tulis_boundary(path, nama, tgl, rings, no, head=None, binary=False):
+def tulis_boundary(path, nama, tgl, rings, no, head=None, binary=False, axis=AXIS):
     head = list(head or [nama, tgl, '0', '0'])
     head[0] = nama; head[1] = tgl
     segs = [[(no, p[1], p[0], p[2], p[3]) for p in r + r[:1]] for r in rings]
-    tulis(path, head, segs, binary)
+    tulis(path, head, segs, binary, axis)
+
+
+# ----------------------------------------------------------------------------- 4. alur lengkap (= VBA)
+def jalankan_potong(progres_path, bdy_paths, bdy_no, mode, harian_paths, out_path, tgl=None,
+                    titik_potong=False, cek=2.0):
+    g = baca(progres_path)
+    bd = [baca(p) for p in bdy_paths]
+    hr = [baca(p) for p in harian_paths]
+    if tgl is None:
+        src = (harian_paths or bdy_paths)[0]
+        tgl = tgl_dari_file(src)
+    out, st, cekl = potong(g, [(b, bdy_no) for b in bd], mode, hr, bdy_no, titik_potong, cek if mode == 'dalam' else 0)
+    nama = os.path.splitext(os.path.basename(out_path))[0]
+    tulis(out_path, kepala(g['head'], nama, tgl_surpac(tgl)), out, g['binary'], g['axis'])
+    if cekl: tulis_cek(os.path.splitext(out_path)[0] + '_CEK.str', nama, tgl_surpac(tgl), cekl)
+    return st, len(cekl)
+
+
+def jalankan_bdy(a_path, a_no, b_paths, b_no, op, out_path, tgl=None, out_no=None):
+    a = baca(a_path)
+    B = []
+    for p in b_paths: B += rings_dari(baca(p)['segs'], b_no)
+    if tgl is None: tgl = tgl_dari_file(b_paths[0])
+    R = boundary_op(rings_dari(a['segs'], a_no), B, op)
+    nama = os.path.splitext(os.path.basename(out_path))[0]
+    tulis_boundary(out_path, nama, tgl_surpac(tgl), R, out_no or a_no, kepala(a['head'], nama, tgl_surpac(tgl)), a['binary'], a['axis'])
+    return len(R)
