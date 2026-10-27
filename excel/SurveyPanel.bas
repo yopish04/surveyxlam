@@ -57,6 +57,7 @@ Public Sub RbBantuan(control As IRibbonControl)
            "   gabung\<tanggal>.str dan <tanggal>_LOG.txt." & vbLf & vbLf & _
            "Profil: harian (pit/rehandling/quarry: 2->5, 3->6, 500->600)," & vbLf & _
            "        base (base/dump/waste/pelebaran: 2->2, 3->3, 500->500)," & vbLf & _
+           "        tetap (data hampar/topo/kuari: nomor string = kode 2, 3, 23, 500)," & vbLf & _
            "        exca (posisi unit; Area = nama file hasil, mis. exa_ds)." & vbLf & _
            "Muat Ulang Boundary: setelah crest/toe/spot diedit di Surpac dan disimpan," & vbLf & _
            "   pilih file .str itu; string 1 dibuat ulang dari titik yang ada sekarang." & vbLf & _
@@ -133,6 +134,13 @@ Public Sub SiapkanJob(ByVal folderIn As String)
             Case "abaikan"
                 prof = "": area = "": use_ = "N"
             Case Else
+                If RawFormatOf(JoinPath(folderIn, names(i))) = "B" Then
+                    ' code-first raw (hampar, topo, kuari ...): strings keep the code number,
+                    ' one .str per file named like the file
+                    prof = "tetap"
+                    area = AreaFromFile(names(i))
+                    GoTo haveArea
+                End If
                 prof = ProfileOf(kind)
                 If kind = "dumpingan" Then
                     area = "dumpingan"
@@ -142,6 +150,7 @@ Public Sub SiapkanJob(ByVal folderIn As String)
                     area = kind
                 End If
                 If d > 0 And newest > 0 And d < newest Then area = TagOfDay(d) & "_" & area
+haveArea:
         End Select
         ws.Cells(r, COL_USE).Value = use_
         ws.Cells(r, COL_FILE).Value = names(i)
@@ -157,7 +166,7 @@ Public Sub SiapkanJob(ByVal folderIn As String)
         .Delete: .Add Type:=xlValidateList, AlertStyle:=xlValidAlertStop, Formula1:="Y,N"
     End With
     With ws.Range(ws.Cells(FIRST_ROW, COL_PROF), ws.Cells(last + 50, COL_PROF)).Validation
-        .Delete: .Add Type:=xlValidateList, AlertStyle:=xlValidAlertStop, Formula1:="harian,base,exca"
+        .Delete: .Add Type:=xlValidateList, AlertStyle:=xlValidAlertStop, Formula1:="harian,base,tetap,exca"
     End With
     ws.Range(ws.Cells(FIRST_ROW, COL_AREA), ws.Cells(last, COL_PROF)).Interior.Color = RGB(255, 242, 204)
     ws.Range("B2:B7").Interior.Color = RGB(255, 242, 204)
@@ -488,6 +497,21 @@ Public Function KindOf(ByVal fileName As String) As String
         Next w
     Next k
     KindOf = "lain"
+End Function
+
+' 20261021_progres_hampar_limonit_090428.txt -> 20261021_progres_hampar_limonit
+' (extension, a trailing _hhmmss time and trailing _ removed)
+Public Function AreaFromFile(ByVal fileName As String) As String
+    Dim b As String, p As Long
+    b = StripExt(fileName)
+    p = InStrRev(b, "_")
+    If p > 0 And Len(b) - p = 6 Then
+        If IsDigits(Mid(b, p + 1)) Then b = Left(b, p - 1)
+    End If
+    Do While Right(b, 1) = "_" Or Right(b, 1) = " "
+        b = Left(b, Len(b) - 1)
+    Loop
+    AreaFromFile = b
 End Function
 
 Public Function ProfileOf(ByVal kind As String) As String

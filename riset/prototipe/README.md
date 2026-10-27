@@ -258,3 +258,19 @@ teks maupun biner Surpac (format keluaran = format masukan).
 
 Uji: boundary dari file manual 26 Okt dibuang lalu dibuat ulang → crest/toe tetap 100 % sama,
 sisi boundary sama dengan buatan tangan **79 % (tofu3) dan 80 % (tofu9)**, tidak ada persilangan.
+
+## Data hampar / topo / kuari (format mentah kedua, profil `tetap`)
+
+Data di `DATA RAW` (20–27 Okt 2026, 17 file) memakai format lain:
+`kode N E Z nama tinggi_antena FIXED` (dipisah spasi, tanpa header). Nomor string di `.str` manual
+**sama dengan kode**: crest `2`, toe `3`, titik pertemuan `23`, spot `500`; boundary `1` hanya di
+file terbaru. `read_raw` (dan VBA `LoadRaw`) sekarang mengenali kedua format per baris;
+profil baru `tetap` menulis nomor string = kode. Di panel, file berformat ini otomatis diberi
+profil `tetap` dan nama area = nama file tanpa jam (`..._090428`) dan tanpa `_` di akhir.
+
+Uji 17 pasang `.txt`/`.str` manual: sambungan sama dengan manual crest 67 %, toe 80 %,
+spot 95 %; boundary (3 file yang punya) IoU 0,96–1,00. Hasil VBA = Python untuk 17 file.
+
+Belum cocok: `20261026_ongrade_limonit` (crest 11/81). File ini diukur **per penampang**
+(toe–crest–crest–toe melintang, maju tiap ±3 m), sehingga urutan tembak tidak mengikuti garis.
+Perlu mode "penampang" seperti jalan (kode 7), tapi jumlah titik per penampang tidak tetap.

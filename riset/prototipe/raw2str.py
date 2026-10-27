@@ -37,6 +37,7 @@ CEK_GANDA, CEK_POTONG = 9007, 9008   # crest/toe points dropped (pass measured t
 NUMBERING = {
     'harian': dict(crest=5, toe=6, spot={'500': 600, '602': 602}),   # pit, rehandling, quarry
     'base':   dict(crest=2, toe=3, spot={'500': 500, '602': 602}),   # base, dumping, waste, fill
+    'tetap':  dict(crest=2, toe=3, spot={}),                        # string number = code (hampar, topo, kuari, ...)
 }
 BASE_WORDS = ('BASE', 'DUMP', 'DAMPING', 'WASTE', 'WSD', 'WD_', 'WD-', 'PELEBARAN', 'FILL')
 
@@ -46,14 +47,28 @@ def detect_profile(raw_files):
     return 'base' if any(w in names for w in BASE_WORDS) else 'harian'
 
 
+def _num(t):
+    try: float(t); return True
+    except ValueError: return False
+
+
 def read_raw(path):
+    """Two instrument formats, detected per line:
+    A  tab, header line:   name<TAB>N<TAB>E<TAB>Z<TAB>code          (pit RTK export)
+    B  spaces, no header:  code N E Z name [antenna height] [FIXED|DGNSS|...]
+    """
     pts = []
-    for i, l in enumerate(open(path, encoding='latin1').read().splitlines()[1:]):
-        p = l.split('\t')
-        if len(p) < 4:
-            continue
-        pts.append(dict(file=os.path.basename(path), row=i, name=p[0].strip(), n=float(p[1]),
-                        e=float(p[2]), z=float(p[3]), code=p[4].strip() if len(p) > 4 else ''))
+    for i, l in enumerate(open(path, encoding='latin1').read().splitlines()):
+        if '\t' in l:
+            p = l.split('\t')
+            if len(p) < 4 or not _num(p[1]) or not _num(p[2]) or not _num(p[3]): continue
+            pts.append(dict(file=os.path.basename(path), row=i, name=p[0].strip(), n=float(p[1]),
+                            e=float(p[2]), z=float(p[3]), code=p[4].strip() if len(p) > 4 else ''))
+        else:
+            p = l.split()
+            if len(p) < 5 or not (_num(p[1]) and _num(p[2]) and _num(p[3])): continue
+            pts.append(dict(file=os.path.basename(path), row=i, name=p[4], n=float(p[1]),
+                            e=float(p[2]), z=float(p[3]), code=p[0]))
     return pts
 
 

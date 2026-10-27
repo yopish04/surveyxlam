@@ -166,7 +166,7 @@ Private Sub ConvertArea(fl() As String, ByVal nf As Long, ByVal title As String,
     Dim nNoCode As Long, nExca As Long
     Dim crestNo As Long, toeNo As Long
 
-    If profile = "base" Then crestNo = 2: toeNo = 3 Else crestNo = 5: toeNo = 6
+    If profile = "base" Or profile = "tetap" Then crestNo = 2: toeNo = 3 Else crestNo = 5: toeNo = 6
     NP = 0
     For i = 0 To nf - 1
         LoadRaw fl(i)
@@ -295,31 +295,104 @@ End Sub
 ' =============================================================================
 ' Raw file reading
 ' =============================================================================
+' Two instrument formats, detected per line (same as raw2str.read_raw):
+'   A  tab, header line:   name<TAB>N<TAB>E<TAB>Z<TAB>code          (pit RTK export)
+'   B  spaces, no header:  code N E Z name [antenna height] [FIXED|DGNSS|...]
 Private Sub LoadRaw(ByVal path As String)
-    Dim f As Integer, s As String, parts() As String, first As Boolean
+    Dim f As Integer, s As String, parts As Variant
     f = FreeFile
     Open path For Input As #f
-    first = True
     Do While Not EOF(f)
         Line Input #f, s
         s = Replace(s, Chr(13), "")
-        If first Then
-            first = False
-        Else
+        If InStr(s, Chr(9)) > 0 Then
             parts = Split(s, Chr(9))
             If UBound(parts) >= 3 Then
-                If NP Mod 512 = 0 Then GrowPool NP + 512
-                PName(NP) = Trim(parts(0))
-                PN(NP) = Val(parts(1)): PE(NP) = Val(parts(2)): PZ(NP) = Val(parts(3))
-                If UBound(parts) >= 4 Then PCode(NP) = Trim(parts(4)) Else PCode(NP) = ""
-                PFile(NP) = path
-                PCls(NP) = Classify(PCode(NP))
-                NP = NP + 1
+                If IsNumText(parts(1)) And IsNumText(parts(2)) And IsNumText(parts(3)) Then
+                    Dim rawCode As String
+                    rawCode = ""
+                    If UBound(parts) >= 4 Then rawCode = Trim(parts(4))
+                    AddRawPoint Trim(parts(0)), parts(1), parts(2), parts(3), rawCode, path
+                End If
+            End If
+        Else
+            parts = SplitSpaces(s)
+            If UBound(parts) >= 4 Then
+                If IsNumText(parts(1)) And IsNumText(parts(2)) And IsNumText(parts(3)) Then
+                    AddRawPoint parts(4), parts(1), parts(2), parts(3), parts(0), path
+                End If
             End If
         End If
     Loop
     Close #f
 End Sub
+
+Private Sub AddRawPoint(ByVal nm As String, ByVal sn As String, ByVal se As String, ByVal sz As String, _
+                        ByVal code As String, ByVal path As String)
+    If NP Mod 512 = 0 Then GrowPool NP + 512
+    PName(NP) = nm
+    PN(NP) = Val(sn): PE(NP) = Val(se): PZ(NP) = Val(sz)
+    PCode(NP) = code
+    PFile(NP) = path
+    PCls(NP) = Classify(PCode(NP))
+    NP = NP + 1
+End Sub
+
+' "  a  b   c " -> (a, b, c)
+Public Function SplitSpaces(ByVal s As String) As Variant
+    Dim t As String, parts() As String
+    t = Trim(Replace(s, Chr(9), " "))
+    Do While InStr(t, "  ") > 0
+        t = Replace(t, "  ", " ")
+    Loop
+    If Len(t) = 0 Then
+        ReDim parts(0 To 0): parts(0) = "": SplitSpaces = parts: Exit Function
+    End If
+    SplitSpaces = Split(t, " ")
+End Function
+
+' A number as written by the instrument (digits, one dot, optional leading minus)
+Public Function IsNumText(ByVal s As String) As Boolean
+    Dim i As Long, c As String, dots As Long, digits As Long
+    s = Trim(s)
+    If Len(s) = 0 Then Exit Function
+    For i = 1 To Len(s)
+        c = Mid(s, i, 1)
+        If c >= "0" And c <= "9" Then
+            digits = digits + 1
+        ElseIf c = "." Then
+            dots = dots + 1
+        ElseIf c = "-" And i = 1 Then
+        Else
+            Exit Function
+        End If
+    Next i
+    IsNumText = (digits > 0 And dots <= 1)
+End Function
+
+' Format of a raw file: "B" when the first data line is code N E Z name (spaces), else "A"
+Public Function RawFormatOf(ByVal path As String) As String
+    Dim f As Integer, s As String, parts As Variant
+    RawFormatOf = "A"
+    f = FreeFile
+    Open path For Input As #f
+    Do While Not EOF(f)
+        Line Input #f, s
+        s = Replace(s, Chr(13), "")
+        If InStr(s, Chr(9)) > 0 Then
+            parts = Split(s, Chr(9))
+            If UBound(parts) >= 3 Then
+                If IsNumText(parts(1)) Then Exit Do
+            End If
+        ElseIf Len(Trim(s)) > 0 Then
+            parts = SplitSpaces(s)
+            If UBound(parts) >= 4 Then
+                If IsNumText(parts(1)) And IsNumText(parts(2)) Then RawFormatOf = "B": Exit Do
+            End If
+        End If
+    Loop
+    Close #f
+End Function
 
 Private Sub GrowPool(ByVal n As Long)
     ReDim Preserve PN(0 To n): ReDim Preserve PE(0 To n): ReDim Preserve PZ(0 To n)
@@ -1626,7 +1699,7 @@ End Sub
 
 Private Function SpotNumber(ByVal code As String, ByVal profile As String) As Long
     If code = "500" Then
-        If profile = "base" Then SpotNumber = 500 Else SpotNumber = 600
+        If profile = "base" Or profile = "tetap" Then SpotNumber = 500 Else SpotNumber = 600
     ElseIf code = "602" Then
         SpotNumber = 602
     Else
@@ -2085,6 +2158,9 @@ End Function
 Private Function FullName(ByVal tag As String, ByVal name As String) As String
     If Len(name) >= 7 Then
         If IsDigits(Left(name, 6)) And Mid(name, 7, 1) = "_" Then FullName = name: Exit Function
+    End If
+    If Len(name) >= 9 Then
+        If IsDigits(Left(name, 8)) And Mid(name, 9, 1) = "_" Then FullName = name: Exit Function
     End If
     FullName = tag & "_" & name
 End Function
