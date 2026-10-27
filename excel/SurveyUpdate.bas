@@ -51,6 +51,17 @@ Public LastStat As String
 '   titikPotong : True = tambah titik di garis boundary pada garis yang terpotong
 '   cekJarak    : m, ujung garis lama terpotong sedekat ini dari boundary -> _CEK.str (0 = tidak)
 ' =============================================================================
+
+' ---- deklarasi bagian boundary ----
+Private AX() As Double, AY() As Double, AZ() As Double, AD() As String, ARS() As Long, ARL() As Long, NAR As Long
+Private BXr() As Double, BYr() As Double, BZr() As Double, BDr() As String, BRS() As Long, BRL() As Long, NBR As Long
+Private AFlip() As Boolean, BFlip() As Boolean
+Private AQx0() As Double, AQx1() As Double, AQy0() As Double, AQy1() As Double
+Private BQx0() As Double, BQx1() As Double, BQy0() As Double, BQy1() As Double
+Private PPx() As Double, PPy() As Double, PPz() As Double, PPd() As String, PPnew() As Long
+Private PQx() As Double, PQy() As Double, PQz() As Double, PQd() As String, PQnew() As Long
+Private PSrc() As Long, PRing() As Long, PCls() As Long, NPc As Long
+
 Public Function PotongProgres(ByVal progresPath As String, ByVal bdyList As String, ByVal bdyNo As Long, _
                               ByVal mode As String, ByVal harianList As String, ByVal outPath As String, _
                               ByVal tgl As String, Optional ByVal titikPotong As Boolean = False, _
@@ -615,16 +626,8 @@ End Function
 ' 2. BOUNDARY: A + B, A - B, A x B   (sama dengan boundary_op di progres.py)
 ' =============================================================================
 ' ring set: titik datar RX/RY/RZ/RD, ring k = RS(k) .. RS(k)+RL(k)-1 (terbuka, tanpa titik penutup)
-Private AX() As Double, AY() As Double, AZ() As Double, AD() As String, ARS() As Long, ARL() As Long, NAR As Long
-Private BXr() As Double, BYr() As Double, BZr() As Double, BDr() As String, BRS() As Long, BRL() As Long, NBR As Long
-Private AFlip() As Boolean, BFlip() As Boolean
 ' kotak batas per ring (untuk lewati ring yang jauh)
-Private AQx0() As Double, AQx1() As Double, AQy0() As Double, AQy1() As Double
-Private BQx0() As Double, BQx1() As Double, BQy0() As Double, BQy1() As Double
 ' potongan sisi: titik awal (P*) dan akhir (Q*), sumber 0=A 1=B, ring, kelas
-Private PPx() As Double, PPy() As Double, PPz() As Double, PPd() As String, PPnew() As Long
-Private PQx() As Double, PQy() As Double, PQz() As Double, PQd() As String, PQnew() As Long
-Private PSrc() As Long, PRing() As Long, PCls() As Long, NPc As Long
 ' kelas: 1 luar, 2 dalam, 3 sama, 4 lawan
 
 Public Function BoundaryOp(ByVal aPath As String, ByVal aNo As Long, ByVal bList As String, ByVal bNo As Long, _
@@ -1783,6 +1786,7 @@ End Sub
 
 Private Sub WriteBytes(ByVal path As String, o() As Byte)
     Dim f As Integer
+    MakeDirs path
     On Error Resume Next
     Kill path
     On Error GoTo 0
@@ -1790,6 +1794,22 @@ Private Sub WriteBytes(ByVal path As String, o() As Byte)
     Open path For Binary Access Write As #f
     Put #f, 1, o
     Close #f
+End Sub
+
+' buat folder induk file (bertingkat) kalau belum ada
+Private Sub MakeDirs(ByVal filePath As String)
+    Dim p() As String, i As Long, cur As String, sep As String
+    If InStr(filePath, "\") > 0 Then sep = "\" Else sep = "/"
+    p = Split(filePath, sep)
+    cur = p(0)
+    For i = 1 To UBound(p) - 1
+        cur = cur & sep & p(i)
+        If Len(p(i)) > 0 Then
+            On Error Resume Next
+            MkDir cur
+            On Error GoTo 0
+        End If
+    Next i
 End Sub
 
 Private Sub WriteText(ByVal path As String, ByVal s As String)
