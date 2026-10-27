@@ -1390,6 +1390,9 @@ End Function
 Public Function ResolveYmd(ByVal v As String, ByVal fileList As String) As Long
     Dim p() As String, f As String, m As Long
     v = Trim(v)
+    If Len(v) = 8 And IsNum(v) Then
+        If Left(v, 2) = "20" Then ResolveYmd = CLng(v): Exit Function
+    End If
     p = Split(v, "-")
     If UBound(p) = 2 Then
         If Len(p(0)) = 4 And IsNum(p(0)) And IsNum(p(1)) And IsNum(p(2)) Then ResolveYmd = CLng(p(0)) * 10000 + CLng(p(1)) * 100 + CLng(p(2)): Exit Function

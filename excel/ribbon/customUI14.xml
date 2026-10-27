@@ -19,6 +19,25 @@
                   screentip="Muat Ulang Boundary" supertip="Pilih file .str yang sudah diedit di Surpac. String 1 (boundary) dibuat ulang dari crest/toe/spot yang ada sekarang; string lain tidak diubah. File lama disalin ke folder backup_boundary."
                   onAction="RbMuatBoundary"/>
         </group>
+        <group id="grpUpdate" label="Update Progress">
+          <button id="btnUpdSheet" label="Sheet Update" size="large" imageMso="TableInsert"
+                  screentip="Sheet Update" supertip="Buat atau buka sheet Update: satu baris = satu pekerjaan (UPDATE HARIAN, POTONG, BDY TAMBAH / KURANGI / IRISAN)."
+                  onAction="RbUpdSheet"/>
+          <button id="btnUpdIsi" label="Isi File" imageMso="FileOpen"
+                  supertip="Pilih file (boleh banyak); path ditulis ke sel yang sedang dipilih."
+                  onAction="RbUpdIsiFile"/>
+          <button id="btnUpdRun" label="Jalankan Update" size="large" imageMso="MacroPlay"
+                  screentip="Jalankan Update" supertip="Kerjakan semua baris Pakai = Y di sheet Update. Hasil ke Folder keluar (B2), tidak pernah ke folder server."
+                  onAction="RbUpdJalankan"/>
+          <button id="btnPotongCepat" label="Potong Cepat" imageMso="Cut"
+                  supertip="Potong satu file progress dengan boundary lewat dialog: string boundary, buang di dalam / di luar, tambah harian, tanggal."
+                  onAction="RbPotongCepat"/>
+          <button id="btnBdyCepat" label="Boundary Cepat" imageMso="ObjectsGroup"
+                  supertip="Boundary A + B, A - B atau irisan lewat dialog, dengan nomor string pilihan."
+                  onAction="RbBoundaryCepat"/>
+          <button id="btnUpdHelp" label="Cara Pakai" imageMso="Help"
+                  onAction="RbUpdBantuan"/>
+        </group>
         <group id="grpFileJob" label="File Job">
           <button id="btnSimpanJob" label="Simpan Job" imageMso="FileSave"
                   supertip="Simpan sheet Job sebagai file daftar pekerjaan .txt."
