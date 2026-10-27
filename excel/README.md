@@ -58,6 +58,33 @@ Catatan kompatibilitas yang ditemukan saat uji: LibreOffice salah membaca
 baris. Keduanya sudah ditulis dalam bentuk blok, jadi modul berjalan sama di Excel dan
 LibreOffice.
 
+## Update Progress (SurveyUpdate.bas + SurveyUpdatePanel.bas)
+
+Grup ribbon **Update Progress**: Sheet Update, Isi File, Jalankan Update, Potong Cepat, Boundary Cepat, Cara Pakai.
+
+- **POTONG**: file progress (teks/biner) dipotong dengan boundary dari satu atau banyak file. Nomor string bisa dipilih. Mode DALAM (buang titik di dalam, = Surpac STRING CLIP OUTSIDE) atau LUAR. Data harian bisa langsung ditambahkan. Titik tepat di garis boundary (≤ 1 cm) dihitung di dalam.
+- **BDY TAMBAH / KURANGI / IRISAN**: boundary A dan B, masing-masing dengan nomor string pilihan.
+- **UPDATE HARIAN** menghasilkan tiga file sekaligus: `YYYY_MM_DD_update_topo_<area>.str`, `..._bdy.str`, dan `..._CEK.str`.
+
+Aturan Surpac yang ditiru untuk gabung boundary:
+
+- z titik potong = (2·zA + zB)/3;
+- ring hasil memakai satu deskripsi, yaitu titik pertama ring harian;
+- titik awal ring mengikuti ring harian terakhir yang menyentuh.
+
+Hasil uji (spesifikasi `riset/volume/progres.py`):
+
+| Uji | Hasil |
+|---|---|
+| bdy LD03 26→27 dan 25→26 | identik byte per byte dengan file manual Surpac |
+| bdy Tofu 9 (11 segmen, biner) | sama, selisih koordinat ≤ 6e-11 m |
+| VBA (LibreOffice) vs Python | 16 kasus (potong DALAM/LUAR, banyak boundary, string 3, titik potong, harian, tambah/kurangi/irisan, update harian): semua byte sama |
+| update global vs manual | sama di luar daerah edit manual; selisih volume 0,04 % / 0,002 % |
+
+Uji LibreOffice: `uji_libreoffice/run_update.sh SurveyUpdate.bas job.txt`.
+
+Catatan LibreOffice: `If ... Then ReDim Preserve ...` satu baris tidak jalan, harus ditulis sebagai blok. `2^1024` membuat overflow (tabel Pow2 hanya sampai 2046). Array besar (> ~10 juta elemen) membuat LibreOffice berhenti; di Excel tidak masalah.
+
 ## Panel (add-in)
 
 `SurveyPanel.bas` + `ribbon/customUI14.xml` → tab **SMA Survey**: Siapkan Job (sheet Job dari

@@ -67,6 +67,7 @@ Public Sub RbUpdBantuan(control As IRibbonControl)
            "  atau 2026-10-27 / 27/10/2026. Nama hasil kosong = nama file utama dengan tanggal baru." & vbLf & _
            "Isi File: pilih sel, klik Isi File, pilih satu atau banyak file." & vbLf & _
            "Hasil ditulis ke Folder keluar (B2), tidak pernah ke folder dilindungi (B5)." & vbLf & _
+           "File asal tidak pernah ditimpa; hasil dengan nama sama di Folder keluar ditimpa." & vbLf & _
            "Format hasil (teks/biner) sama dengan file utama.", vbInformation, "SMA Survey - Update Progress"
 End Sub
 
@@ -87,7 +88,7 @@ Public Sub SiapkanSheetUpdate()
     ws.Cells.Font.Name = "Calibri": ws.Cells.Font.Size = 10
     ws.Range("A1").Value = "SMA Survey - Update Progress"
     ws.Range("A1").Font.Bold = True: ws.Range("A1").Font.Size = 14
-    Setting ws, 2, "Folder keluar", DEF_OUT, "hasil ditulis di sini (kosong = folder file utama, kecuali folder dilindungi)"
+    Setting ws, 2, "Folder keluar", DEF_OUT, "semua hasil ditulis di sini (kosong = " & DEF_OUT & ")"
     Setting ws, 3, "Tanggal", "auto", "auto = dari nama file harian/boundary; atau 2026-10-27 / 27/10/2026"
     Setting ws, 4, "Jarak cek (m)", "2", "ujung garis lama terpotong sedekat ini dari boundary -> _CEK.str (0 = tidak)"
     Setting ws, 5, "Folder dilindungi", DEF_PROT, "tidak pernah ditulisi (server); pisah dengan ;"
@@ -234,7 +235,7 @@ Private Function KerjakanBaris(ws As Worksheet, ByVal r As Long, ByVal folderOut
     tgl = SurpacDateU(ymd)
     ' folder
     folder = folderOut
-    If Len(folder) = 0 Then folder = Left(fMain, InStrRev(fMain, "\") - 1)
+    If Len(folder) = 0 Then folder = DEF_OUT
     If Dilindungi(folder, prot) Then KerjakanBaris = "GAGAL: folder keluar dilindungi (" & folder & "); isi B2 dengan folder lain": Exit Function
     BuatFolder folder
 
@@ -387,12 +388,13 @@ Private Function ProtList() As String
 End Function
 
 Private Function FolderDefault(ByVal f As String) As String
-    Dim d As String
-    d = Left(f, InStrRev(f, "\") - 1)
-    If Dilindungi(d, ProtList()) Then
-        BuatFolder DEF_OUT
-        d = DEF_OUT
-    End If
+    Dim ws As Worksheet, d As String
+    On Error Resume Next
+    Set ws = ActiveWorkbook.Worksheets(UPD_SHEET)
+    On Error GoTo 0
+    If Not ws Is Nothing Then d = Trim(CStr(ws.Range("B2").Value))
+    If Len(d) = 0 Or Dilindungi(d, ProtList()) Then d = DEF_OUT
+    BuatFolder d
     FolderDefault = d
 End Function
 
