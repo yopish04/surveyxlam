@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<customUI xmlns="http://schemas.microsoft.com/office/2009/07/customui">
+  <ribbon>
+    <tabs>
+      <tab id="tabSmaSurvey" label="SMA Survey">
+        <group id="grpJob" label="TXT ke STR">
+          <button id="btnSiapkan" label="Siapkan Job" size="large" imageMso="FileOpen"
+                  screentip="Siapkan Job" supertip="Pilih folder berisi file .txt mentah. Daftar file dibuat di sheet Job; area dan profil ditebak dari nama file dan bisa diedit."
+                  onAction="RbSiapkan"/>
+          <button id="btnProses" label="Proses" size="large" imageMso="MacroPlay"
+                  screentip="Proses" supertip="Baca sheet Job lalu buat file .str per area, jalan, exa_ds/exa_ns, gabung dan LOG."
+                  onAction="RbProses"/>
+          <button id="btnHasil" label="Folder Hasil" size="large" imageMso="FileOpenUsingSystemDialog"
+                  screentip="Folder Hasil" supertip="Buka folder keluar (sel B3 di sheet Job)."
+                  onAction="RbFolderHasil"/>
+        </group>
+        <group id="grpEdit" label="Setelah Edit di Surpac">
+          <button id="btnBoundary" label="Muat Ulang Boundary" size="large" imageMso="Refresh"
+                  screentip="Muat Ulang Boundary" supertip="Pilih file .str yang sudah diedit di Surpac. String 1 (boundary) dibuat ulang dari crest/toe/spot yang ada sekarang; string lain tidak diubah. File lama disalin ke folder backup_boundary."
+                  onAction="RbMuatBoundary"/>
+        </group>
+        <group id="grpFileJob" label="File Job">
+          <button id="btnSimpanJob" label="Simpan Job" imageMso="FileSave"
+                  supertip="Simpan sheet Job sebagai file daftar pekerjaan .txt."
+                  onAction="RbSimpanJob"/>
+          <button id="btnFileJob" label="Jalankan File Job" imageMso="FileOpen"
+                  supertip="Proses langsung dari file daftar pekerjaan .txt."
+                  onAction="RbFileJob"/>
+        </group>
+        <group id="grpBantuan" label="Bantuan">
+          <button id="btnBantuan" label="Cara Pakai" size="large" imageMso="Help"
+                  onAction="RbBantuan"/>
+        </group>
+      </tab>
+    </tabs>
+  </ribbon>
+</customUI>

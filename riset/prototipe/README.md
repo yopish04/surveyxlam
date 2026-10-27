@@ -210,3 +210,51 @@ jadi tiap jenis bisa diberi warna sendiri atau disembunyikan:
 | 9006 | sisa garis crest/toe lama di dekat boundary | update global | `CEK_SISA_GARIS, str<n>, <deskripsi asli>` |
 
 File `_CEK.str` hanya dibuat kalau ada temuan.
+
+## Garis tidak boleh bersilangan + boundary lebih rapat (dipelajari dari 261026_pit_tofu3/9)
+
+Pembanding: `.str` manual vs hasil script (`*_ .str`) 26 Okt. Di file manual **tidak ada satu pun
+garis yang bersilangan**; di hasil script lama ada 20 persilangan (17 di dalam satu garis, 3 antar
+garis). Semua berasal dari tepi yang **diukur dua kali**. Yang dilakukan secara manual, dan sekarang
+ditiru (`tidy_lines`, `fix_crossings` di `raw2str.py`):
+
+| Kasus | Manual | Otomatis sekarang |
+|---|---|---|
+| Satu garis diukur pergi-pulang (413–417 lalu 417–426) | lintasan pertama dihapus | `drop_self_pass`: titik yang berjarak ≤ 1 m dari bagian garis yang **lebih belakang** (blok ≥ 2 titik) dibuang; sisa lintasan pulang dibalik agar menyambung |
+| Ujung run menumpuk di run berikutnya (241, 242 di atas 182–180) | ujung yang menumpuk dihapus | sama (`drop_self_pass`) |
+| Dua garis sejenis menumpuk (toe 23–25 di atas 455–459) | yang pendek dihapus | `drop_double_pass`: ujung garis pendek yang ≤ 1 m dari garis lebih panjang dibuang |
+| Sisa persilangan (2-opt) | – | `untangle`: dua sisi yang bersilangan → bagian di antaranya dibalik |
+| Crest loncat ke bench lain lalu memotong toe (507→506, beda tinggi 2,7 m) | garis diputus di situ | `fix_crossings`: buang 1 titik di ujung garis, atau putus garis di sisi dengan beda tinggi terbesar |
+
+Titik 23 tidak pernah dibuang. Setiap titik yang dibuang → `_CEK.str` string **9007**, setiap garis
+yang diputus → string **9008**.
+
+Hasil pada data 26 Okt (tofu3): 14 titik dibuang, **13 di antaranya juga dibuang di versi manual**;
+garis diputus tepat di 507|506 seperti manual. Persilangan: 20 → **0**.
+
+**Boundary lebih rapat** (`dig`): sisi boundary manual jarang lebih panjang dari ~10 m (median 3 m),
+hasil script lama sampai 14 m. Sisi boundary > 5 m sekarang "digali" ke titik terdekat di dalam
+(paling jauh 0,3 × panjang sisi dan ≤ 2 m), asal segitiganya kosong dan tidak memotong
+crest/toe maupun boundary sendiri.
+
+| 26 Okt | Sisi boundary sama dengan manual | IoU | Persilangan |
+|---|---|---|---|
+| tofu3 lama → baru | 61 % → **77 %** | 0,971 → 0,976 | 20 → 0 |
+| tofu9 lama → baru | 60 % → **76 %** | 0,963 → 0,967 | 3 → 0 |
+
+(Uji memakai titik dari file hasil script, karena file `.txt` mentah 26 Okt tidak ada di repo.)
+
+## Muat ulang boundary setelah edit di Surpac (`boundary_ulang.py`)
+
+Setelah crest/toe/spot dirapikan di Surpac, boundary lama tidak cocok lagi.
+
+```
+python3 boundary_ulang.py <hasil_edit.str> <keluar.str>
+```
+
+String 1 dibuang lalu dibuat ulang dari titik yang ada di file (string 7/77 jalan dan 9001+ cek
+tidak dipakai); semua string lain ditulis kembali **tanpa diubah**. Membaca dan menulis `.str`
+teks maupun biner Surpac (format keluaran = format masukan).
+
+Uji: boundary dari file manual 26 Okt dibuang lalu dibuat ulang → crest/toe tetap 100 % sama,
+sisi boundary sama dengan buatan tangan **79 % (tofu3) dan 80 % (tofu9)**, tidak ada persilangan.

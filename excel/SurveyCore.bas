@@ -33,6 +33,10 @@ Private Const DOUBLE_TOL As Double = 0.05  ' m: same spot shot twice
 Private Const SPOT_GAP As Double = 15#     ' m: break a spot string
 Private Const ROAD_PTS As Long = 5         ' points per road cross-section
 Private Const EXCA_SPREAD As Double = 1#   ' m: unit shots further apart -> pick by hand
+Private Const DUP_TOL As Double = 1#       ' m: crest/toe measured twice (second pass this close)
+Private Const DIG_EDGE As Double = 5#      ' m: boundary edges longer than this are dug inwards
+Private Const DIG_DEPTH As Double = 0.3    ' dug point at most this fraction of the edge inside
+Private Const DIG_CAP As Double = 2#       ' m: and at most this far inside
 
 ' ---- point pool (one area at a time) ----------------------------------------
 Private PN() As Double, PE() As Double, PZ() As Double
@@ -215,6 +219,18 @@ Private Sub ConvertArea(fl() As String, ByVal nf As Long, ByVal title As String,
     Dim crest As Collection, toe As Collection, allLines As Collection
     Set crest = BuildLines(kept, nk, fOf, nFil, C_CREST)
     Set toe = BuildLines(kept, nk, fOf, nFil, C_TOE)
+    ' ---- no crossing lines: drop double passes, untangle, cut what still crosses ----
+    Dim drop() As Boolean, nDrop As Long, nCut As Long
+    ReDim drop(0 To NP)
+    TidyLines crest, drop, nDrop
+    TidyLines toe, drop, nDrop
+    FixCrossings crest, toe, drop, nDrop, nCut
+    j = 0
+    For i = 0 To nk - 1
+        If Not drop(kept(i)) Then kept(j) = kept(i): fOf(j) = fOf(i): j = j + 1
+    Next i
+    nk = j
+
     Set allLines = New Collection
     For i = 1 To crest.Count
         allLines.Add crest(i)
@@ -237,6 +253,7 @@ Private Sub ConvertArea(fl() As String, ByVal nf As Long, ByVal title As String,
         If nm >= 10 Then
             If ConcaveHull(members, nm, hull, nh) Then
                 FollowStrings hull, nh, allLines
+                DigHull hull, nh, members, nm, allLines
                 EmitIdx 1, 1, hull, nh, True
             End If
         End If
@@ -270,6 +287,8 @@ Private Sub ConvertArea(fl() As String, ByVal nf As Long, ByVal title As String,
     If nRoad > 0 Then msg = msg & ", titik jalan (ke file jalan): " & nRoad
     If nRoad > 0 And Not roadOk Then msg = msg & ", JALAN PERLU DICEK"
     If nDbl > 0 Then msg = msg & ", titik double (dihapus): " & nDbl
+    If nDrop > 0 Then msg = msg & ", crest/toe diukur 2x (dibuang): " & nDrop
+    If nCut > 0 Then msg = msg & ", garis diputus agar tidak bersilangan: " & nCut
     AddLog msg
 End Sub
 
@@ -326,7 +345,7 @@ Private Function Classify(ByVal code As String) As Long
     End If
 End Function
 
-Private Function IsDigits(ByVal s As String) As Boolean
+Public Function IsDigits(ByVal s As String) As Boolean
     Dim i As Long, ch As String
     If Len(s) = 0 Then Exit Function
     For i = 1 To Len(s)
@@ -710,6 +729,849 @@ Private Function IsSimple(ring() As Long, ByVal n As Long) As Boolean
     Next i
     IsSimple = True
 End Function
+
+' =============================================================================
+' No crossing lines (port of raw2str.py tidy_lines / fix_crossings)
+' =============================================================================
+' Per kind: drop a pass measured twice inside one line, then a shorter line lying on a
+' longer one, join again, and untangle (2-opt) every line.
+Private Sub TidyLines(lines As Collection, drop() As Boolean, nDrop As Long)
+    Dim i As Long, arr As Variant, outL As New Collection
+    For i = 1 To lines.Count
+        arr = DropSelfPass(lines(i), drop, nDrop)
+        If Not IsEmpty(arr) Then outL.Add arr
+    Next i
+    DropDoublePass outL, drop, nDrop
+    MergeRuns outL
+    Set lines = New Collection
+    For i = 1 To outL.Count
+        lines.Add Untangle(outL(i))
+    Next i
+End Sub
+
+Private Function NearLine(ByVal p As Long, arr As Variant, ByVal tol As Double) As Boolean
+    Dim k As Long
+    For k = 0 To UBound(arr) - 1
+        If SegDist(p, arr(k), arr(k + 1)) <= tol Then NearLine = True: Exit Function
+    Next k
+End Function
+
+' Points within DUP_TOL of a LATER, non-neighbouring part of the same line are the first
+' copy of a stretch measured twice; blocks of >= 2 are removed. Returns Empty if nothing left.
+Private Function DropSelfPass(arr As Variant, drop() As Boolean, nDrop As Long) As Variant
+    Dim n As Long, i As Long, j As Long, k As Long, mark() As Boolean
+    Dim keep() As Long, nk As Long, rest As Variant, t As Long
+    n = UBound(arr) + 1
+    ReDim mark(0 To n): ReDim keep(0 To n)
+    For i = 0 To n - 1
+        If (PCls(arr(i)) And C_JUNC) = 0 Then
+            For k = i + 3 To n - 2
+                If SegDist(arr(i), arr(k), arr(k + 1)) <= DUP_TOL Then mark(i) = True: Exit For
+            Next k
+        End If
+    Next i
+    i = 0
+    Do While i < n
+        If Not mark(i) Then
+            keep(nk) = arr(i): nk = nk + 1: i = i + 1
+        Else
+            j = i
+            Do While j < n
+                If Not mark(j) Then Exit Do
+                j = j + 1
+            Loop
+            If j - i >= 2 Then
+                For t = i To j - 1
+                    drop(arr(t)) = True: nDrop = nDrop + 1
+                Next t
+                If nk > 0 And j < n Then
+                    If Dist(keep(nk - 1), arr(n - 1)) < Dist(keep(nk - 1), arr(j)) Then
+                        For t = n - 1 To j Step -1
+                            keep(nk) = arr(t): nk = nk + 1
+                        Next t
+                        DropSelfPass = Slice(keep, 0, nk)
+                        Exit Function
+                    End If
+                End If
+            Else
+                For t = i To j - 1
+                    keep(nk) = arr(t): nk = nk + 1
+                Next t
+            End If
+            i = j
+        End If
+    Loop
+    If nk > 0 Then DropSelfPass = Slice(keep, 0, nk)
+End Function
+
+' Longest lines first (stable). Points at the END of a line (or the whole line) lying within
+' DUP_TOL of an earlier (longer) line are removed; 23 points never.
+Private Sub DropDoublePass(lines As Collection, drop() As Boolean, nDrop As Long)
+    Dim n As Long, L() As Variant, ln() As Long, i As Long, j As Long, o As Long, t As Long
+    Dim s As Variant, m As Long, near() As Boolean, allNear As Boolean, a As Long, b As Long
+    Dim cutA As Long, cutB As Long, tmpV As Variant, tmpL As Long
+    n = lines.Count
+    If n = 0 Then Exit Sub
+    ReDim L(0 To n - 1): ReDim ln(0 To n - 1)
+    For i = 0 To n - 1
+        L(i) = lines(i + 1): ln(i) = UBound(L(i)) + 1
+    Next i
+    For i = 1 To n - 1                      ' stable insertion sort, longest first
+        j = i
+        Do While j > 0
+            If ln(j - 1) < ln(j) Then
+                tmpV = L(j - 1): L(j - 1) = L(j): L(j) = tmpV
+                tmpL = ln(j - 1): ln(j - 1) = ln(j): ln(j) = tmpL
+                j = j - 1
+            Else
+                Exit Do
+            End If
+        Loop
+    Next i
+    For i = 0 To n - 1
+        If ln(i) >= 2 Then
+            s = L(i): m = ln(i)
+            ReDim near(0 To m - 1)
+            allNear = True
+            For t = 0 To m - 1
+                near(t) = False
+                If (PCls(s(t)) And C_JUNC) = 0 Then
+                    For o = 0 To i - 1
+                        If ln(o) >= 2 Then
+                            If NearLine(s(t), L(o), DUP_TOL) Then near(t) = True: Exit For
+                        End If
+                    Next o
+                End If
+                If Not near(t) Then allNear = False
+            Next t
+            If i > 0 Then
+                If allNear Then
+                    For t = 0 To m - 1
+                        drop(s(t)) = True: nDrop = nDrop + 1
+                    Next t
+                    ln(i) = 0
+                Else
+                    a = 0
+                    Do While a < m
+                        If Not near(a) Then Exit Do
+                        a = a + 1
+                    Loop
+                    b = m
+                    Do While b > a
+                        If Not near(b - 1) Then Exit Do
+                        b = b - 1
+                    Loop
+                    If a >= 2 Or m - b >= 2 Then
+                        If a >= 2 Then cutA = a Else cutA = 0
+                        If m - b >= 2 Then cutB = b Else cutB = m
+                        For t = 0 To cutA - 1
+                            drop(s(t)) = True: nDrop = nDrop + 1
+                        Next t
+                        For t = cutB To m - 1
+                            drop(s(t)) = True: nDrop = nDrop + 1
+                        Next t
+                        Dim part() As Long
+                        ReDim part(0 To cutB - cutA - 1)
+                        For t = cutA To cutB - 1
+                            part(t - cutA) = s(t)
+                        Next t
+                        L(i) = part: ln(i) = cutB - cutA
+                    End If
+                End If
+            End If
+        End If
+    Next i
+    Set lines = New Collection
+    For i = 0 To n - 1
+        If ln(i) > 0 Then lines.Add L(i)
+    Next i
+End Sub
+
+' 2-opt: while two edges cross, reverse the part between them (ends stay).
+Private Function Untangle(arr As Variant) As Variant
+    Dim s() As Long, n As Long, i As Long, j As Long, r As Long, hit As Boolean, t As Long, u As Long, tmp As Long
+    n = UBound(arr) + 1
+    ReDim s(0 To n - 1)
+    For i = 0 To n - 1
+        s(i) = arr(i)
+    Next i
+    For r = 1 To 200
+        hit = False
+        For i = 0 To n - 4
+            For j = i + 2 To n - 2
+                If SegX(s(i), s(i + 1), s(j), s(j + 1)) Then hit = True: Exit For
+            Next j
+            If hit Then Exit For
+        Next i
+        If Not hit Then Exit For
+        t = i + 1: u = j
+        Do While t < u
+            tmp = s(t): s(t) = s(u): s(u) = tmp
+            t = t + 1: u = u - 1
+        Loop
+    Next r
+    Untangle = s
+End Function
+
+' Crossing edges between different lines. With wantFirst it stops at the first one
+' (in the order line i, line j > i, edge of i, edge of j) and returns it in fi/fe/fj/fg.
+Private Function CountCross(L() As Variant, ByVal n As Long, ByVal wantFirst As Boolean, _
+                            fi As Long, fe As Long, fj As Long, fg As Long, skipKeys As String) As Long
+    Dim i As Long, j As Long, ei As Long, ej As Long, x As Variant, y As Variant
+    Dim a As Long, b As Long, c As Long, e As Long, cnt As Long
+    For i = 0 To n - 1
+        x = L(i)
+        If Not IsEmpty(x) Then
+        For j = i + 1 To n - 1
+            y = L(j)
+            If Not IsEmpty(y) Then
+            For ei = 0 To UBound(x) - 1
+                a = x(ei): b = x(ei + 1)
+                For ej = 0 To UBound(y) - 1
+                    c = y(ej): e = y(ej + 1)
+                    If Not (Max2(PE(a), PE(b)) < Min2(PE(c), PE(e)) Or Min2(PE(a), PE(b)) > Max2(PE(c), PE(e)) Or _
+                            Max2(PN(a), PN(b)) < Min2(PN(c), PN(e)) Or Min2(PN(a), PN(b)) > Max2(PN(c), PN(e))) Then
+                        If SegX(a, b, c, e) Then
+                            If wantFirst Then
+                                If InStr(skipKeys, "|" & a & "," & b & "," & c & "," & e & "|") = 0 Then
+                                    fi = i: fe = ei: fj = j: fg = ej: CountCross = 1: Exit Function
+                                End If
+                            Else
+                                cnt = cnt + 1
+                            End If
+                        End If
+                    End If
+                Next ej
+            Next ei
+            End If
+        Next j
+        End If
+    Next i
+    CountCross = cnt
+End Function
+
+' Crossings left between different lines: remove one point next to a line end (never a 23),
+' or cut the line at the crossing edge with the bigger height jump - whichever is cheapest
+' and clears the crossing without making a new one.
+Private Sub FixCrossings(crest As Collection, toe As Collection, drop() As Boolean, nDrop As Long, nCut As Long)
+    Dim L() As Variant, T() As Variant, n As Long, nT As Long, i As Long, it As Long, total As Long
+    Dim stuck As String, fi As Long, fe As Long, fj As Long, fg As Long, dum As Long
+    Dim cand(0 To 3) As Long, candI(0 To 3) As Long, c As Long, li As Long, idx As Long, p As Long
+    Dim bestRank As Double, haveBest As Boolean, bestL As Long, bestKind As Long, bestIdx As Long
+    Dim rank As Double, arr As Variant, arr2 As Variant, m As Long, k As Long
+    n = crest.Count + toe.Count
+    If n < 2 Then Exit Sub
+    ReDim L(0 To 2 * n + 210)
+    For i = 1 To crest.Count
+        L(i - 1) = crest(i)
+    Next i
+    For i = 1 To toe.Count
+        L(crest.Count + i - 1) = toe(i)
+    Next i
+    For it = 1 To 100
+        total = CountCross(L, n, False, dum, dum, dum, dum, "")
+        If total = 0 Then Exit For
+        If CountCross(L, n, True, fi, fe, fj, fg, stuck) = 0 Then Exit For
+        haveBest = False
+        candI(0) = fi: cand(0) = fe
+        candI(1) = fi: cand(1) = fe + 1
+        candI(2) = fj: cand(2) = fg
+        candI(3) = fj: cand(3) = fg + 1
+        For c = 0 To 3                                 ' remove a point near a line end
+            li = candI(c): idx = cand(c): arr = L(li): m = UBound(arr) + 1
+            p = arr(idx)
+            If (PCls(p) And C_JUNC) = 0 Then
+                rank = idx
+                If m - 1 - idx < rank Then rank = m - 1 - idx
+                If rank <= 1 Then
+                    CopyList L, T, n: nT = n
+                    T(li) = WithoutIdx(arr, idx)
+                    If CountCross(T, nT, False, dum, dum, dum, dum, "") < total Then
+                        If Not haveBest Or rank < bestRank Then
+                            haveBest = True: bestRank = rank: bestL = li: bestKind = 0: bestIdx = idx
+                        End If
+                    End If
+                End If
+            End If
+        Next c
+        For c = 0 To 2 Step 2                          ' cut the line at the crossing edge
+            li = candI(c): idx = cand(c): arr = L(li)
+            CopyList L, T, n: nT = n
+            CutLine T, nT, li, idx
+            If CountCross(T, nT, False, dum, dum, dum, dum, "") < total Then
+                rank = 2# + 1# / (1# + Abs(PZ(arr(idx)) - PZ(arr(idx + 1))))
+                If Not haveBest Or rank < bestRank Then
+                    haveBest = True: bestRank = rank: bestL = li: bestKind = 1: bestIdx = idx
+                End If
+            End If
+        Next c
+        If Not haveBest Then
+            arr = L(fi): arr2 = L(fj)
+            stuck = stuck & "|" & arr(fe) & "," & arr(fe + 1) & "," & arr2(fg) & "," & arr2(fg + 1) & "|"
+        ElseIf bestKind = 0 Then
+            arr = L(bestL)
+            drop(arr(bestIdx)) = True: nDrop = nDrop + 1
+            L(bestL) = WithoutIdx(arr, bestIdx)
+        Else
+            CutLine L, n, bestL, bestIdx
+            nCut = nCut + 1
+        End If
+    Next it
+    ' back to crest / toe: a crest line has a crest point that is not a 23
+    Set crest = New Collection
+    Set toe = New Collection
+    For i = 0 To n - 1
+        arr = L(i)
+        m = 0
+        For k = 0 To UBound(arr)
+            If (PCls(arr(k)) And C_CREST) <> 0 And (PCls(arr(k)) And C_JUNC) = 0 Then m = 1: Exit For
+        Next k
+        If m = 1 Then
+            crest.Add arr
+        Else
+            toe.Add arr
+        End If
+    Next i
+End Sub
+
+Private Sub CopyList(L() As Variant, T() As Variant, ByVal n As Long)
+    Dim i As Long
+    ReDim T(0 To UBound(L))
+    For i = 0 To n - 1
+        T(i) = L(i)
+    Next i
+End Sub
+
+Private Function WithoutIdx(arr As Variant, ByVal idx As Long) As Variant
+    Dim o() As Long, i As Long, k As Long
+    ReDim o(0 To UBound(arr) - 1)
+    For i = 0 To UBound(arr)
+        If i <> idx Then o(k) = arr(i): k = k + 1
+    Next i
+    WithoutIdx = o
+End Function
+
+' Replace L(li) by its two halves (cut after point idx); halves shorter than 2 points
+' are left out, so the list grows by one, stays or shrinks by one (as raw2str.fix_crossings).
+Private Sub CutLine(L() As Variant, n As Long, ByVal li As Long, ByVal idx As Long)
+    Dim arr As Variant, a As Variant, b As Variant, k As Long, hasA As Boolean, hasB As Boolean
+    arr = L(li)
+    hasA = (idx + 1 >= 2): hasB = (UBound(arr) - idx >= 2)
+    If hasA Then a = Slice2(arr, 0, idx + 1)
+    If hasB Then b = Slice2(arr, idx + 1, UBound(arr) - idx)
+    If hasA And hasB Then
+        For k = n - 1 To li + 1 Step -1
+            L(k + 1) = L(k)
+        Next k
+        L(li) = a: L(li + 1) = b: n = n + 1
+    ElseIf hasA Then
+        L(li) = a
+    ElseIf hasB Then
+        L(li) = b
+    Else
+        For k = li To n - 2
+            L(k) = L(k + 1)
+        Next k
+        L(n - 1) = Empty: n = n - 1
+    End If
+End Sub
+
+Private Function Slice2(arr As Variant, ByVal s0 As Long, ByVal n As Long) As Variant
+    Dim o() As Long, i As Long
+    ReDim o(0 To n - 1)
+    For i = 0 To n - 1
+        o(i) = arr(s0 + i)
+    Next i
+    Slice2 = o
+End Function
+
+' =============================================================================
+' Boundary: dig long edges inwards (port of raw2str.dig)
+' =============================================================================
+' An edge a-b longer than DIG_EDGE becomes a-p-b, p the inside point (of this area, not on
+' the boundary yet) that keeps both new edges shortest, when p lies at most
+' min(DIG_DEPTH * edge, DIG_CAP) inside, the triangle a-p-b holds no other point, and the
+' new edges cross neither the boundary nor a crest/toe line.
+Private Sub DigHull(hull() As Long, nh As Long, mem() As Long, ByVal nm As Long, lines As Collection)
+    Dim onR() As Boolean, i As Long, it As Long, a As Long, b As Long, Lg As Double, lim As Double
+    Dim cand() As Long, cd() As Double, nc As Long, t As Long, j As Long, p As Long, q As Long
+    Dim tmpL As Long, tmpD As Double, ringSgn As Double, side As Double, ok As Boolean, done As Boolean
+    Dim ring() As Long, k As Long
+    ReDim onR(0 To NP)
+    For i = 0 To nh - 1
+        onR(hull(i)) = True
+    Next i
+    ReDim cand(0 To nm): ReDim cd(0 To nm)
+    ReDim ring(0 To nh + nm + 1)
+    For i = 0 To nh - 1
+        ring(i) = hull(i)
+    Next i
+    i = 0
+    Do While i < nh And it < 5000
+        a = ring(i): b = ring((i + 1) Mod nh)
+        Lg = Dist(a, b)
+        If Lg <= DIG_EDGE Then
+            i = i + 1
+        Else
+            it = it + 1
+            lim = DIG_DEPTH * Lg: If DIG_CAP < lim Then lim = DIG_CAP
+            nc = 0
+            For t = 0 To nm - 1
+                p = mem(t)
+                If Not onR(p) Then
+                    If Max2(Dist(a, p), Dist(p, b)) < Lg Then
+                        If SegDist(p, a, b) <= lim Then
+                            cand(nc) = p: cd(nc) = Max2(Dist(a, p), Dist(p, b)): nc = nc + 1
+                        End If
+                    End If
+                End If
+            Next t
+            For t = 1 To nc - 1                         ' stable sort by the longer new edge
+                j = t
+                Do While j > 0
+                    If cd(j - 1) > cd(j) Then
+                        tmpD = cd(j - 1): cd(j - 1) = cd(j): cd(j) = tmpD
+                        tmpL = cand(j - 1): cand(j - 1) = cand(j): cand(j) = tmpL
+                        j = j - 1
+                    Else
+                        Exit Do
+                    End If
+                Loop
+            Next t
+            If nc > 12 Then nc = 12
+            ringSgn = 0
+            For t = 0 To nh - 1
+                ringSgn = ringSgn + PE(ring(t)) * PN(ring((t + 1) Mod nh)) - PE(ring((t + 1) Mod nh)) * PN(ring(t))
+            Next t
+            done = False
+            For t = 0 To nc - 1
+                p = cand(t)
+                side = (PE(b) - PE(a)) * (PN(p) - PN(a)) - (PN(b) - PN(a)) * (PE(p) - PE(a))
+                ok = True
+                If side > 0 And ringSgn < 0 Then ok = False
+                If side < 0 And ringSgn > 0 Then ok = False
+                If ok Then
+                    For j = 0 To nm - 1
+                        q = mem(j)
+                        If q <> p And Not onR(q) Then
+                            If InTri(a, p, b, q) Then ok = False: Exit For
+                        End If
+                    Next j
+                End If
+                If ok Then
+                    If CrossesLines(a, p, lines) Then ok = False
+                End If
+                If ok Then
+                    If CrossesLines(p, b, lines) Then ok = False
+                End If
+                If ok Then
+                    For k = nh To i + 2 Step -1
+                        ring(k) = ring(k - 1)
+                    Next k
+                    ring(i + 1) = p: nh = nh + 1
+                    If SimpleNear(ring, nh, i + 1) Then
+                        onR(p) = True: done = True: Exit For
+                    End If
+                    For k = i + 1 To nh - 2
+                        ring(k) = ring(k + 1)
+                    Next k
+                    nh = nh - 1
+                End If
+            Next t
+            If Not done Then i = i + 1
+        End If
+    Loop
+    ReDim hull(0 To nh)
+    For i = 0 To nh - 1
+        hull(i) = ring(i)
+    Next i
+End Sub
+
+Private Function InTri(ByVal a As Long, ByVal b As Long, ByVal c As Long, ByVal p As Long) As Boolean
+    Dim d1 As Double, d2 As Double, d3 As Double, hasNeg As Boolean, hasPos As Boolean
+    d1 = TriS(p, a, b): d2 = TriS(p, b, c): d3 = TriS(p, c, a)
+    hasNeg = (d1 < 0) Or (d2 < 0) Or (d3 < 0)
+    hasPos = (d1 > 0) Or (d2 > 0) Or (d3 > 0)
+    InTri = Not (hasNeg And hasPos)
+End Function
+
+Private Function TriS(ByVal p1 As Long, ByVal p2 As Long, ByVal p3 As Long) As Double
+    TriS = (PE(p1) - PE(p3)) * (PN(p2) - PN(p3)) - (PE(p2) - PE(p3)) * (PN(p1) - PN(p3))
+End Function
+
+Private Function CrossesLines(ByVal a As Long, ByVal b As Long, lines As Collection) As Boolean
+    Dim li As Long, arr As Variant, k As Long, c As Long, e As Long
+    For li = 1 To lines.Count
+        arr = lines(li)
+        For k = 0 To UBound(arr) - 1
+            c = arr(k): e = arr(k + 1)
+            If Not (Max2(PE(a), PE(b)) < Min2(PE(c), PE(e)) Or Min2(PE(a), PE(b)) > Max2(PE(c), PE(e)) Or _
+                    Max2(PN(a), PN(b)) < Min2(PN(c), PN(e)) Or Min2(PN(a), PN(b)) > Max2(PN(c), PN(e))) Then
+                If SegX(a, b, c, e) Then CrossesLines = True: Exit Function
+            End If
+        Next k
+    Next li
+End Function
+
+' Only the two edges at ring(k) are new: check them against all other edges.
+Private Function SimpleNear(ring() As Long, ByVal n As Long, ByVal k As Long) As Boolean
+    Dim e As Long, i0 As Long, i1 As Long, j As Long, a As Long, b As Long, c As Long, d As Long
+    For e = 0 To 1
+        If e = 0 Then i0 = (k - 1 + n) Mod n: i1 = k Else i0 = k: i1 = (k + 1) Mod n
+        a = ring(i0): b = ring(i1)
+        For j = 0 To n - 1
+            c = ring(j): d = ring((j + 1) Mod n)
+            If Not (j = i0 Or j = (i0 - 1 + n) Mod n Or j = i1 Or c = a Or c = b Or d = a Or d = b) Then
+                If SegX(a, b, c, d) Then Exit Function
+            End If
+        Next j
+    Next e
+    SimpleNear = True
+End Function
+
+' =============================================================================
+' Muat ulang boundary (port of riset/prototipe/boundary_ulang.py)
+' =============================================================================
+' Reads a .str edited in Surpac (text or binary), throws string 1 away and makes it again
+' from the points that remain. All other strings are written back unchanged.
+Public Function ReloadBoundary(ByVal inPath As String, ByVal outPath As String) As String
+    Dim h1 As String, h2 As String, isBin As Boolean
+    Dim segNum() As Long, segStart() As Long, segLen() As Long, nSeg As Long
+    Dim ptDesc() As String, ptGeo() As Long, nOcc As Long
+    NP = 0: nSeg = 0: nOcc = 0
+    ReDim segNum(0 To 64): ReDim segStart(0 To 64): ReDim segLen(0 To 64)
+    ReDim ptDesc(0 To 1024): ReDim ptGeo(0 To 1024)
+    isBin = IsBinaryStr(inPath)
+    If isBin Then
+        ReadBinStr inPath, h1, h2, segNum, segStart, segLen, nSeg, ptDesc, ptGeo, nOcc
+    Else
+        ReadTextStr inPath, h1, h2, segNum, segStart, segLen, nSeg, ptDesc, ptGeo, nOcc
+    End If
+
+    ' points that take part: not boundary, not road, not check strings
+    Dim useP() As Boolean, kept() As Long, nk As Long, s As Long, i As Long, p As Long
+    ReDim useP(0 To NP): ReDim kept(0 To NP)
+    For s = 0 To nSeg - 1
+        If segNum(s) <> 1 And segNum(s) <> 7 And segNum(s) <> 77 And segNum(s) < 9001 Then
+            For i = segStart(s) To segStart(s) + segLen(s) - 1
+                p = ptGeo(i)
+                If Not useP(p) Then useP(p) = True: kept(nk) = p: nk = nk + 1
+            Next i
+        End If
+    Next s
+    Dim lines As New Collection
+    For s = 0 To nSeg - 1
+        Select Case segNum(s)
+            Case 5, 6, 2, 3
+                If segLen(s) >= 2 Then lines.Add Slice(ptGeo, segStart(s), segLen(s))
+        End Select
+    Next s
+
+    Dim lab() As Long, nAreas As Long, members() As Long, nm As Long, c As Long
+    Dim hull() As Long, nh As Long, nRing As Long, nPtsB As Long
+    NA = 0
+    nAreas = Clusters(kept, nk, lab)
+    ReDim members(0 To nk)
+    For c = 0 To nAreas - 1
+        nm = 0
+        For i = 0 To nk - 1
+            If lab(i) = c Then members(nm) = kept(i): nm = nm + 1
+        Next i
+        If nm >= 10 Then
+            If ConcaveHull(members, nm, hull, nh) Then
+                FollowStrings hull, nh, lines
+                DigHull hull, nh, members, nm, lines
+                For i = 0 To nh
+                    p = hull(i Mod nh)
+                    AddLine 1, "1, " & Fmt3(PN(p)) & ", " & Fmt3(PE(p)) & ", " & Fmt3(PZ(p)) & ", " & PName(p)
+                Next i
+                AddLine 1, "0, 0.000, 0.000, 0.000,"
+                nRing = nRing + 1: nPtsB = nPtsB + nh
+            End If
+        End If
+    Next c
+    ' boundary lines carry the description of the point's first occurrence (kept in PName)
+    For s = 0 To nSeg - 1
+        If segNum(s) <> 1 Then
+            For i = segStart(s) To segStart(s) + segLen(s) - 1
+                p = ptGeo(i)
+                AddLine 1, CStr(segNum(s)) & ", " & Fmt3(PN(p)) & ", " & Fmt3(PE(p)) & ", " & Fmt3(PZ(p)) & ", " & ptDesc(i)
+            Next i
+            AddLine 1, "0, 0.000, 0.000, 0.000,"
+        End If
+    Next s
+    If isBin Then
+        WriteBinStr outPath, h1, h2
+    Else
+        Dim f As Integer
+        f = FreeFile
+        Open outPath For Output As #f
+        Print #f, h1
+        Print #f, h2
+        For i = 0 To NA - 1
+            Print #f, BufA(i)
+        Next i
+        Print #f, "0, 0.000, 0.000, 0.000, END"
+        Close #f
+    End If
+    ReloadBoundary = nRing & " boundary, " & nPtsB & " titik boundary"
+End Function
+
+' one pool point per coordinate (first occurrence keeps its description in PName)
+Private Function GeoPoint(ByVal n As Double, ByVal e As Double, ByVal z As Double, ByVal desc As String, _
+                          keys As Collection) As Long
+    Dim k As String, v As Variant
+    k = Fmt3(e) & "/" & Fmt3(n)
+    On Error Resume Next
+    v = keys(k)
+    If Err.Number = 0 Then
+        On Error GoTo 0
+        GeoPoint = CLng(v): Exit Function
+    End If
+    Err.Clear
+    On Error GoTo 0
+    If NP Mod 512 = 0 Then GrowPool NP + 512
+    PN(NP) = n: PE(NP) = e: PZ(NP) = z: PName(NP) = desc: PCode(NP) = "": PFile(NP) = "": PCls(NP) = 0
+    keys.Add NP, k
+    GeoPoint = NP: NP = NP + 1
+End Function
+
+Private Sub AddOcc(ByVal num As Long, ByVal n As Double, ByVal e As Double, ByVal z As Double, ByVal desc As String, _
+                   ByVal newSeg As Boolean, segNum() As Long, segStart() As Long, segLen() As Long, nSeg As Long, _
+                   ptDesc() As String, ptGeo() As Long, nOcc As Long, keys As Collection)
+    If newSeg Then
+        If nSeg > UBound(segNum) Then
+            ReDim Preserve segNum(0 To 2 * nSeg): ReDim Preserve segStart(0 To 2 * nSeg)
+            ReDim Preserve segLen(0 To 2 * nSeg)
+        End If
+        segNum(nSeg) = num: segStart(nSeg) = nOcc: segLen(nSeg) = 0: nSeg = nSeg + 1
+    End If
+    If nOcc > UBound(ptDesc) Then
+        ReDim Preserve ptDesc(0 To 2 * nOcc): ReDim Preserve ptGeo(0 To 2 * nOcc)
+    End If
+    ptDesc(nOcc) = desc
+    If num = 1 Then
+        ptGeo(nOcc) = -1                     ' old boundary: not used
+    Else
+        ptGeo(nOcc) = GeoPoint(n, e, z, desc, keys)
+    End If
+    nOcc = nOcc + 1
+    segLen(nSeg - 1) = segLen(nSeg - 1) + 1
+End Sub
+
+Private Sub ReadTextStr(ByVal path As String, h1 As String, h2 As String, segNum() As Long, segStart() As Long, _
+                        segLen() As Long, nSeg As Long, ptDesc() As String, ptGeo() As Long, nOcc As Long)
+    Dim f As Integer, s As String, parts() As String, num As Long, open_ As Boolean, i As Long, desc As String
+    Dim keys As New Collection, ln As Long
+    f = FreeFile
+    Open path For Input As #f
+    Do While Not EOF(f)
+        Line Input #f, s
+        s = Replace(s, Chr(13), "")
+        ln = ln + 1
+        If ln = 1 Then
+            h1 = s
+        ElseIf ln = 2 Then
+            h2 = s
+        Else
+            parts = Split(s, ",")
+            If UBound(parts) >= 3 Then
+                If IsDigits(Trim(parts(0))) Then
+                    num = CLng(Trim(parts(0)))
+                    If num = 0 Then
+                        open_ = False
+                        If Right(Trim(s), 3) = "END" Then Exit Do
+                    Else
+                        desc = ""
+                        For i = 4 To UBound(parts)
+                            If i > 4 Then desc = desc & ","
+                            desc = desc & Trim(parts(i))
+                        Next i
+                        AddOcc num, Val(Trim(parts(1))), Val(Trim(parts(2))), Val(Trim(parts(3))), desc, Not open_, _
+                               segNum, segStart, segLen, nSeg, ptDesc, ptGeo, nOcc, keys
+                        open_ = True
+                    End If
+                End If
+            End If
+        End If
+    Loop
+    Close #f
+End Sub
+
+' ---- binary Surpac .str: 2 text lines, 5 zero bytes, records of
+'      int32 BE string number, float64 BE Y X Z, description NUL-terminated ----
+Private Function IsBinaryStr(ByVal path As String) As Boolean
+    Dim f As Integer, b() As Byte, n As Long, i As Long, nl As Long
+    f = FreeFile
+    Open path For Binary Access Read As #f
+    n = LOF(f): If n > 4096 Then n = 4096
+    If n < 8 Then Close #f: Exit Function
+    ReDim b(0 To n - 1)
+    Get #f, 1, b
+    Close #f
+    For i = 0 To n - 1
+        If b(i) = 10 Then
+            nl = nl + 1
+            If nl = 2 Then
+                If i + 5 < n Then
+                    IsBinaryStr = (b(i + 1) = 0 And b(i + 2) = 0 And b(i + 3) = 0 And b(i + 4) = 0 And b(i + 5) = 0)
+                End If
+                Exit Function
+            End If
+        End If
+    Next i
+End Function
+
+Private Sub ReadBinStr(ByVal path As String, h1 As String, h2 As String, segNum() As Long, segStart() As Long, _
+                       segLen() As Long, nSeg As Long, ptDesc() As String, ptGeo() As Long, nOcc As Long)
+    Dim f As Integer, b() As Byte, n As Long, pos As Long, i As Long, num As Long, open_ As Boolean
+    Dim y As Double, x As Double, z As Double, e As Long, desc As String, keys As New Collection
+    f = FreeFile
+    Open path For Binary Access Read As #f
+    n = LOF(f)
+    ReDim b(0 To n - 1)
+    Get #f, 1, b
+    Close #f
+    pos = 0
+    h1 = ReadLineBytes(b, pos): h2 = ReadLineBytes(b, pos)
+    If pos + 5 <= n Then
+        If b(pos) = 0 And b(pos + 1) = 0 And b(pos + 2) = 0 And b(pos + 3) = 0 And b(pos + 4) = 0 Then pos = pos + 5
+    End If
+    Do While pos + 28 <= n
+        num = BeLong(b, pos): y = BeDouble(b, pos + 4): x = BeDouble(b, pos + 12): z = BeDouble(b, pos + 20)
+        e = pos + 28
+        desc = ""
+        Do While e < n
+            If b(e) = 0 Then Exit Do
+            desc = desc & Chr(b(e)): e = e + 1
+        Loop
+        pos = e + 1
+        If num = 0 Then
+            open_ = False
+            If Right(RTrim(desc), 3) = "END" Then Exit Do
+        Else
+            AddOcc num, y, x, z, desc, Not open_, segNum, segStart, segLen, nSeg, ptDesc, ptGeo, nOcc, keys
+            open_ = True
+        End If
+    Loop
+End Sub
+
+Private Function ReadLineBytes(b() As Byte, pos As Long) As String
+    Dim s As String
+    Do While pos <= UBound(b)
+        If b(pos) = 10 Then pos = pos + 1: Exit Do
+        If b(pos) <> 13 Then s = s & Chr(b(pos))
+        pos = pos + 1
+    Loop
+    ReadLineBytes = s
+End Function
+
+Private Function BeLong(b() As Byte, ByVal pos As Long) As Long
+    Dim v As Double
+    v = ((CDbl(b(pos)) * 256# + b(pos + 1)) * 256# + b(pos + 2)) * 256# + b(pos + 3)
+    If v >= 2147483648# Then v = v - 4294967296#
+    BeLong = CLng(v)
+End Function
+
+' IEEE 754 big-endian double from 8 bytes, built arithmetically (no API, no LSet)
+Private Function BeDouble(b() As Byte, ByVal pos As Long) As Double
+    Dim sgnv As Double, ex As Long, mant As Double, i As Long
+    sgnv = 1#: If b(pos) >= 128 Then sgnv = -1#
+    ex = (CLng(b(pos)) And 127) * 16 + (CLng(b(pos + 1)) \ 16)
+    mant = CLng(b(pos + 1)) And 15
+    For i = 2 To 7
+        mant = mant * 256# + b(pos + i)
+    Next i
+    If ex = 0 And mant = 0 Then BeDouble = 0#: Exit Function
+    If ex = 0 Then
+        BeDouble = sgnv * mant * 2# ^ (-1074)
+    Else
+        BeDouble = sgnv * (1# + mant / 4503599627370496#) * 2# ^ (ex - 1023)
+    End If
+End Function
+
+Private Sub PutBeDouble(b() As Byte, ByVal pos As Long, ByVal v As Double)
+    Dim sgnv As Long, ex As Long, m As Double, i As Long, hi As Double
+    If v = 0 Then
+        For i = 0 To 7
+            b(pos + i) = 0
+        Next i
+        Exit Sub
+    End If
+    If v < 0 Then sgnv = 128: v = -v
+    ex = Int(Log(v) / Log(2#))
+    If 2# ^ ex > v Then ex = ex - 1
+    If 2# ^ (ex + 1) <= v Then ex = ex + 1
+    m = (v / 2# ^ ex - 1#) * 4503599627370496#      ' 52-bit mantissa
+    m = Int(m + 0.5)
+    If m >= 4503599627370496# Then m = 0: ex = ex + 1
+    ex = ex + 1023
+    For i = 7 To 2 Step -1
+        hi = Int(m / 256#)
+        b(pos + i) = CByte(m - hi * 256#): m = hi
+    Next i
+    b(pos + 1) = CByte((ex And 15) * 16 + m)
+    b(pos) = CByte(sgnv + ex \ 16)
+End Sub
+
+Private Sub PutBeLong(b() As Byte, ByVal pos As Long, ByVal v As Long)
+    Dim d As Double, i As Long, hi As Double
+    d = v: If d < 0 Then d = d + 4294967296#
+    For i = 3 To 0 Step -1
+        hi = Int(d / 256#)
+        b(pos + i) = CByte(d - hi * 256#): d = hi
+    Next i
+End Sub
+
+' Write BufA (text rows "num, N, E, Z, desc") as a binary .str
+Private Sub WriteBinStr(ByVal path As String, ByVal h1 As String, ByVal h2 As String)
+    Dim b() As Byte, cap As Long, pos As Long, i As Long, parts() As String, j As Long, desc As String
+    cap = 64 + Len(h1) + Len(h2) + 5
+    For i = 0 To NA - 1
+        cap = cap + 29 + Len(BufA(i))
+    Next i
+    cap = cap + 32
+    ReDim b(0 To cap)
+    PutText b, pos, h1 & vbCrLf & h2 & vbCrLf
+    pos = pos + 5                              ' 5 zero bytes
+    For i = 0 To NA - 1
+        parts = Split(BufA(i), ",")
+        desc = ""
+        For j = 4 To UBound(parts)
+            If j > 4 Then desc = desc & ","
+            desc = desc & Trim(parts(j))
+        Next j
+        PutBeLong b, pos, CLng(Trim(parts(0)))
+        If CLng(Trim(parts(0))) = 0 Then
+            PutBeDouble b, pos + 4, 0: PutBeDouble b, pos + 12, 0: PutBeDouble b, pos + 20, 0
+        Else
+            PutBeDouble b, pos + 4, Val(Trim(parts(1)))
+            PutBeDouble b, pos + 12, Val(Trim(parts(2)))
+            PutBeDouble b, pos + 20, Val(Trim(parts(3)))
+        End If
+        pos = pos + 28
+        PutText b, pos, desc
+        pos = pos + 1                          ' NUL
+    Next i
+    PutBeLong b, pos, 0: pos = pos + 28
+    PutText b, pos, "END": pos = pos + 1
+    ReDim Preserve b(0 To pos - 1)
+    Dim f As Integer
+    On Error Resume Next
+    Kill path
+    On Error GoTo 0
+    f = FreeFile
+    Open path For Binary Access Write As #f
+    Put #f, 1, b
+    Close #f
+End Sub
+
+Private Sub PutText(b() As Byte, pos As Long, ByVal s As String)
+    Dim i As Long
+    For i = 1 To Len(s)
+        b(pos) = Asc(Mid(s, i, 1)) And 255: pos = pos + 1
+    Next i
+End Sub
 
 ' =============================================================================
 ' Spot strings: per file, per code (sorted), break on other points or > SPOT_GAP
@@ -1179,7 +2041,7 @@ Private Function ResolveDate(ByVal v As String, ByVal fileList As String) As Str
 End Function
 
 ' Date written in a file name (26102026, 26-10-2026 or 20261026) as yyyymmdd, 0 if none.
-Private Function FileDate(ByVal name As String) As Long
+Public Function FileDate(ByVal name As String) As Long
     Dim s As String, i As Long, j As Long, t As String, y As Long, m As Long, d As Long
     i = InStrRev(name, "\"): If InStrRev(name, "/") > i Then i = InStrRev(name, "/")
     s = Mid(name, i + 1)
@@ -1212,7 +2074,7 @@ Private Function FileDate(ByVal name As String) As Long
 End Function
 
 ' 26-Oct-26 -> 261026
-Private Function TagOf(ByVal dt As String) As String
+Public Function TagOf(ByVal dt As String) As String
     Dim p() As String, m As Long
     p = Split(dt, "-")
     If UBound(p) <> 2 Then TagOf = Replace(dt, "-", ""): Exit Function

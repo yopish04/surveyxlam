@@ -30,6 +30,7 @@ def resolve_date(value, raw_files):
 # Check report as a Surpac .str (<out>_CEK.str): one string number per kind of finding, so
 # each kind can get its own colour in Surpac and be compared with the progress data.
 CEK_DOUBLE, CEK_TINGGI, CEK_ZIGZAG, CEK_JALAN, CEK_EXCA, CEK_SISA = 9001, 9002, 9003, 9004, 9005, 9006
+CEK_GANDA, CEK_POTONG = 9007, 9008   # crest/toe points dropped (pass measured twice), line cut at a crossing
 
 # String numbers per kind of area, learned from 22-26 Oct 2026 manual work.
 # Spot strings are keyed by the raw code; any other numeric code keeps its own number.
@@ -157,6 +158,156 @@ def merge_runs(runs, gap):
         if eb == -1: b = b[::-1]
         runs[i] = a + b
         del runs[j]
+
+
+# ---------------------------------------------------------------- no crossing lines
+DUP_TOL = 1.0     # m: a pass this close to another line of the same kind measures the same edge
+
+
+def _near_line(p, line, tol):
+    return any(_seg_dist(p, a, b) <= tol for a, b in zip(line, line[1:]))
+
+
+def drop_double_pass(lines, tol=DUP_TOL):
+    """The same crest/toe measured twice (two files, or out and back) gives two lines on top
+    of each other, which then cross. By hand one pass is deleted. Here: points at the END of
+    a shorter line (or the whole line) that lie within tol of a longer line of the same kind
+    are removed. Junction points (23) are never removed. Returns (lines, removed points)."""
+    lines = sorted((l[:] for l in lines), key=len, reverse=True)
+    removed = []
+    for i in range(len(lines)):
+        s = lines[i]
+        if len(s) < 2: continue
+        others = [l for j, l in enumerate(lines) if j < i and len(l) >= 2]
+        if not others: continue
+        near = [JUNC not in p['cls'] and any(_near_line(p, o, tol) for o in others) for p in s]
+        if all(near):
+            removed += s; lines[i] = []; continue
+        a = 0
+        while a < len(s) and near[a]: a += 1
+        b = len(s)
+        while b > a and near[b - 1]: b -= 1
+        if a >= 2 or len(s) - b >= 2:
+            cut_a = a if a >= 2 else 0
+            cut_b = b if len(s) - b >= 2 else len(s)
+            removed += s[:cut_a] + s[cut_b:]
+            lines[i] = s[cut_a:cut_b]
+    return [l for l in lines if l], removed
+
+
+def drop_self_pass(line, tol=DUP_TOL):
+    """Inside one line: a stretch measured twice (out and back, or two joined runs that
+    overlap). Points lying within tol of a LATER, non-neighbouring part of the same line are
+    the first copy; blocks of >= 2 such points are removed (by hand the first pass is deleted)."""
+    n = len(line)
+    mark = [False] * n
+    for i, p in enumerate(line):
+        if JUNC in p['cls']: continue
+        for k in range(i + 3, n - 1):
+            if _seg_dist(p, line[k], line[k + 1]) <= tol:
+                mark[i] = True; break
+    keep, removed, i = [], [], 0
+    while i < n:
+        if not mark[i]: keep.append(line[i]); i += 1; continue
+        j = i
+        while j < n and mark[j]: j += 1
+        if j - i >= 2:
+            removed += line[i:j]
+            rest = line[j:]
+            # out and back: the kept (return) pass runs the other way -> continue from its far end
+            if keep and rest and d(keep[-1], rest[-1]) < d(keep[-1], rest[0]):
+                return keep + rest[::-1], removed
+        else:
+            keep += line[i:j]
+        i = j
+    return keep, removed
+
+
+def fix_crossings(lines):
+    """Crossings left between different lines. Two ways out, the cheapest that clears the
+    crossing without making a new one:
+      - remove one point next to a line end (a toe shot just past a crest), never a 23;
+      - cut the line at the crossing edge with the bigger height jump (by hand the line is
+        split there: it jumped from one bench to the next).
+    Lines are changed in place. Returns (removed points, cut edges as point pairs)."""
+    removed, cuts, stuck = [], [], set()
+    for _ in range(100):
+        total = line_crossings(lines)
+        def key(x): return (id(lines[x[0]][x[1]]), id(lines[x[0]][x[1] + 1]), id(lines[x[2]][x[3]]), id(lines[x[2]][x[3] + 1]))
+        xs = [x for x in total if key(x) not in stuck]
+        if not xs: break
+        i, ei, j, ej = xs[0]
+        best = None
+        for li, idx in ((i, ei), (i, ei + 1), (j, ej), (j, ej + 1)):
+            l = lines[li]; p = l[idx]
+            if JUNC in p['cls']: continue
+            rank = min(idx, len(l) - 1 - idx)
+            if rank > 1: continue
+            trial = [l[:idx] + l[idx + 1:]]
+            test = lines[:li] + trial + lines[li + 1:]
+            if len(line_crossings(test)) >= len(total): continue
+            if best is None or rank < best[0]: best = (rank, li, trial, ('punt', p))
+        for li, k in ((i, ei), (j, ej)):
+            l = lines[li]; p, q = l[k], l[k + 1]
+            trial = [x for x in (l[:k + 1], l[k + 1:]) if len(x) >= 2]
+            test = lines[:li] + trial + lines[li + 1:]
+            if len(line_crossings(test)) >= len(total): continue
+            rank = 2 + 1.0 / (1.0 + abs(p['z'] - q['z']))
+            if best is None or rank < best[0]: best = (rank, li, trial, ('cut', p, q))
+        if not best: stuck.add(key(xs[0])); continue
+        _, li, trial, what = best
+        lines[li:li + 1] = trial
+        if what[0] == 'punt': removed.append(what[1])
+        else: cuts.append((what[1], what[2]))
+    return removed, cuts
+
+
+def untangle(line, max_rounds=200):
+    """2-opt: while two edges of the line cross, reverse the part between them. The ends stay,
+    each move makes the line shorter, so it stops; a line shot out and back becomes one line
+    ordered along the edge (as done by hand)."""
+    s = line[:]
+    for _ in range(max_rounds):
+        hit = None
+        for i in range(len(s) - 3):
+            for j in range(i + 2, len(s) - 1):
+                if _segx(s[i], s[i + 1], s[j], s[j + 1]):
+                    hit = (i, j); break
+            if hit: break
+        if not hit: return s
+        i, j = hit
+        s[i + 1:j + 1] = s[i + 1:j + 1][::-1]
+    return s
+
+
+def line_crossings(lines):
+    """Crossing edges between different lines -> [(line i, edge ei, line j, edge ej)], i < j.
+    Edge ei joins lines[i][ei] and lines[i][ei + 1]."""
+    out = []
+    for i, x in enumerate(lines):
+        for j in range(i + 1, len(lines)):
+            y = lines[j]
+            for ei in range(len(x) - 1):
+                a, b = x[ei], x[ei + 1]
+                for ej in range(len(y) - 1):
+                    c, e = y[ej], y[ej + 1]
+                    if max(a['e'], b['e']) < min(c['e'], e['e']) or min(a['e'], b['e']) > max(c['e'], e['e']): continue
+                    if max(a['n'], b['n']) < min(c['n'], e['n']) or min(a['n'], b['n']) > max(c['n'], e['n']): continue
+                    if _segx(a, b, c, e): out.append((i, ei, j, ej))
+    return out
+
+
+def tidy_lines(lines, gap):
+    """drop_self_pass + drop_double_pass -> join again -> untangle every line.
+    Returns (lines, removed points)."""
+    removed = []
+    out = []
+    for l in lines:
+        k, r = drop_self_pass(l); removed += r
+        if k: out.append(k)
+    lines, r = drop_double_pass(out); removed += r
+    lines = merge_runs(lines, gap)
+    return [untangle(l) for l in lines], removed
 
 
 # ---------------------------------------------------------------- areas + boundary
@@ -457,8 +608,90 @@ def _touch(p1, p2, p3, p4):
                ((p1, p3, p4), (p2, p3, p4), (p3, p1, p2), (p4, p1, p2)))
 
 
+# ---------------------------------------------------------------- boundary: dig long edges
+DIG_EDGE = 5.0    # m: boundary edges longer than this are dug inwards (manual: few > 10 m)
+DIG_DEPTH = 0.3   # dug point at most this fraction of the edge length inside
+DIG_CAP = 2.0     # m: and at most this far inside
+def _in_tri(a, b, c, p):
+    def s(p1, p2, p3): return (p1['e'] - p3['e']) * (p2['n'] - p3['n']) - (p2['e'] - p3['e']) * (p1['n'] - p3['n'])
+    d1, d2, d3 = s(p, a, b), s(p, b, c), s(p, c, a)
+    neg = d1 < 0 or d2 < 0 or d3 < 0; pos = d1 > 0 or d2 > 0 or d3 > 0
+    return not (neg and pos)
+
+
+def edge_grid(edges, G=10.0):
+    cell = collections.defaultdict(list)
+    for a, b in edges:
+        for cx in range(int(min(a['e'], b['e']) // G), int(max(a['e'], b['e']) // G) + 1):
+            for cy in range(int(min(a['n'], b['n']) // G), int(max(a['n'], b['n']) // G) + 1):
+                cell[(cx, cy)].append((a, b))
+    return cell, G
+
+
+def _crosses_lines(a, b, grid):
+    cell, G = grid
+    for cx in range(int(min(a['e'], b['e']) // G), int(max(a['e'], b['e']) // G) + 1):
+        for cy in range(int(min(a['n'], b['n']) // G), int(max(a['n'], b['n']) // G) + 1):
+            for c, e in cell.get((cx, cy), ()):
+                if _segx(a, b, c, e): return True
+    return False
+
+
+def dig(ring, pts, max_edge, line_grid, max_iter=5000, depth=DIG_DEPTH):
+    """Replace a boundary edge a-b longer than max_edge by a-p-b, p the inside point that
+    keeps both new edges shortest, when the triangle a-p-b holds no other point and the
+    new edges cross neither the boundary nor a crest/toe string."""
+    on = {id(p) for p in ring}
+    free = [p for p in pts if id(p) not in on]
+    cell = collections.defaultdict(list); G = max(5.0, max_edge)
+    for p in free: cell[(int(p['e'] // G), int(p['n'] // G))].append(p)
+    it = 0; i = 0
+    while i < len(ring) and it < max_iter:
+        a, b = ring[i], ring[(i + 1) % len(ring)]
+        L = d(a, b)
+        if L <= max_edge: i += 1; continue
+        it += 1
+        cx0, cx1 = int((min(a['e'], b['e']) - L / 2) // G), int((max(a['e'], b['e']) + L / 2) // G)
+        cy0, cy1 = int((min(a['n'], b['n']) - L / 2) // G), int((max(a['n'], b['n']) + L / 2) // G)
+        cand = [p for cx in range(cx0, cx1 + 1) for cy in range(cy0, cy1 + 1) for p in cell.get((cx, cy), ())
+                if id(p) not in on and max(d(a, p), d(p, b)) < L and _seg_dist(p, a, b) <= min(depth * L, DIG_CAP)]
+        cand.sort(key=lambda p: max(d(a, p), d(p, b)))
+        done = False
+        for p in cand[:12]:
+            # p must lie on the inner side of a->b (the ring is clockwise from _knn_hull)
+            side = (b['e'] - a['e']) * (p['n'] - a['n']) - (b['n'] - a['n']) * (p['e'] - a['e'])
+            if side > 0 and _area_sign(ring) < 0: continue
+            if side < 0 and _area_sign(ring) > 0: continue
+            if any(q is not p and id(q) not in on and _in_tri(a, p, b, q) for cx in range(cx0, cx1 + 1)
+                   for cy in range(cy0, cy1 + 1) for q in cell.get((cx, cy), ())): continue
+            if _crosses_lines(a, p, line_grid) or _crosses_lines(p, b, line_grid): continue
+            trial = ring[:i + 1] + [p] + ring[i + 1:]
+            if not _simple_near(trial, i + 1): continue
+            ring = trial; on.add(id(p)); done = True
+            break
+        if not done: i += 1
+    return ring
+
+
+def _area_sign(ring):
+    return sum(a['e'] * b['n'] - b['e'] * a['n'] for a, b in zip(ring, ring[1:] + ring[:1]))
+
+
+def _simple_near(ring, k):
+    """Only the two edges touching ring[k] are new: check them against all others."""
+    n = len(ring)
+    new = [((k - 1) % n, k), (k, (k + 1) % n)]
+    for i0, i1 in new:
+        a, b = ring[i0], ring[i1]
+        for j in range(n):
+            c, e = ring[j], ring[(j + 1) % n]
+            if j in (i0, (i0 - 1) % n, i1, (i1) % n) or c is a or c is b or e is a or e is b: continue
+            if _segx(a, b, c, e): return False
+    return True
+
+
 def convert(raw_files, out_path, title, date, line_gap=8.0, area_link=12.0, k=8, profile=None,
-            follow=True, max_dev=6.0, zigzag=False, road_sink=None):
+            follow=True, max_dev=6.0, zigzag=False, road_sink=None, tidy=True, dig_edge=DIG_EDGE):
     """road_sink: a list -> road strings are appended there (one daily jalan file built by
     the caller) instead of writing <out>_jalan.str next to the area file."""
     num = NUMBERING[profile or detect_profile(raw_files)]
@@ -496,11 +729,30 @@ def convert(raw_files, out_path, title, date, line_gap=8.0, area_link=12.0, k=8,
                     zig_runs.append(r)
                 runs += parts if zigzag else [r]
         lines[kind] = merge_runs(runs, line_gap)
+    dropped, cuts = [], []
+    if tidy:
+        for kind in (CREST, TOE):
+            lines[kind], r = tidy_lines(lines[kind], line_gap); dropped += r
+        both = lines[CREST] + lines[TOE]
+        r, cuts = fix_crossings(both); dropped += r
+        def crest_line(l): return any(CREST in p['cls'] and JUNC not in p['cls'] for p in l)
+        lines[CREST] = [l for l in both if crest_line(l)]
+        lines[TOE] = [l for l in both if not crest_line(l)]
+        report['titik crest/toe ganda (dibuang, lihat _CEK.str)'] = len(dropped)
+        report['garis dipotong agar tidak bersilangan'] = len(cuts)
+    gone = {id(p) for p in dropped}
+    pts = [p for p in pts if id(p) not in gone]
     areas = clusters(pts, area_link)
-    hulls = [h for h in (concave_hull(a, k) for a in areas if len(a) >= 10) if h]
-    if follow:
-        all_lines = lines[CREST] + lines[TOE]
-        hulls = [follow_strings(h, all_lines, max_dev) for h in hulls]
+    all_lines = lines[CREST] + lines[TOE]
+    grid = edge_grid([(a, b) for l in all_lines for a, b in zip(l, l[1:])])
+    hulls = []
+    for a in areas:
+        if len(a) < 10: continue
+        h = concave_hull(a, k)
+        if not h: continue
+        if follow: h = follow_strings(h, all_lines, max_dev)
+        if dig_edge: h = dig(h, a, dig_edge, grid)
+        hulls.append(h)
     for h in hulls: strings.append((BND, h, True))
     for kind, no in ((CREST, num['crest']), (TOE, num['toe'])):
         for r in lines[kind]:
@@ -525,6 +777,10 @@ def convert(raw_files, out_path, title, date, line_gap=8.0, area_link=12.0, k=8,
             items.append((CEK_TINGGI, [p], f"CEK_TINGGI {kind} {dev:+.2f}m"))
     for r in zig_runs:
         items.append((CEK_ZIGZAG, r, f"CEK_ZIGZAG {r[0]['name']}-{r[-1]['name']} mungkin 2 garis"))
+    for p in dropped:
+        items.append((CEK_GANDA, [p], "CEK_GANDA crest/toe diukur dua kali, titik dibuang"))
+    for p, q in cuts:
+        items.append((CEK_POTONG, [p, q], f"CEK_POTONG garis diputus {p['name']}-{q['name']} (bersilangan)"))
     if road and not road_ok:
         items.append((CEK_JALAN, road, "CEK_JALAN penampang tidak teratur"))
     write_check_str(out_path[:-4] + '_CEK.str', title + '_CEK', date, items)

@@ -22,6 +22,15 @@ menjadi `.str` Surpac. Isinya terjemahan langsung dari prototipe Python di
   `LABEL=RTK_SMA` mengisi kolom deskripsi terakhir. Awalan nama file (`271026_`) ikut tanggal.
   Panel memanggil `SetDateLabel` sebelum `RunJob`.
 
+- **Garis tidak bersilangan.** Crest/toe yang diukur dua kali dibuang (lintasan pertama /
+  ujung yang menumpuk, ≤ 1 m), garis diurai (2-opt), sisa persilangan diputus di beda tinggi
+  terbesar. Titik 23 tidak pernah dibuang. Jumlahnya ditulis di LOG.
+- **Boundary lebih rapat**: sisi > 5 m digali ke titik di dalam (≤ 0,3 × sisi, ≤ 2 m) selama tidak
+  memotong garis.
+- **`ReloadBoundary(masuk, keluar)`**: membuat ulang string 1 dari `.str` yang sudah diedit di
+  Surpac (teks atau biner); string lain ditulis apa adanya. Di panel: tombol
+  *Muat Ulang Boundary* (file lama disalin dulu ke `backup_boundary\`).
+
 Masukan berupa daftar pekerjaan (lihat `uji_libreoffice/contoh_job_251026.txt`), yaitu
 isi yang nanti diisi lewat panel: folder masuk/keluar, baris AREA, JALAN, EXCA.
 Panel Excel cukup memanggil `RunJob` (atau `RunJobFile` dengan file daftar pekerjaan).
@@ -37,6 +46,8 @@ setiap file dibandingkan baris demi baris dengan hasil Python:
 | 25 Okt 2026 | 10 file | semua sama persis |
 | 26 Okt 2026 | 7 file | semua sama persis |
 | 25 Okt, `DATE=auto` / `DATE=2026-10-27` + `LABEL=RTK_XYZ` | 10 + 10 file | semua sama persis |
+| 26 Okt tofu3 + tofu9 (garis rapi + boundary digali) | 2 file | semua sama persis |
+| Muat ulang boundary, file manual 26 Okt (teks) dan versi biner | 3 file | sama persis (biner: byte per byte) |
 
 ```
 excel/uji_libreoffice/run_lo.sh excel/SurveyCore.bas <job.txt>
@@ -47,10 +58,13 @@ Catatan kompatibilitas yang ditemukan saat uji: LibreOffice salah membaca
 baris. Keduanya sudah ditulis dalam bentuk blok, jadi modul berjalan sama di Excel dan
 LibreOffice.
 
+## Panel (add-in)
+
+`SurveyPanel.bas` + `ribbon/customUI14.xml` → tab **SMA Survey**: Siapkan Job (sheet Job dari
+folder `.txt`), Proses, Folder Hasil, Muat Ulang Boundary, Simpan/Jalankan File Job, Cara Pakai.
+
 ## Belum
 
-- Panel (UserForm) dan tombol ribbon belum dibuat. Ini perlu Microsoft Excel di Windows,
-  jadi dikerjakan saat terhubung ke PC pengguna.
 - Laporan tinggi mencurigakan dan tanda zig-zag baru ada di versi Python.
 - Waktu proses di LibreOffice ± 47 detik per hari data; di Excel biasanya lebih cepat,
   tapi angkanya baru bisa dipastikan di PC pengguna.
