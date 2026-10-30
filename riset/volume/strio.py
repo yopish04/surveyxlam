@@ -78,3 +78,32 @@ def read_dtm(dtm_path, str_path):
         if len(p) >= 4 and p[0].strip().isdigit():
             tris.append((int(p[1]), int(p[2]), int(p[3])))
     return P, np.array(tris) - 1
+
+
+def read_dtm_any(dtm_path, str_path):
+    """.dtm teks atau biner. Biner: baris header, 5 byte nol, string hull seperti .str biner sampai END,
+    lalu rekaman: int32 jenis (1=OBJECT, 2=TRISOLATION, 3=segitiga), int32 id, [segitiga: 6 x int32 v1 v2 v3 n1 n2 n3],
+    deskripsi diakhiri NUL. -> P (baris .str), T (indeks 0-based)."""
+    import struct
+    d = open(dtm_path, 'rb').read()
+    i = d.index(b'\n') + 1
+    if d[i:i + 5] != b'\x00' * 5:
+        return read_dtm(dtm_path, str_path)
+    _, segs = read_str(str_path)
+    rows = []
+    for s in segs:
+        rows += [(r[2], r[1], r[3]) for r in s]; rows.append((np.nan,) * 3)
+    P = np.array(rows)
+    p = d.index(b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00END\x00', i) + 32
+    tris = []
+    n = len(d)
+    while p + 8 <= n:
+        typ, ident = struct.unpack_from('>ii', d, p); p += 8
+        if typ not in (1, 2, 3): break
+        if typ == 3:
+            v = struct.unpack_from('>6i', d, p); p += 24
+            tris.append(v[:3])
+        e = d.find(b'\x00', p)
+        if e < 0: break
+        p = e + 1
+    return P, np.array(tris) - 1
