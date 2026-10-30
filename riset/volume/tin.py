@@ -55,5 +55,24 @@ def build_tin_cdt(segs, skip=(1,), spot=(500, 600, 602)):
         lines += [(a, b) for a, b in zip(ids, ids[1:]) if a != b]
     P = np.zeros((len(pts), 3))
     for (e, n), (i, z) in pts.items(): P[i] = (e, n, z)
-    T, skipped = cdt(P[:, :2], lines)
+    T, skipped = cdt(P[:, :2], lines, tol=tol, sisa=sisa)
+    return P, T, len(skipped), where
+
+
+def build_tin_cdt2(segs, skip=(1,), spot=(500, 600, 602), tol=0.0, sisa=True):
+    """Sama dengan build_tin_cdt, memakai cdt2 (cepat untuk data besar)."""
+    from cdt2 import cdt
+    pts = {}; lines = []; where = {}
+    for si, s in enumerate(segs):
+        if s[0][0] in skip: continue
+        ids = []
+        for pi, r in enumerate(s):
+            k = (round(r[2], 3), round(r[1], 3))
+            if k not in pts: pts[k] = (len(pts), r[3])
+            ids.append(pts[k][0]); where[(si, pi)] = pts[k][0]
+        if s[0][0] in spot: continue
+        lines += [(a, b) for a, b in zip(ids, ids[1:]) if a != b]
+    P = np.zeros((len(pts), 3))
+    for (e, n), (i, z) in pts.items(): P[i] = (e, n, z)
+    T, skipped = cdt(P[:, :2], lines, tol=tol, sisa=sisa)
     return P, T, len(skipped), where
