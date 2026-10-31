@@ -186,10 +186,3 @@ function transferList(r) {
 }
 
 if (typeof module !== 'undefined') module.exports = { parseStr, parseDtm, parseShp, parseAny };
-if (typeof self !== 'undefined' && typeof window === 'undefined' && typeof module === 'undefined') {
-  self.onmessage = (ev) => {
-    const { id, name, buf } = ev.data;
-    try { const r = parseAny(name, buf); r.name = name; self.postMessage({ id, r }, transferList(r)); }
-    catch (err) { self.postMessage({ id, err: String(err && err.stack || err) }); }
-  };
-}

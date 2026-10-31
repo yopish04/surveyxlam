@@ -73,21 +73,29 @@ function parseRange(s) {
   return (n) => out.some(([a, b]) => n >= a && n <= b);
 }
 
-/* ---------- worker pembaca ---------- */
+/* ---------- pekerja latar: baca file, DTM, volume, update ---------- */
 let worker = null, wid = 0; const wcb = new Map();
 try {
-  const src = $('#parserSrc').textContent;
+  const src = ['parserSrc', 'tinSrc', 'volSrc', 'progresSrc', 'workerSrc'].map((id) => $('#' + id).textContent).join('\n;\n');
   worker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
-  worker.onmessage = (ev) => { const f = wcb.get(ev.data.id); wcb.delete(ev.data.id); f(ev.data); };
-  worker.onerror = (e) => { e.preventDefault && e.preventDefault(); worker = null; for (const f of wcb.values()) f({ err: 'worker' }); wcb.clear(); };
+  worker.onmessage = (ev) => {
+    const d = ev.data, f = wcb.get(d.id); if (!f) return;
+    if (d.progress) { f.prog && f.prog(...d.progress); return; }
+    wcb.delete(d.id); f.done(d);
+  };
+  worker.onerror = (e) => { e.preventDefault && e.preventDefault(); worker = null; for (const f of wcb.values()) f.done({ err: 'worker' }); wcb.clear(); };
 } catch (e) { worker = null; }
-function parseFile(name, buf) {
-  if (!worker) return Promise.resolve().then(() => { const r = parseAny(name, buf); r.name = name; return r; });
+/* jalankan pekerjaan berat di worker (atau di thread utama kalau worker tidak ada) */
+function run(cmd, args, transfer = [], prog = null) {
+  const local = () => Promise.resolve().then(() => smaJob(cmd, args, prog)[0]);
+  if (!worker) return local();
   return new Promise((res, rej) => {
-    const id = ++wid; wcb.set(id, (d) => d.err ? rej(new Error(d.err)) : res(d.r));
-    worker.postMessage({ id, name, buf }, [buf]);
+    const id = ++wid;
+    wcb.set(id, { prog, done: (d) => d.err === 'worker' ? local().then(res, rej) : d.err ? rej(new Error(d.err)) : res(d.r) });
+    worker.postMessage({ id, cmd, args }, transfer);
   });
 }
+function parseFile(name, buf) { return run('parse', { name, buf }, [buf]); }
 
 /* ---------- memuat file ---------- */
 const busy = (t) => { $('#busy').hidden = !t; if (t) $('#busyTxt').textContent = t; };
@@ -100,11 +108,10 @@ async function loadFiles(files) {
     busy(`Membaca ${f.name} (${(f.size / 1048576).toFixed(1)} MB)…`);
     try {
       const t0 = performance.now();
-      let r;
-      try { r = await parseFile(f.name, await f.arrayBuffer()); }
-      catch (e) { if (worker) throw e; r = parseAny(f.name, await f.arrayBuffer()); r.name = f.name; }
+      const buf = await f.arrayBuffer(), raw = ext === 'str' ? buf.slice(0) : null;
+      const r = await parseFile(f.name, buf);
       r.ms = performance.now() - t0;
-      if (r.kind === 'dtm') addDtm(f.name, r, msgs); else addStr(f.name, r);
+      if (r.kind === 'dtm') addDtm(f.name, r, msgs); else addStr(f.name, r, raw);
     } catch (e) { msgs.push(`${f.name}: gagal dibaca (${e.message.split('\n')[0]})`); }
   }
   busy(null);
@@ -113,7 +120,7 @@ async function loadFiles(files) {
   if (msgs.length) alert(msgs.join('\n'));
 }
 
-function addStr(name, r) {
+function addStr(name, r, raw = null) {
   if (!S.origin) {
     let mx = Infinity, my = Infinity, mz = Infinity;
     for (let i = 0; i < r.rows; i++) if (r.sn[i]) { if (r.x[i] < mx) mx = r.x[i]; if (r.y[i] < my) my = r.y[i]; if (r.z[i] < mz) mz = r.z[i]; }
@@ -137,7 +144,7 @@ function addStr(name, r) {
   for (const [s, c] of segCnt) strs.get(s).segs = c;
   // string spot yang sangat rapat (titik drone) disembunyikan dulu supaya garis tetap terbaca; bisa dicentang di panel
   for (const [s, st] of strs) if (S.spot(s) && st.count > 20000) { st.vis = false; st.auto = true; }
-  const L = { id: S.nextId++, kind: 'str', name, r, pos, strs, segNo, ptNo, segs: seg, bbox: b0, vis: true, open: false, dtms: [] };
+  const L = { id: S.nextId++, kind: 'str', name, r, raw, pos, strs, segNo, ptNo, segs: seg, bbox: b0, vis: true, open: false, dtms: [] };
   L.vbo = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, L.vbo); gl.bufferData(gl.ARRAY_BUFFER, pos, gl.STATIC_DRAW);
   L.cbo = gl.createBuffer(); L.lineIbo = gl.createBuffer(); L.ptIbo = gl.createBuffer();
   buildColors(L); buildIndex(L);
@@ -495,7 +502,7 @@ $('#measClr').onclick = () => { S.meas = []; S.measOpen = false; renderMeasure()
 /* ---------- panel layer ---------- */
 function renderLayers() {
   const box = $('#layers');
-  if (!S.layers.length) { box.innerHTML = '<div class="empty">Belum ada file.</div>'; info(); return; }
+  if (!S.layers.length) { box.innerHTML = '<div class="empty">Belum ada file.</div>'; info(); refreshTools(); return; }
   box.innerHTML = '';
   for (const L of S.layers) {
     const el = document.createElement('div'); el.className = 'layer';
@@ -529,6 +536,7 @@ function renderLayers() {
     box.appendChild(el);
   }
   info();
+  refreshTools();
 }
 function removeLayer(L) {
   const kill = L.kind === 'str' ? [L, ...L.dtms] : [L];
@@ -585,7 +593,7 @@ function setTool(t) {
   showTab(t === 'ident' ? 'tIdent' : 'tMeasure');
 }
 function showTab(id) { for (const b of document.querySelectorAll('.tabs button')) b.classList.toggle('on', b.dataset.t === id); for (const t of document.querySelectorAll('.tab')) t.hidden = t.id !== id; }
-document.querySelector('.tabs').onclick = (e) => { if (e.target.dataset.t) setTool(e.target.dataset.t === 'tIdent' ? 'ident' : 'meas'); };
+document.querySelector('.tabs').onclick = (e) => { const t = e.target.dataset.t; if (!t) return; if (t === 'tIdent') setTool('ident'); else if (t === 'tMeasure') setTool('meas'); else showTab(t); };
 window.addEventListener('keydown', (e) => {
   if (e.target.tagName === 'INPUT') return;
   const k = e.key.toLowerCase();
@@ -610,5 +618,6 @@ view.addEventListener('dragover', (e) => { e.preventDefault(); $('#drop').classL
 view.addEventListener('dragleave', () => $('#drop').classList.remove('on'));
 view.addEventListener('drop', (e) => { e.preventDefault(); $('#drop').classList.remove('on'); loadFiles(e.dataTransfer.files); });
 
-window.SMA = { S, loadFiles, zoomAll, setPlan, setTool, nearest, zAt, camera, draw };   // untuk uji otomatis
+/*TOOLS*/
+window.SMA = { S, run, addStr, attachDtm, loadFiles, zoomAll, setPlan, setTool, nearest, zAt, camera, draw };   // untuk uji otomatis
 })();

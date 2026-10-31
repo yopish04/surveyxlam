@@ -64,3 +64,31 @@ td{padding:2px 4px;border-bottom:1px solid var(--line);white-space:nowrap}
 dialog{border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--text);max-width:620px}
 dialog li{margin:4px 0}
 @media (max-width:900px){#right{width:280px}#left{width:200px}}
+
+.tabs{flex-wrap:wrap}
+.tabs button{padding:3px 8px}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+button:disabled{opacity:.5;cursor:default}
+.form{display:flex;flex-direction:column;gap:6px;margin:8px 0}
+.form label,.form>div{display:flex;flex-direction:column;gap:2px;color:var(--muted);font-size:12px}
+.form label.chk{flex-direction:row;align-items:center;gap:6px;color:var(--text)}
+.form select,.form input:not([type=checkbox]){color:var(--text);width:100%}
+select{font:inherit;color:var(--text);background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:3px 4px;max-width:100%}
+.checks{max-height:120px;overflow:auto;border:1px solid var(--line);border-radius:5px;padding:4px 6px;background:var(--panel)}
+label.chk{display:flex;align-items:center;gap:6px;color:var(--text);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lbl{color:var(--muted)}
+[hidden]{display:none!important}
+table.mini{font-size:11px}
+table.mini td,table.mini th{padding:2px 3px;text-align:right}
+table.mini td:first-child,table.mini th:first-child{text-align:left}
+.scroll{overflow:auto}
+.warn{color:#c0392b;margin-top:4px}
+.files{display:flex;flex-direction:column;gap:4px;margin:6px 0}
+.frow{display:flex;align-items:center;gap:6px;justify-content:space-between;font-size:12px}
+.frow span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#volOut,#upOut,#secOut,#dtmOut,#sodOut{display:flex;flex-direction:column;gap:6px}
+svg.sec{width:100%;height:auto;background:var(--chip);border-radius:8px}
+svg.sec text{font-size:10px;fill:var(--muted)}
+svg.sec .gr{stroke:var(--line);stroke-width:.6}
+.legend{display:flex;flex-wrap:wrap;gap:10px;font-size:11px}
+.legend i{display:inline-block;width:12px;height:3px;margin-right:4px;vertical-align:middle}

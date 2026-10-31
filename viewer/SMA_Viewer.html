@@ -70,6 +70,34 @@ td{padding:2px 4px;border-bottom:1px solid var(--line);white-space:nowrap}
 dialog{border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--text);max-width:620px}
 dialog li{margin:4px 0}
 @media (max-width:900px){#right{width:280px}#left{width:200px}}
+
+.tabs{flex-wrap:wrap}
+.tabs button{padding:3px 8px}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+button:disabled{opacity:.5;cursor:default}
+.form{display:flex;flex-direction:column;gap:6px;margin:8px 0}
+.form label,.form>div{display:flex;flex-direction:column;gap:2px;color:var(--muted);font-size:12px}
+.form label.chk{flex-direction:row;align-items:center;gap:6px;color:var(--text)}
+.form select,.form input:not([type=checkbox]){color:var(--text);width:100%}
+select{font:inherit;color:var(--text);background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:3px 4px;max-width:100%}
+.checks{max-height:120px;overflow:auto;border:1px solid var(--line);border-radius:5px;padding:4px 6px;background:var(--panel)}
+label.chk{display:flex;align-items:center;gap:6px;color:var(--text);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lbl{color:var(--muted)}
+[hidden]{display:none!important}
+table.mini{font-size:11px}
+table.mini td,table.mini th{padding:2px 3px;text-align:right}
+table.mini td:first-child,table.mini th:first-child{text-align:left}
+.scroll{overflow:auto}
+.warn{color:#c0392b;margin-top:4px}
+.files{display:flex;flex-direction:column;gap:4px;margin:6px 0}
+.frow{display:flex;align-items:center;gap:6px;justify-content:space-between;font-size:12px}
+.frow span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#volOut,#upOut,#secOut,#dtmOut,#sodOut{display:flex;flex-direction:column;gap:6px}
+svg.sec{width:100%;height:auto;background:var(--chip);border-radius:8px}
+svg.sec text{font-size:10px;fill:var(--muted)}
+svg.sec .gr{stroke:var(--line);stroke-width:.6}
+.legend{display:flex;flex-wrap:wrap;gap:10px;font-size:11px}
+.legend i{display:inline-block;width:12px;height:3px;margin-right:4px;vertical-align:middle}
 </style>
 </head>
 <body>
@@ -103,7 +131,7 @@ dialog li{margin:4px 0}
     <div id="north" title="Arah utara">N<div class="arrow"></div></div>
   </section>
   <aside id="right">
-    <div class="tabs"><button data-t="tIdent" class="on">Identify</button><button data-t="tMeasure">Ukur</button></div>
+    <div class="tabs"><button data-t="tIdent" class="on">Identify</button><button data-t="tMeasure">Ukur</button><button data-t="tSec">Section</button><button data-t="tDtm">DTM</button><button data-t="tVol">Volume</button><button data-t="tUp">Update</button></div>
     <div id="tIdent" class="tab">
       <div id="identCur" class="card muted">Klik titik di layar.</div>
       <table id="identTbl"><thead><tr><th>#</th><th>Str</th><th>Y</th><th>X</th><th>Z</th><th>Desc</th></tr></thead><tbody></tbody></table>
@@ -113,6 +141,69 @@ dialog li{margin:4px 0}
       <div id="measSum" class="card muted">Mode Ukur: klik titik-titik (menempel ke titik terdekat). Esc = selesai, klik lagi = ukuran baru.</div>
       <table id="measTbl"><thead><tr><th>#</th><th>Y</th><th>X</th><th>Z</th><th>Datar</th><th>Miring</th><th>Bearing</th><th>Grade</th></tr></thead><tbody></tbody></table>
       <div class="acts"><button id="measCopy">Salin ke Excel</button><button id="measStr">Simpan .str</button><button id="measClr">Hapus</button></div>
+      <div class="acts"><label class="fld">String<input id="measNo" type="number" value="1" min="1" style="width:64px"></label><button id="measSod" title="Garis ukur ditempel ke DTM teratas (titik di tiap sisi segitiga), lalu disimpan">Tempel ke DTM &amp; simpan .str</button></div>
+    </div>
+    <div id="tSec" class="tab" hidden>
+      <div class="card"><div class="big">Section DTM</div><div id="secInfo" class="muted"></div></div>
+      <div class="acts"><button id="secBtn" class="primary">Buat section</button></div>
+      <div id="secOut"></div>
+    </div>
+    <div id="tDtm" class="tab" hidden>
+      <div class="card"><div class="big">CREATE DTM</div>
+        <div class="form">
+          <label>String file<select id="dtmSrc"></select></label>
+          <label>String tidak dipakai<input id="dtmSkip" value="1" title="Boundary, mis. 1"></label>
+          <label>String spot (titik saja)<input id="dtmSpot" value="500-999"></label>
+        </div>
+        <div class="acts"><button id="dtmBtn" class="primary">Buat DTM</button></div>
+        <div id="dtmOut"></div>
+      </div>
+      <div class="card"><div class="big">String over DTM (SOD)</div>
+        <div class="form">
+          <label>String file<select id="sodSrc"></select></label>
+          <label>Nomor string<input id="sodStr" value="" placeholder="kosong = semua"></label>
+          <label>DTM<select id="sodDtm"></select></label>
+          <label class="chk"><input id="sodAdd" type="checkbox" checked> tambah titik di tiap sisi segitiga</label>
+        </div>
+        <div class="acts"><button id="sodBtn" class="primary">Tempel ke DTM</button></div>
+        <div id="sodOut"></div>
+      </div>
+    </div>
+    <div id="tVol" class="tab" hidden>
+      <div class="card"><div class="big">DTM CUT AND FILL VOLUMES</div>
+        <div class="form">
+          <label>DTM pertama (base)<select id="volA"></select></label>
+          <label>DTM kedua (update)<select id="volB"></select></label>
+          <label>Boundary<select id="volBdy"></select></label>
+          <label>String boundary<input id="volNo" type="number" value="1" min="1"></label>
+          <label>Nett kemarin (opsional)<input id="volKemarin" placeholder="mis. -5640000.000"></label>
+        </div>
+        <div class="acts"><button id="volBtn" class="primary">Hitung volume</button></div>
+      </div>
+      <div id="volOut"></div>
+    </div>
+    <div id="tUp" class="tab" hidden>
+      <div class="card">
+        <div class="form">
+          <label>Pekerjaan<select id="upJenis"><option value="harian">Update harian</option><option value="potong">Potong progress</option><option value="bdy">Boundary (tambah/kurangi)</option></select></label>
+          <label><span data-up="harian potong">File global / progress</span><span data-up="bdy">Boundary A</span><select id="upG"></select></label>
+          <label data-up="bdy">String A<input id="upGNo" type="number" value="1" min="1"></label>
+          <label data-up="harian">Boundary lama<select id="upBdy"></select></label>
+          <label data-up="harian">String boundary lama<input id="upBdyNo" type="number" value="1" min="1"></label>
+          <div data-up="harian potong"><span class="lbl"><span data-up="harian">Data harian</span><span data-up="potong"><label class="chk"><input id="upAdd" type="checkbox"> tambahkan data harian:</label></span></span><div id="upHarian" class="checks"></div></div>
+          <label data-up="harian">String boundary harian<input id="upHarianNo" type="number" value="1" min="1"></label>
+          <div data-up="potong bdy"><span class="lbl"><span data-up="potong">File boundary</span><span data-up="bdy">Boundary B</span></span><div id="upB" class="checks"></div></div>
+          <label data-up="potong bdy">String boundary<input id="upBNo" type="number" value="1" min="1"></label>
+          <label data-up="potong">Mode<select id="upMode"><option value="dalam">DALAM (buang titik di dalam boundary)</option><option value="luar">LUAR (buang titik di luar boundary)</option></select></label>
+          <label data-up="potong" class="chk"><input id="upTitik" type="checkbox"> tambah titik potong di garis boundary</label>
+          <label data-up="bdy">Operasi<select id="upOp"><option value="tambah">TAMBAH (A + B)</option><option value="kurangi">KURANGI (A − B)</option><option value="irisan">IRISAN</option></select></label>
+          <label>Tanggal<input id="upTgl" value="auto" title="auto (dari nama file harian), 27/10/2026, 2026-10-27"></label>
+          <label data-up="potong bdy">Nama hasil<input id="upNama" placeholder="kosong = otomatis"></label>
+        </div>
+        <div class="acts"><button id="upBtn" class="primary">Jalankan</button><button class="pickDir" title="Pilih folder tempat menyimpan hasil (mis. D:\yopi\...)">Folder simpan: <b class="dirName">Downloads</b></button></div>
+      </div>
+      <div id="upOut"></div>
+      <div class="muted">Hasilnya sama byte per byte dengan add-in Excel "Update Progress". File asal tidak diubah.</div>
     </div>
   </aside>
 </main>
@@ -125,6 +216,10 @@ dialog li{margin:4px 0}
     <li><b>Identify</b>: klik titik → nomor string, Y, X, Z, deskripsi. <b>Ukur</b>: klik beberapa titik → jarak datar, miring, bearing, grade; di atas DTM juga jarak mengikuti permukaan DTM.</li>
     <li><b>Salin ke Excel</b>: tabel disalin, tinggal Ctrl+V di Excel. <b>Simpan .str</b>: titik yang dipilih/diukur disimpan sebagai string file Surpac.</li>
     <li>Layer: centang untuk tampil/sembunyi, klik kotak warna untuk ganti warna, klik ▸ untuk daftar nomor string.</li>
+    <li><b>Section</b>: buat garis di mode Ukur, lalu Buat section (semua DTM yang tampil).</li>
+    <li><b>DTM</b>: CREATE DTM dari string file (aturan sama dengan Surpac) dan String over DTM (SOD) untuk jalan/distance.</li>
+    <li><b>Volume</b>: DTM cut/fill per segmen boundary, sama dengan report Surpac. Isi nett kemarin untuk volume hari ini.</li>
+    <li><b>Update</b>: update harian (potong global + tambah harian + boundary), potong progress, atau boundary tambah/kurangi. Hasil langsung jadi layer; simpan ke folder pilihan.</li>
     <li>Tombol: F zoom semua, P plan, 3 tampak 3D, I identify, M ukur, Esc selesai ukur.</li>
   </ul>
   <form method="dialog"><button>Tutup</button></form>
@@ -317,11 +412,960 @@ function transferList(r) {
 }
 
 if (typeof module !== 'undefined') module.exports = { parseStr, parseDtm, parseShp, parseAny };
-if (typeof self !== 'undefined' && typeof window === 'undefined' && typeof module === 'undefined') {
+</script>
+<script id="tinSrc">/* SMA Viewer - CREATE DTM: Delaunay (sweep-hull) + breakline dipaksa (Sloan), meniru riset/volume/cdt2.py
+   yang identik dengan TIN Surpac di LD03.
+   Aturan: string boundary (default 1) tidak dipakai; string spot = titik saja; segmen lain = breakline;
+   titik kembar (dibulatkan mm) memakai kemunculan pertama; breakline yang memotong breakline terpasang dilewati;
+   breakline yang melewati titik lain dipecah di titik itu. */
+'use strict';
+
+function orient(X, a, b, c) {
+  return (X[2 * b] - X[2 * a]) * (X[2 * c + 1] - X[2 * a + 1]) - (X[2 * b + 1] - X[2 * a + 1]) * (X[2 * c] - X[2 * a]);
+}
+function inCircleDet(X, a, b, c, d) {      // > 0: d di dalam lingkaran abc (abc CCW)
+  const ax = X[2 * a] - X[2 * d], ay = X[2 * a + 1] - X[2 * d + 1];
+  const bx = X[2 * b] - X[2 * d], by = X[2 * b + 1] - X[2 * d + 1];
+  const cx = X[2 * c] - X[2 * d], cy = X[2 * c + 1] - X[2 * d + 1];
+  return (ax * ax + ay * ay) * (bx * cy - cx * by) - (bx * bx + by * by) * (ax * cy - cx * ay) + (cx * cx + cy * cy) * (ax * by - bx * ay);
+}
+
+/* ---------- Delaunay sweep-hull. X = Float64Array [x0,y0,x1,y1,...] tanpa titik kembar ---------- */
+function delaunay(X, tie = true) {
+  const n = X.length >> 1;
+  const maxT = Math.max(2 * n - 5, 1);
+  let T = new Int32Array(maxT * 3), H = new Int32Array(maxT * 3), tl = 0;
+  const hullPrev = new Int32Array(n), hullNext = new Int32Array(n), hullTri = new Int32Array(n);
+  const hashSize = Math.ceil(Math.sqrt(n)), hullHash = new Int32Array(hashSize).fill(-1);
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (let i = 0; i < n; i++) { const x = X[2 * i], y = X[2 * i + 1]; if (x < minX) minX = x; if (y < minY) minY = y; if (x > maxX) maxX = x; if (y > maxY) maxY = y; }
+  const cx0 = (minX + maxX) / 2, cy0 = (minY + maxY) / 2;
+  const d2 = (i, x, y) => { const dx = X[2 * i] - x, dy = X[2 * i + 1] - y; return dx * dx + dy * dy; };
+  let i0 = 0, i1 = 0, i2 = 0, md = Infinity;
+  for (let i = 0; i < n; i++) { const d = d2(i, cx0, cy0); if (d < md) { i0 = i; md = d; } }
+  const i0x = X[2 * i0], i0y = X[2 * i0 + 1];
+  md = Infinity;
+  for (let i = 0; i < n; i++) { if (i === i0) continue; const d = d2(i, i0x, i0y); if (d < md && d > 0) { i1 = i; md = d; } }
+  const circR = (ax, ay, bx, by, cx, cy) => {
+    const dx = bx - ax, dy = by - ay, ex = cx - ax, ey = cy - ay, bl = dx * dx + dy * dy, cl = ex * ex + ey * ey, d = 0.5 / (dx * ey - dy * ex);
+    const x = (ey * bl - dy * cl) * d, y = (dx * cl - ex * bl) * d; return x * x + y * y;
+  };
+  let mr = Infinity;
+  for (let i = 0; i < n; i++) {
+    if (i === i0 || i === i1) continue;
+    const r = circR(i0x, i0y, X[2 * i1], X[2 * i1 + 1], X[2 * i], X[2 * i + 1]);
+    if (r < mr) { i2 = i; mr = r; }
+  }
+  if (mr === Infinity) return { triangles: new Int32Array(0), halfedges: new Int32Array(0) };
+  if (orient(X, i0, i1, i2) < 0) { const t = i1; i1 = i2; i2 = t; }
+  // pusat lingkaran luar segitiga awal
+  const ax = X[2 * i0], ay = X[2 * i0 + 1], bx = X[2 * i1], by = X[2 * i1 + 1], qx = X[2 * i2], qy = X[2 * i2 + 1];
+  const dx = bx - ax, dy = by - ay, ex = qx - ax, ey = qy - ay, bl = dx * dx + dy * dy, cl = ex * ex + ey * ey, dd = 0.5 / (dx * ey - dy * ex);
+  const cx = ax + (ey * bl - dy * cl) * dd, cy = ay + (dx * cl - ex * bl) * dd;
+  const dist = new Float64Array(n), ids = new Uint32Array(n);
+  for (let i = 0; i < n; i++) { dist[i] = d2(i, cx, cy); ids[i] = i; }
+  ids.sort((a, b) => dist[a] - dist[b] || a - b);
+  const hashKey = (x, y) => {
+    const ddx = x - cx, ddy = y - cy, p = ddx / (Math.abs(ddx) + Math.abs(ddy));
+    return Math.floor((ddy > 0 ? 3 - p : 1 + p) / 4 * hashSize) % hashSize;
+  };
+  const link = (a, b) => { H[a] = b; if (b !== -1) H[b] = a; };
+  const addT = (a, b, c, ha, hb, hc) => { const t = tl; T[t] = a; T[t + 1] = b; T[t + 2] = c; link(t, ha); link(t + 1, hb); link(t + 2, hc); tl += 3; return t; };
+  let hullStart = i0;
+  hullNext[i0] = hullPrev[i2] = i1; hullNext[i1] = hullPrev[i0] = i2; hullNext[i2] = hullPrev[i1] = i0;
+  hullTri[i0] = 0; hullTri[i1] = 1; hullTri[i2] = 2;
+  hullHash[hashKey(ax, ay)] = i0; hullHash[hashKey(bx, by)] = i1; hullHash[hashKey(qx, qy)] = i2;
+  addT(i0, i1, i2, -1, -1, -1);
+  let stack = new Int32Array(1024);
+  const legalize = (a) => {
+    let i = 0, ar = 0;
+    for (;;) {
+      const b = H[a], a0 = a - a % 3;
+      ar = a0 + (a + 2) % 3;
+      if (b === -1) { if (i === 0) break; a = stack[--i]; continue; }
+      const b0 = b - b % 3, al = a0 + (a + 1) % 3, bl2 = b0 + (b + 2) % 3;
+      const p0 = T[ar], pr = T[a], pl = T[al], p1 = T[bl2];
+      const det = inCircleDet(X, p0, pr, pl, p1);
+      let flipIt = det > 0;
+      if (tie) {            // 4 titik satu lingkaran (grid drone): pilih diagonal condong NW-SE seperti Surpac
+        const L2 = (X[2 * pr] - X[2 * pl]) ** 2 + (X[2 * pr + 1] - X[2 * pl + 1]) ** 2;
+        if (Math.abs(det) <= 1e-9 * L2 * L2) flipIt = (X[2 * p1] - X[2 * p0]) * (X[2 * p1 + 1] - X[2 * p0 + 1]) < 0;
+      }
+      if (flipIt) {
+        T[a] = p1; T[b] = p0;
+        const hbl = H[bl2];
+        if (hbl === -1) { let e = hullStart; do { if (hullTri[e] === bl2) { hullTri[e] = a; break; } e = hullPrev[e]; } while (e !== hullStart); }
+        link(a, hbl); link(b, H[ar]); link(ar, bl2);
+        const br = b0 + (b + 1) % 3;
+        if (i >= stack.length) { const s = new Int32Array(stack.length * 2); s.set(stack); stack = s; }
+        stack[i++] = br;
+      } else { if (i === 0) break; a = stack[--i]; }
+    }
+    return ar;
+  };
+  let xp = NaN, yp = NaN;
+  for (let k = 0; k < n; k++) {
+    const i = ids[k], x = X[2 * i], y = X[2 * i + 1];
+    if (x === xp && y === yp) continue;
+    xp = x; yp = y;
+    if (i === i0 || i === i1 || i === i2) continue;
+    let start = 0;
+    for (let j = 0, key = hashKey(x, y); j < hashSize; j++) { start = hullHash[(key + j) % hashSize]; if (start !== -1 && start !== hullNext[start]) break; }
+    start = hullPrev[start];
+    let e = start, q;
+    while (q = hullNext[e], !(orient(X, e, q, i) < 0)) { e = q; if (e === start) { e = -1; break; } }
+    if (e === -1) continue;
+    let t = addT(e, i, hullNext[e], -1, -1, hullTri[e]);
+    hullTri[i] = legalize(t + 2); hullTri[e] = t;
+    let nn = hullNext[e];
+    while (q = hullNext[nn], orient(X, nn, q, i) < 0) { t = addT(nn, i, q, hullTri[i], -1, hullTri[nn]); hullTri[i] = legalize(t + 2); hullNext[nn] = nn; nn = q; }
+    if (e === start) {
+      while (q = hullPrev[e], orient(X, q, e, i) < 0) { t = addT(q, i, e, -1, hullTri[e], hullTri[q]); legalize(t + 2); hullTri[q] = t; hullNext[e] = e; e = q; }
+    }
+    hullStart = hullPrev[i] = e; hullNext[e] = hullPrev[nn] = i; hullNext[i] = nn;
+    hullHash[hashKey(x, y)] = i; hullHash[hashKey(X[2 * e], X[2 * e + 1])] = e;
+  }
+  return { triangles: T.subarray(0, tl), halfedges: H.subarray(0, tl) };
+}
+
+/* ---------- jaring halfedge yang bisa di-flip ---------- */
+class HMesh {
+  constructor(X, D, n) {
+    this.X = X; this.T = D.triangles; this.H = D.halfedges;
+    this.vt = new Int32Array(n).fill(-1);
+    for (let e = 0; e < this.T.length; e++) this.vt[this.T[e]] = e;
+  }
+  nx(e) { return e - e % 3 + (e + 1) % 3; }
+  pv(e) { return e - e % 3 + (e + 2) % 3; }
+  /* halfedge keluar dari a (urutan bebas) */
+  out(a) {
+    const s = this.vt[a]; if (s < 0) return [];
+    const r = [s]; let e = s;
+    for (let g = 0; g < 10000; g++) { const t = this.H[this.pv(e)]; if (t === -1) break; e = t; if (e === s) return r; r.push(e); }
+    e = s;
+    for (let g = 0; g < 10000; g++) { const t = this.H[e]; if (t === -1) break; e = this.nx(t); if (e === s) break; r.push(e); }
+    return r;
+  }
+  find(u, v) { for (const e of this.out(u)) if (this.T[this.nx(e)] === v) return e; return -1; }   // halfedge u->v
+  has(u, v) { return this.find(u, v) >= 0 || this.find(v, u) >= 0; }
+  opp(e) { return this.T[this.pv(e)]; }
+  /* flip sisi u-v kalau segiempatnya cembung; hasil [p,q] diagonal baru atau null */
+  flip(u, v) {
+    let a = this.find(u, v); if (a < 0) return null;
+    const b = this.H[a]; if (b === -1) return null;
+    const X = this.X, p = this.T[this.pv(a)], q = this.T[this.pv(b)];
+    if (!(orient(X, p, q, u) * orient(X, p, q, v) < 0)) return null;
+    const a0 = a - a % 3, b0 = b - b % 3, ar = a0 + (a + 2) % 3, al = a0 + (a + 1) % 3, bl = b0 + (b + 2) % 3, br = b0 + (b + 1) % 3;
+    const p0 = this.T[ar], pr = this.T[a], pl = this.T[al], p1 = this.T[bl];
+    this.T[a] = p1; this.T[b] = p0;
+    const H = this.H, hbl = H[bl], har = H[ar];
+    H[a] = hbl; if (hbl !== -1) H[hbl] = a;
+    H[b] = har; if (har !== -1) H[har] = b;
+    H[ar] = bl; H[bl] = ar;
+    this.vt[p0] = ar; this.vt[p1] = a; this.vt[pl] = al; this.vt[pr] = br;
+    return [p, q];
+  }
+}
+
+/* sisi yang dipotong ruas a-b (pasangan titik), atau {titik:w} kalau ruas lewat titik w, atau null */
+function walk(M, a, b, tol) {
+  const X = M.X;
+  const L = Math.hypot(X[2 * b] - X[2 * a], X[2 * b + 1] - X[2 * a + 1]);
+  const eps = Math.max(1e-7 * Math.max(L, 1) * Math.max(L, 1), tol * L);
+  const dot = (p) => (X[2 * p] - X[2 * a]) * (X[2 * b] - X[2 * a]) + (X[2 * p + 1] - X[2 * a + 1]) * (X[2 * b + 1] - X[2 * a + 1]);
+  let first = null;
+  for (const e of M.out(a)) {
+    const p = M.T[M.nx(e)], q = M.T[M.pv(e)];
+    const op = orient(X, a, b, p), oq = orient(X, a, b, q);
+    if (Math.abs(op) <= eps && dot(p) > 0) return { titik: p };
+    if (Math.abs(oq) <= eps && dot(q) > 0) return { titik: q };
+    if (op < 0 && 0 < oq) { first = [p, q]; break; }
+  }
+  if (!first) return null;
+  const cross = []; let [p, q] = first;
+  for (let g = 0; g < 1000000; g++) {
+    cross.push([p, q]);
+    const e = M.find(q, p); if (e < 0) return null;
+    const r = M.opp(e);
+    if (r === b) return cross;
+    const o = orient(X, a, b, r);
+    if (Math.abs(o) <= eps) return { titik: r };
+    if (o < 0) p = r; else q = r;
+  }
+  return null;
+}
+
+function cdt(X, n, cons, opt = {}) {
+  const tol = opt.tol || 0, sisa = opt.sisa !== false, maxFlips = opt.maxFlips || 20000000;
+  const M = new HMesh(X, delaunay(X, opt.tie !== false), n);
+  const key = (a, b) => a < b ? a * n + b : b * n + a;
+  const fixed = new Set(), skipped = [];
+  const work = []; for (let i = cons.length - 2; i >= 0; i -= 2) work.push(cons[i], cons[i + 1]);   // tumpukan: urutan asal
+  let flips = 0;
+  while (work.length) {
+    const b = work.pop(), a = work.pop();
+    if (a === b) continue;
+    const k = key(a, b);
+    if (M.has(a, b)) { fixed.add(k); continue; }
+    const w = walk(M, a, b, tol);
+    if (w === null) { skipped.push(a, b); continue; }
+    if (!Array.isArray(w)) {
+      const mid = w.titik;
+      if (sisa || tol === 0) work.push(mid, b);
+      work.push(a, mid); continue;
+    }
+    if (w.some(([u, v]) => fixed.has(key(u, v)))) { skipped.push(a, b); continue; }
+    const queue = w.slice(); let qh = 0; const nw = []; let guard = 0;
+    while (qh < queue.length) {
+      let [u, v] = queue[qh++]; guard++;
+      if (guard > 50 * (w.length + 5)) break;
+      if (!M.has(u, v)) continue;
+      if (M.find(u, v) < 0) { const t = u; u = v; v = t; }
+      const r = M.flip(u, v);
+      if (!r) { queue.push([u, v]); continue; }
+      flips++;
+      const [p, q] = r;
+      if ((p === a && q === b) || (p === b && q === a)) continue;
+      const crosses = p !== a && p !== b && q !== a && q !== b &&
+        orient(X, a, b, p) * orient(X, a, b, q) < 0 && orient(X, p, q, a) * orient(X, p, q, b) < 0;
+      if (crosses) queue.push([p, q]); else nw.push([p, q]);
+    }
+    if (!M.has(a, b)) { skipped.push(a, b); continue; }
+    fixed.add(k);
+    let changed = true, it = 0;
+    while (changed && it < 20) {
+      changed = false; it++;
+      for (const pq of nw.slice()) {
+        let [p, q] = pq;
+        if (fixed.has(key(p, q)) || !M.has(p, q)) continue;
+        if (M.find(p, q) < 0) { const t = p; p = q; q = t; }
+        const e1 = M.find(p, q), e2 = M.find(q, p);
+        if (e1 < 0 || e2 < 0) continue;
+        if (inCircleDet(X, p, q, M.opp(e1), M.opp(e2)) > 1e-9) {
+          const r = M.flip(p, q);
+          if (r) { const ix = nw.findIndex(([s, t]) => s === pq[0] && t === pq[1]); if (ix >= 0) nw.splice(ix, 1); nw.push(r); changed = true; }
+        }
+      }
+    }
+    if (flips > maxFlips) break;
+  }
+  // segitiga akhir
+  const T = M.T, out = new Int32Array(T.length);
+  out.set(T);
+  return { tris: out, skipped: skipped.length / 2, flips };
+}
+
+/* dari baris .str (r: hasil parseStr) ke DTM: tris berisi indeks baris .str */
+function createDtm(r, opt = {}) {
+  const skip = opt.skip || ((s) => s === 1), spot = opt.spot || ((s) => s === 500 || s === 600 || s === 602);
+  const n = r.rows, rowOf = [], idx = new Int32Array(n).fill(-1), map = new Map();
+  let x0 = Infinity, y0 = Infinity;
+  for (let i = 0; i < n; i++) if (r.sn[i] && !skip(r.sn[i])) { if (r.x[i] < x0) x0 = r.x[i]; if (r.y[i] < y0) y0 = r.y[i]; }
+  const XY = [];
+  for (let i = 0; i < n; i++) {
+    const s = r.sn[i]; if (!s || skip(s)) continue;
+    const k = Math.round(r.x[i] * 1000) + ',' + Math.round(r.y[i] * 1000);
+    let j = map.get(k);
+    if (j === undefined) { j = rowOf.length; map.set(k, j); rowOf.push(i); XY.push(r.x[i] - x0, r.y[i] - y0); }
+    idx[i] = j;
+  }
+  const cons = [];
+  for (let i = 0; i + 1 < n; i++) {
+    const s = r.sn[i];
+    if (!s || skip(s) || spot(s) || !r.sn[i + 1]) continue;
+    const a = idx[i], b = idx[i + 1];
+    if (a !== b) cons.push(a, b);
+  }
+  const X = new Float64Array(XY);
+  const res = cdt(X, rowOf.length, cons, opt);
+  const t = res.tris;
+  for (let k = 0; k < t.length; k++) t[k] = rowOf[t[k]];
+  return { tris: t, ntri: t.length / 3, npts: rowOf.length, skipped: res.skipped, flips: res.flips };
+}
+
+if (typeof module !== 'undefined') module.exports = { delaunay, cdt, createDtm };
+</script>
+<script id="volSrc">/* SMA Viewer - DTM CUT AND FILL VOLUMES secara eksak (bukan grid).
+   Beda tinggi d = DTM kedua - DTM pertama linear di tiap irisan (segitiga DTM1 ∩ segitiga DTM2).
+   Irisan dipotong garis d = 0, lalu diintegralkan di dalam boundary dengan teorema Green:
+   batas daerah = sisi irisan yang di dalam boundary + ruas boundary yang di dalam irisan.
+   Tiap segmen boundary dihitung sendiri, seperti report Surpac. */
+'use strict';
+
+function triGrid(D, x0, y0) {           // D: {x,y,z (Float64 per baris), tris}
+  const t = D.tris, n = t.length / 3, X = D.x, Y = D.y;
+  let a0 = Infinity, b0 = Infinity, a1 = -Infinity, b1 = -Infinity;
+  for (let i = 0; i < t.length; i++) { const x = X[t[i]], y = Y[t[i]]; if (x < a0) a0 = x; if (x > a1) a1 = x; if (y < b0) b0 = y; if (y > b1) b1 = y; }
+  const cs = Math.max(Math.sqrt((a1 - a0) * (b1 - b0) / Math.max(n, 1)) * 1.5, 0.2);
+  const nx = Math.ceil((a1 - a0) / cs) + 1, ny = Math.ceil((b1 - b0) / cs) + 1;
+  const bb = new Int32Array(n * 4);
+  for (let j = 0; j < n; j++) {
+    const p = t[3 * j], q = t[3 * j + 1], r = t[3 * j + 2];
+    bb[4 * j] = Math.floor((Math.min(X[p], X[q], X[r]) - a0) / cs); bb[4 * j + 1] = Math.floor((Math.max(X[p], X[q], X[r]) - a0) / cs);
+    bb[4 * j + 2] = Math.floor((Math.min(Y[p], Y[q], Y[r]) - b0) / cs); bb[4 * j + 3] = Math.floor((Math.max(Y[p], Y[q], Y[r]) - b0) / cs);
+  }
+  const cnt = new Uint32Array(nx * ny + 1);
+  for (let j = 0; j < n; j++) for (let yy = bb[4 * j + 2]; yy <= bb[4 * j + 3]; yy++) for (let xx = bb[4 * j]; xx <= bb[4 * j + 1]; xx++) cnt[yy * nx + xx + 1]++;
+  for (let c = 0; c < nx * ny; c++) cnt[c + 1] += cnt[c];
+  const fill = cnt.slice(0, nx * ny), list = new Uint32Array(cnt[nx * ny]);
+  for (let j = 0; j < n; j++) for (let yy = bb[4 * j + 2]; yy <= bb[4 * j + 3]; yy++) for (let xx = bb[4 * j]; xx <= bb[4 * j + 1]; xx++) list[fill[yy * nx + xx]++] = j;
+  return { a0, b0, cs, nx, ny, cnt, list };
+}
+
+/* grid ruas boundary: untuk titik-di-dalam (sinar ke +x per baris) dan mencari ruas di sekitar irisan */
+function ringIndex(R) {                  // R: Float64Array [x0,y0,x1,y1,...] lokal, CCW, tertutup implisit
+  const m = R.length / 2;
+  let a0 = Infinity, b0 = Infinity, a1 = -Infinity, b1 = -Infinity;
+  for (let i = 0; i < m; i++) { const x = R[2 * i], y = R[2 * i + 1]; if (x < a0) a0 = x; if (x > a1) a1 = x; if (y < b0) b0 = y; if (y > b1) b1 = y; }
+  const cs = Math.max(Math.sqrt((a1 - a0) * (b1 - b0) / Math.max(m, 1)) * 2, 0.5);
+  const nx = Math.ceil((a1 - a0) / cs) + 1, ny = Math.ceil((b1 - b0) / cs) + 1;
+  const cells = new Map(), rows = Array.from({ length: ny }, () => []);
+  for (let i = 0; i < m; i++) {
+    const j = (i + 1) % m, x1 = R[2 * i], y1 = R[2 * i + 1], x2 = R[2 * j], y2 = R[2 * j + 1];
+    const ia = Math.floor((Math.min(x1, x2) - a0) / cs), ib = Math.floor((Math.max(x1, x2) - a0) / cs);
+    const ja = Math.floor((Math.min(y1, y2) - b0) / cs), jb = Math.floor((Math.max(y1, y2) - b0) / cs);
+    for (let yy = ja; yy <= jb; yy++) { rows[yy].push(i); for (let xx = ia; xx <= ib; xx++) { const k = yy * nx + xx; let c = cells.get(k); if (!c) cells.set(k, c = []); c.push(i); } }
+  }
+  return { R, m, a0, b0, a1, b1, cs, nx, ny, cells, rows };
+}
+function inRing(G, x, y) {
+  if (x < G.a0 || x > G.a1 || y < G.b0 || y > G.b1) return false;
+  const R = G.R, m = G.m, row = G.rows[Math.min(G.ny - 1, Math.floor((y - G.b0) / G.cs))];
+  let c = false;
+  for (const i of row) {
+    const j = (i + 1) % m, x1 = R[2 * i], y1 = R[2 * i + 1], x2 = R[2 * j], y2 = R[2 * j + 1];
+    if ((y1 > y) !== (y2 > y) && x < x1 + (y - y1) * (x2 - x1) / (y2 - y1)) c = !c;
+  }
+  return c;
+}
+function edgesNear(G, x0, y0, x1, y1, stamp, tag) {
+  const out = [];
+  const ia = Math.max(0, Math.floor((x0 - G.a0) / G.cs)), ib = Math.min(G.nx - 1, Math.floor((x1 - G.a0) / G.cs));
+  const ja = Math.max(0, Math.floor((y0 - G.b0) / G.cs)), jb = Math.min(G.ny - 1, Math.floor((y1 - G.b0) / G.cs));
+  for (let yy = ja; yy <= jb; yy++) for (let xx = ia; xx <= ib; xx++) {
+    const c = G.cells.get(yy * G.nx + xx); if (!c) continue;
+    for (const e of c) if (stamp[e] !== tag) { stamp[e] = tag; out.push(e); }
+  }
+  return out;
+}
+
+/* poligon cembung: array datar [x,y,...] CCW. potong dengan setengah bidang a + b x + c y >= 0 */
+function clipHalf(P, a, b, c) {
+  const out = [], n = P.length / 2;
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n, x1 = P[2 * i], y1 = P[2 * i + 1], x2 = P[2 * j], y2 = P[2 * j + 1];
+    const f1 = a + b * x1 + c * y1, f2 = a + b * x2 + c * y2;
+    if (f1 >= 0) out.push(x1, y1);
+    if ((f1 >= 0) !== (f2 >= 0)) { const t = f1 / (f1 - f2); out.push(x1 + t * (x2 - x1), y1 + t * (y2 - y1)); }
+  }
+  // buang titik kembar berurutan (sisi panjang nol)
+  const o2 = [];
+  for (let i = 0; i < out.length; i += 2) {
+    if (!o2.length || Math.abs(out[i] - o2[o2.length - 2]) > 1e-9 || Math.abs(out[i + 1] - o2[o2.length - 1]) > 1e-9) o2.push(out[i], out[i + 1]);
+  }
+  while (o2.length >= 4 && Math.abs(o2[0] - o2[o2.length - 2]) <= 1e-9 && Math.abs(o2[1] - o2[o2.length - 1]) <= 1e-9) o2.length -= 2;
+  return o2;
+}
+function clipTri(P, x1, y1, x2, y2, x3, y3) {     // P ∩ segitiga CCW
+  const E = [[x1, y1, x2, y2], [x2, y2, x3, y3], [x3, y3, x1, y1]];
+  for (const [ax, ay, bx, by] of E) {
+    // kiri dari a->b: (bx-ax)(y-ay) - (by-ay)(x-ax) >= 0
+    P = clipHalf(P, -(bx - ax) * ay + (by - ay) * ax, -(by - ay), (bx - ax));
+    if (P.length < 6) return P;
+  }
+  return P;
+}
+/* kontribusi Green ruas (x0,y0)->(x1,y1) untuk f = al + be x + ga y */
+function seg(x0, y0, x1, y1, al, be, ga) {
+  const dy = y1 - y0, dx = x1 - x0;
+  return dy * (al * (x0 + x1) / 2 + be * (x0 * x0 + x0 * x1 + x1 * x1) / 6) - ga * dx * (y0 * y0 + y0 * y1 + y1 * y1) / 6;
+}
+function polyInt(P, al, be, ga) {
+  let s = 0; const n = P.length / 2;
+  for (let i = 0; i < n; i++) { const j = (i + 1) % n; s += seg(P[2 * i], P[2 * i + 1], P[2 * j], P[2 * j + 1], al, be, ga); }
+  return s;
+}
+/* integral f di (P ∩ ring), P cembung CCW, ring CCW (Weiler-Atherton + Green):
+   potongan ring di dalam P dirangkai; ujung masuk/keluar ada di tepi P; tepi P dari titik keluar
+   (searah CCW) sampai titik masuk berikutnya ikut menjadi batas daerah. */
+function perim(P, x, y) {                 // posisi titik di keliling P: indeks sisi + t
+  const n = P.length / 2; let best = Infinity, s = 0;
+  for (let i = 0; i < n; i++) {
+    const k = (i + 1) % n, ax = P[2 * i], ay = P[2 * i + 1], dx = P[2 * k] - ax, dy = P[2 * k + 1] - ay, L = dx * dx + dy * dy;
+    if (L === 0) continue;
+    const t = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / L)), ex = ax + t * dx - x, ey = ay + t * dy - y, d = ex * ex + ey * ey;
+    if (d < best) { best = d; s = i + t; }
+  }
+  return s;
+}
+function arcInt(P, s0, s1, fs, res) {     // integral sepanjang keliling P dari s0 ke s1 (CCW)
+  const n = P.length / 2;
+  if (s1 < s0) s1 += n;
+  const pt = (s) => { s = s % n; const i = Math.min(n - 1, Math.floor(s)), t = s - i, k = (i + 1) % n; return [P[2 * i] + t * (P[2 * k] - P[2 * i]), P[2 * i + 1] + t * (P[2 * k + 1] - P[2 * i + 1])]; };
+  let a = s0, [ax, ay] = pt(a);
+  while (a < s1 - 1e-15) {
+    const b = Math.min(s1, Math.floor(a) + 1);
+    const [bx, by] = pt(b);
+    for (let q = 0; q < fs.length; q++) res[q] += seg(ax, ay, bx, by, fs[q][0], fs[q][1], fs[q][2]);
+    a = b; ax = bx; ay = by;
+  }
+}
+function clipInt(P0, G, near, fs0) {
+  const R = G.R, m = G.m, n = P0.length / 2, res = new Float64Array(fs0.length);
+  // geser ke titik asal di P supaya integral Green tidak kehilangan presisi
+  let cx = 0, cy = 0; for (let i = 0; i < n; i++) { cx += P0[2 * i]; cy += P0[2 * i + 1]; } cx /= n; cy /= n;
+  const P = new Float64Array(2 * n); for (let i = 0; i < n; i++) { P[2 * i] = P0[2 * i] - cx; P[2 * i + 1] = P0[2 * i + 1] - cy; }
+  const fs = fs0.map(([a, b, c]) => [a + b * cx + c * cy, b, c]);
+  const ord = near.slice().sort((a, b) => a - b), segs = [];
+  for (const e of ord) {
+    const j = (e + 1) % m; const x0 = R[2 * e] - cx, y0 = R[2 * e + 1] - cy, x1 = R[2 * j] - cx, y1 = R[2 * j + 1] - cy;
+    if (x0 === x1 && y0 === y1) continue;
+    let t0 = 0, t1 = 1, e0 = -1, e1 = -1;
+    for (let i = 0; i < n && t0 < t1; i++) {
+      const k = (i + 1) % n, ax = P[2 * i], ay = P[2 * i + 1], bx = P[2 * k], by = P[2 * k + 1];
+      const f0 = (bx - ax) * (y0 - ay) - (by - ay) * (x0 - ax), f1 = (bx - ax) * (y1 - ay) - (by - ay) * (x1 - ax);
+      const tl = 1e-6 * Math.hypot(bx - ax, by - ay);
+      if (Math.abs(f0) <= tl && Math.abs(f1) <= tl) { t1 = -1; break; }   // ruas boundary berimpit tepi P: tidak memotong isi P
+      if (f0 < 0 && f1 < 0) { t1 = -1; break; }
+      if (f0 < 0) { const t = f0 / (f0 - f1); if (t > t0) { t0 = t; e0 = i; } }
+      else if (f1 < 0) { const t = f0 / (f0 - f1); if (t < t1) { t1 = t; e1 = i; } }
+    }
+    if (!(t1 - t0 > 1e-12)) continue;
+    const ax = x0 + (x1 - x0) * t0, ay = y0 + (y1 - y0) * t0, bx = x0 + (x1 - x0) * t1, by = y0 + (y1 - y0) * t1;
+    for (let q = 0; q < fs.length; q++) res[q] += seg(ax, ay, bx, by, fs[q][0], fs[q][1], fs[q][2]);
+    segs.push({ e, t0, t1, ax, ay, bx, by, e0, e1 });
+  }
+  const ent = [], ext = [], k = segs.length;
+  const onEdge = (i, x, y) => {            // posisi di sisi i; kalau di luar sisi itu (sisi segaris), cari sisi terdekat
+    const q = (i + 1) % n, dx = P[2 * q] - P[2 * i], dy = P[2 * q + 1] - P[2 * i + 1], L = dx * dx + dy * dy;
+    const t = L ? ((x - P[2 * i]) * dx + (y - P[2 * i + 1]) * dy) / L : -1;
+    return t >= -1e-9 && t <= 1 + 1e-9 ? i + Math.max(0, Math.min(1, t)) : perim(P, x, y);
+  };
+  for (let i = 0; i < k; i++) {
+    const s = segs[i], pr = segs[(i - 1 + k) % k], nx = segs[(i + 1) % k];
+    const linkedPrev = s.t0 === 0 && pr.t1 === 1 && (pr.e + 1) % m === s.e;
+    const linkedNext = s.t1 === 1 && nx.t0 === 0 && (s.e + 1) % m === nx.e;
+    if (!linkedPrev) ent.push(s.e0 >= 0 ? onEdge(s.e0, s.ax, s.ay) : perim(P, s.ax, s.ay));
+    if (!linkedNext) ext.push(s.e1 >= 0 ? onEdge(s.e1, s.bx, s.by) : perim(P, s.bx, s.by));
+  }
+  if (!ent.length || !ext.length) {
+    // tidak ada ruas boundary yang masuk-keluar P: kalau tidak ada potongan sama sekali, P seluruhnya di dalam
+    // atau di luar (cek titik berat P); kalau potongan berupa lingkaran tertutup di dalam P, tepi P di luar boundary
+    if (!k && inRing(G, cx, cy)) for (let f = 0; f < fs.length; f++) res[f] += polyInt(P, fs[f][0], fs[f][1], fs[f][2]);
+    return Array.from(res);
+  }
+  ent.sort((a, b) => a - b);
+  for (const sx of ext) {
+    let se = ent.find((v) => v >= sx);
+    if (se === undefined) se = ent[0];
+    arcInt(P, sx, se, fs, res);
+  }
+  return Array.from(res);
+}
+
+function cleanRing(r) {               // buang titik kembar berurutan dan titik penutup
+  const o = [];
+  for (let i = 0; i < r.length; i += 2) if (!o.length || r[i] !== o[o.length - 2] || r[i + 1] !== o[o.length - 1]) o.push(r[i], r[i + 1]);
+  while (o.length >= 4 && o[0] === o[o.length - 2] && o[1] === o[o.length - 1]) o.length -= 2;
+  return o;
+}
+function plane(D, t, ox, oy) {    // z = a + b x + c y (koordinat lokal)
+  const X = D.x, Y = D.y, Z = D.z, p = D.tris[3 * t], q = D.tris[3 * t + 1], r = D.tris[3 * t + 2];
+  const x1 = X[p] - ox, y1 = Y[p] - oy, x2 = X[q] - ox, y2 = Y[q] - oy, x3 = X[r] - ox, y3 = Y[r] - oy;
+  const det = (x2 - x1) * (y3 - y1) - (x3 - x1) * (y2 - y1);
+  const b = ((Z[q] - Z[p]) * (y3 - y1) - (Z[r] - Z[p]) * (y2 - y1)) / det;
+  const c = ((x2 - x1) * (Z[r] - Z[p]) - (x3 - x1) * (Z[q] - Z[p])) / det;
+  if (det < 0) return [Z[p] - b * x1 - c * y1, b, c, x1, y1, x3, y3, x2, y2, -det];
+  return [Z[p] - b * x1 - c * y1, b, c, x1, y1, x2, y2, x3, y3, det];
+}
+
+/* first = DTM pertama (mis. base), second = DTM kedua (update). rings: array Float64Array [x,y,...] koordinat asli.
+   -> per segmen {cut, cutArea, fill, fillArea, nett, common} */
+function cutFill(first, second, rings, onProgress) {
+  const out = [];
+  const g1 = triGrid(first), stamp1 = new Int32Array(first.tris.length / 3).fill(-1);
+  let tag = 0;
+  for (let ri = 0; ri < rings.length; ri++) {
+    const raw = cleanRing(rings[ri]), m = raw.length / 2;
+    if (m < 3) { out.push({ cut: 0, cutArea: 0, fill: 0, fillArea: 0, common: 0, nett: 0 }); continue; }
+    let ox = 0, oy = 0; for (let i = 0; i < m; i++) { ox += raw[2 * i]; oy += raw[2 * i + 1]; } ox /= m; oy /= m;
+    const R = new Float64Array(raw.length);
+    let area = 0;
+    for (let i = 0; i < m; i++) { R[2 * i] = raw[2 * i] - ox; R[2 * i + 1] = raw[2 * i + 1] - oy; }
+    for (let i = 0; i < m; i++) { const j = (i + 1) % m; area += R[2 * i] * R[2 * j + 1] - R[2 * j] * R[2 * i + 1]; }
+    if (area < 0) { for (let i = 0, k = m - 1; i < k; i++, k--) { const ax = R[2 * i], ay = R[2 * i + 1]; R[2 * i] = R[2 * k]; R[2 * i + 1] = R[2 * k + 1]; R[2 * k] = ax; R[2 * k + 1] = ay; } }
+    const G = ringIndex(R), estamp = new Int32Array(m).fill(-1);
+    const acc = { cut: 0, cutArea: 0, fill: 0, fillArea: 0, common: 0 };
+    const T2 = second.tris, n2 = T2.length / 3, X2 = second.x, Y2 = second.y;
+    for (let t = 0; t < n2; t++) {
+      if (onProgress && (t & 0x3ffff) === 0) onProgress(ri, t / n2);
+      const p = T2[3 * t], q = T2[3 * t + 1], r = T2[3 * t + 2];
+      const bx0 = Math.min(X2[p], X2[q], X2[r]) - ox, bx1 = Math.max(X2[p], X2[q], X2[r]) - ox;
+      const by0 = Math.min(Y2[p], Y2[q], Y2[r]) - oy, by1 = Math.max(Y2[p], Y2[q], Y2[r]) - oy;
+      if (bx1 < G.a0 || bx0 > G.a1 || by1 < G.b0 || by0 > G.b1) continue;
+      const near = edgesNear(G, bx0, by0, bx1, by1, estamp, ++tag);
+      if (!near.length && !inRing(G, (bx0 + bx1) / 2, (by0 + by1) / 2)) {
+        // seluruh segitiga di luar? cek pusat berat (bbox tanpa ruas boundary -> semua di dalam atau semua di luar)
+        const cx = (X2[p] + X2[q] + X2[r]) / 3 - ox, cy = (Y2[p] + Y2[q] + Y2[r]) / 3 - oy;
+        if (!inRing(G, cx, cy)) continue;
+      }
+      const P2 = plane(second, t, ox, oy);
+      if (P2[9] <= 0) continue;
+      // kandidat segitiga DTM pertama
+      const ia = Math.max(0, Math.floor((bx0 + ox - g1.a0) / g1.cs)), ib = Math.min(g1.nx - 1, Math.floor((bx1 + ox - g1.a0) / g1.cs));
+      const ja = Math.max(0, Math.floor((by0 + oy - g1.b0) / g1.cs)), jb = Math.min(g1.ny - 1, Math.floor((by1 + oy - g1.b0) / g1.cs));
+      const tg = ++tag;
+      for (let yy = ja; yy <= jb; yy++) for (let xx = ia; xx <= ib; xx++) {
+        const c = yy * g1.nx + xx;
+        for (let k = g1.cnt[c]; k < g1.cnt[c + 1]; k++) {
+          const u = g1.list[k]; if (stamp1[u] === tg) continue; stamp1[u] = tg;
+          const P1 = plane(first, u, ox, oy);
+          if (P1[9] <= 0) continue;
+          let poly = clipTri([P2[3], P2[4], P2[5], P2[6], P2[7], P2[8]], P1[3], P1[4], P1[5], P1[6], P1[7], P1[8]);
+          if (poly.length < 6 || polyInt(poly, 1, 0, 0) < 1e-7) continue;     // irisan nol/serpih (segitiga bertetangga)
+          const da = P2[0] - P1[0], db = P2[1] - P1[1], dc = P2[2] - P1[2];      // d = second - first
+          const same = Math.abs(da) < 1e-9 && Math.abs(db) < 1e-12 && Math.abs(dc) < 1e-12;
+          const ints = (poly2, fs) => near.length ? clipInt(poly2, G, near, fs) : fs.map((f) => polyInt(poly2, f[0], f[1], f[2]));
+          if (same) { acc.common += ints(poly, [[1, 0, 0]])[0]; continue; }
+          const pf = clipHalf(poly, da, db, dc), pc = clipHalf(poly, -da, -db, -dc);
+          if (pf.length >= 6 && polyInt(pf, 1, 0, 0) > 1e-9) { const v = ints(pf, [[da, db, dc], [1, 0, 0]]); acc.fill += v[0]; acc.fillArea += v[1]; }
+          if (pc.length >= 6 && polyInt(pc, 1, 0, 0) > 1e-9) { const v = ints(pc, [[-da, -db, -dc], [1, 0, 0]]); acc.cut += v[0]; acc.cutArea += v[1]; }
+        }
+      }
+    }
+    acc.nett = acc.fill - acc.cut;
+    out.push(acc);
+  }
+  return out;
+}
+
+if (typeof module !== 'undefined') module.exports = { cutFill, _t: { triGrid, ringIndex, inRing, clipInt, clipTri, clipHalf, polyInt, plane } };
+</script>
+<script id="progresSrc">/* SMA Viewer - update progress: port riset/volume/progres.py (hasil sama dengan add-in Excel dan Python).
+   potong(): potong file progress dengan boundary (DALAM = buang titik di dalam, LUAR = buang di luar),
+   boundaryOp(): A + B / A - B / irisan dengan aturan Surpac, updateHarian(): alur harian lengkap. */
+'use strict';
+const PG = (() => {
+const EDGE_TOL = 0.01, SPOT = new Set([500, 600, 602]);
+const BULAN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const AXIS = '0,           0.000,           0.000,           0.000,           0.000,           0.000,           0.000';
+const lat = (u, a, b) => { let s = ''; for (let i = a; i < b; i += 8192) s += String.fromCharCode.apply(null, u.subarray(i, Math.min(b, i + 8192))); return s; };
+
+/* titik = [num, n(y), e(x), z, desc] ; segmen = array titik */
+function baca(buf) {
+  const u = new Uint8Array(buf), dv = new DataView(buf);
+  const i1 = u.indexOf(10) + 1, i2 = u.indexOf(10, i1) + 1;
+  const head = lat(u, 0, i1).replace(/[\r\n]+$/, '').split(',');
+  const axis = lat(u, i1, i2).replace(/[\r\n]+$/, '');
+  const binary = u[i2] === 0 && u[i2 + 1] === 0 && u[i2 + 2] === 0 && u[i2 + 3] === 0 && u[i2 + 4] === 0;
+  const segs = []; let cur = [];
+  if (binary) {
+    let pos = i2 + 5;
+    while (pos + 28 <= u.length) {
+      const num = dv.getInt32(pos), y = dv.getFloat64(pos + 4), x = dv.getFloat64(pos + 12), z = dv.getFloat64(pos + 20);
+      const e = u.indexOf(0, pos + 28); const d = lat(u, pos + 28, e); pos = e + 1;
+      if (num === 0) { if (cur.length) segs.push(cur); cur = []; if (d.trim() === 'END') break; }
+      else cur.push([num, y, x, z, d]);
+    }
+  } else {
+    const lines = lat(u, i2, u.length).split(/\r\n|\r|\n/);
+    for (const l of lines) {
+      const p = l.split(','); if (p.length < 4) continue;
+      const num = Math.trunc(parseFloat(p[0])); if (isNaN(num)) continue;
+      if (num === 0) { if (cur.length) segs.push(cur); cur = []; if (p.length > 4 && p[4].trim() === 'END') break; continue; }
+      cur.push([num, parseFloat(p[1]), parseFloat(p[2]), parseFloat(p[3]), p.slice(4).join(',').replace(/^ +/, '')]);
+    }
+  }
+  if (cur.length) segs.push(cur);
+  return { head, axis, binary, segs };
+}
+
+function f3(v) {                       // seperti Python f'{v:.3f}'
+  let s = v.toFixed(3); if (s === '-0.000') s = '-0.000'; return s;
+}
+function tulis(head, segs, binary, axis = AXIS) {
+  const h = head.join(',');
+  if (binary) {
+    let n = h.length + axis.length + 4 + 5 + 33;
+    for (const s of segs) { for (const r of s) n += 29 + r[4].length; n += 29; }
+    const buf = new ArrayBuffer(n), u = new Uint8Array(buf), dv = new DataView(buf); let p = 0;
+    const put = (str) => { for (let i = 0; i < str.length; i++) u[p++] = str.charCodeAt(i) & 255; };
+    const rec = (num, y, x, z) => { dv.setInt32(p, num); dv.setFloat64(p + 4, y); dv.setFloat64(p + 12, x); dv.setFloat64(p + 20, z); p += 28; };
+    put(h + '\r\n' + axis + '\r\n'); p += 5;
+    for (const s of segs) { for (const r of s) { rec(r[0], r[1], r[2], r[3]); put(r[4]); u[p++] = 0; } rec(0, 0, 0, 0); u[p++] = 0; }
+    rec(0, 0, 0, 0); put('END'); u[p++] = 0;
+    return u.subarray(0, p);
+  }
+  const L = [h, axis];
+  for (const s of segs) { for (const r of s) L.push(`${r[0]}, ${f3(r[1])}, ${f3(r[2])}, ${f3(r[3])}, ${r[4]}`); L.push('0, 0.000, 0.000, 0.000,'); }
+  L.push('0, 0.000, 0.000, 0.000, END');
+  const t = L.join('\r\n') + '\r\n', u = new Uint8Array(t.length);
+  for (let i = 0; i < t.length; i++) u[i] = t.charCodeAt(i) & 255;
+  return u;
+}
+
+/* ---------- tanggal / nama ---------- */
+function tglDariNama(b, head) {
+  let m = b.match(/^(\d{4})_(\d{2})_(\d{2})/); if (m) return [+m[1], +m[2], +m[3]];
+  m = b.match(/^(\d{2})(\d{2})(\d{4})(?!\d)/); if (m) return [+m[3], +m[2], +m[1]];
+  m = b.match(/^(\d{2})(\d{2})(\d{2})(?!\d)/); if (m) return [2000 + +m[3], +m[2], +m[1]];
+  if (head && head.length > 1) { m = head[1].match(/^\s*(\d{1,2})-(\w{3})-(\d{2})/); if (m) { const k = BULAN.findIndex((x) => x.toLowerCase() === m[2].toLowerCase()); if (k >= 0) return [2000 + +m[3], k + 1, +m[1]]; } }
+  return null;
+}
+function tglTeks(v, b, head) {          // "auto" / 2026-10-27 / 27/10/2026 / 20261027 / 27-Oct-26
+  v = String(v || '').trim();
+  let m;
+  if ((m = v.match(/^(20\d{2})(\d{2})(\d{2})$/))) return [+m[1], +m[2], +m[3]];
+  if ((m = v.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/))) return [+m[1], +m[2], +m[3]];
+  if ((m = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/))) return [+m[3], +m[2], +m[1]];
+  if ((m = v.match(/^(\d{1,2})-(\w{3})-(\d{2,4})$/))) { const k = BULAN.findIndex((x) => x.toLowerCase() === m[2].toLowerCase()); if (k >= 0) return [2000 + (+m[3] % 100), k + 1, +m[1]]; }
+  if (v && v.toLowerCase() !== 'auto') return null;
+  return tglDariNama(b, head);
+}
+const p2 = (n) => String(n).padStart(2, '0');
+const tglSurpac = (d) => `${p2(d[2])}-${BULAN[d[1] - 1]}-${p2(d[0] % 100)}`;
+function namaTanggal(nama, d) {
+  const i = nama.lastIndexOf('.'), base = i > 0 ? nama.slice(0, i) : nama, ext = i > 0 ? nama.slice(i) : '';
+  const t = `${d[0]}_${p2(d[1])}_${p2(d[2])}`;
+  if (/^\d{4}_\d{2}_\d{2}/.test(base)) return t + base.slice(10) + ext;
+  if (/^\d{8}(?!\d)/.test(base)) return `${p2(d[2])}${p2(d[1])}${d[0]}` + base.slice(8) + ext;
+  if (/^\d{6}(?!\d)/.test(base)) return `${p2(d[2])}${p2(d[1])}${p2(d[0] % 100)}` + base.slice(6) + ext;
+  return t + '_' + base + ext;
+}
+function kepala(head, nama, tgl) { const h = head.concat(['0', '0']); return [nama, tgl].concat(h.slice(2, Math.max(4, head.length))); }
+
+/* ---------- geometri ---------- */
+class Bdy {
+  constructor(rings, band = 5.0) {
+    this.rings = rings.filter((r) => r.length >= 3); this.E = [];
+    for (const r of this.rings) { const n = r.length; for (let i = 0; i < n; i++) { const p = r[i], q = r[(i + 1) % n]; if (p[0] !== q[0] || p[1] !== q[1]) this.E.push([p[0], p[1], q[0], q[1]]); } }
+    this.x0 = Infinity; this.x1 = -Infinity; this.y0 = Infinity; this.y1 = -Infinity;
+    for (const e of this.E) { this.x0 = Math.min(this.x0, e[0], e[2]); this.x1 = Math.max(this.x1, e[0], e[2]); this.y0 = Math.min(this.y0, e[1], e[3]); this.y1 = Math.max(this.y1, e[1], e[3]); }
+    this.band = band; this.idx = new Map();
+    this.E.forEach(([x1, y1, x2, y2], k) => {
+      for (let b = Math.floor((Math.min(y1, y2) - EDGE_TOL - this.y0) / band); b <= Math.floor((Math.max(y1, y2) + EDGE_TOL - this.y0) / band); b++) { let l = this.idx.get(b); if (!l) this.idx.set(b, l = []); l.push(k); }
+    });
+  }
+  status(x, y) {
+    if (x < this.x0 - EDGE_TOL || x > this.x1 + EDGE_TOL || y < this.y0 - EDGE_TOL || y > this.y1 + EDGE_TOL) return 0;
+    let c = false;
+    for (const k of this.idx.get(Math.floor((y - this.y0) / this.band)) || []) {
+      const [x1, y1, x2, y2] = this.E[k], dx = x2 - x1, dy = y2 - y1, L = dx * dx + dy * dy;
+      let t = ((x - x1) * dx + (y - y1) * dy) / L; t = t < 0 ? 0 : t > 1 ? 1 : t;
+      if ((x1 + t * dx - x) ** 2 + (y1 + t * dy - y) ** 2 <= EDGE_TOL * EDGE_TOL) return 1;
+      if ((y1 > y) !== (y2 > y) && x < x1 + (y - y1) * dx / dy) c = !c;
+    }
+    return c ? 1 : 0;
+  }
+  jarak(x, y, maks) {
+    let best = maks * maks + 1;
+    for (let b = Math.floor((y - maks - this.y0) / this.band); b <= Math.floor((y + maks - this.y0) / this.band); b++) {
+      for (const k of this.idx.get(b) || []) {
+        const [x1, y1, x2, y2] = this.E[k], dx = x2 - x1, dy = y2 - y1, L = dx * dx + dy * dy;
+        const t = Math.max(0, Math.min(1, ((x - x1) * dx + (y - y1) * dy) / L));
+        best = Math.min(best, (x1 + t * dx - x) ** 2 + (y1 + t * dy - y) ** 2);
+      }
+    }
+    return Math.sqrt(best);
+  }
+  potongRuas(p, q) {
+    let best = null;
+    for (const [x1, y1, x2, y2] of this.E) {
+      const d = (q[0] - p[0]) * (y2 - y1) - (q[1] - p[1]) * (x2 - x1);
+      if (Math.abs(d) < 1e-12) continue;
+      const t = ((x1 - p[0]) * (y2 - y1) - (y1 - p[1]) * (x2 - x1)) / d, u = ((x1 - p[0]) * (q[1] - p[1]) - (y1 - p[1]) * (q[0] - p[0])) / d;
+      if (t >= 0 && t <= 1 && u >= 0 && u <= 1 && (best === null || t < best)) best = t;
+    }
+    return best;
+  }
+}
+const ringsDari = (segs, no) => segs.filter((s) => s[0][0] === no && s.length >= 3).map((s) => s.map((r) => [r[2], r[1], r[3], r[4]]));
+function bukaRing(r) { if (r.length > 1 && Math.abs(r[0][0] - r[r.length - 1][0]) < 1e-9 && Math.abs(r[0][1] - r[r.length - 1][1]) < 1e-9) return r.slice(0, -1); return r; }
+
+/* ---------- 1. potong ---------- */
+function potong(progres, boundaries, mode = 'dalam', harian = [], strBdyHarian = null, titikPotong = false, cek = 2.0, sambung = 0) {
+  const B = boundaries.map(([b, no]) => new Bdy(ringsDari(b.segs, no).map(bukaRing))).filter((b) => b.rings.length);
+  const dalam = (x, y) => B.some((b) => b.status(x, y));
+  const buang = mode === 'dalam' ? dalam : (x, y) => !dalam(x, y);
+  const st = { titik_awal: 0, titik_dibuang: 0, titik_potong: 0, titik_harian: 0, sambungan: 0 };
+  let out = []; const cekl = [], sisa = [];
+  for (const s of progres.segs) {
+    st.titik_awal += s.length;
+    const flags = s.map((r) => buang(r[2], r[1]));
+    if (!flags.some(Boolean)) { out.push(s); continue; }
+    const nb = flags.filter(Boolean).length; st.titik_dibuang += nb;
+    const garis = s.length > 1 && !SPOT.has(s[0][0]);
+    const pieces = []; let cur = [];
+    s.forEach((r, i) => {
+      if (flags[i]) { if (cur.length) { if (titikPotong && garis) cur.push(titikPada(B, cur[cur.length - 1], r)); pieces.push(cur); cur = []; } }
+      else { if (!cur.length && i > 0 && titikPotong && garis && flags[i - 1]) cur.push(titikPada(B, r, s[i - 1])); cur.push(r); }
+    });
+    if (cur.length) pieces.push(cur);
+    if (garis) for (const p of pieces) { const uj = []; if (p[0] !== s[0]) uj.push(0); if (p[p.length - 1] !== s[s.length - 1]) uj.push(1); if (uj.length) sisa.push([p, uj]); }
+    if (titikPotong && garis) st.titik_potong += pieces.reduce((a, p) => a + p.length, 0) - (s.length - nb);
+    out.push(...pieces);
+    if (garis && cek && mode === 'dalam') {
+      for (const p of pieces) {
+        const ends = p[0] === p[p.length - 1] ? [p[0]] : [p[0], p[p.length - 1]];
+        for (const r of ends) { if (r[4].startsWith('POTONG')) continue; if (Math.min(...B.map((b) => b.jarak(r[2], r[1], cek))) <= cek) cekl.push(r); }
+      }
+    }
+  }
+  let add = [];
+  for (const h of harian) add = add.concat(h.segs.filter((s) => s[0][0] !== strBdyHarian));
+  st.titik_harian = add.reduce((a, s) => a + s.length, 0);
+  if (sambung > 0 && add.length && sisa.length) [out, add, st.sambungan] = sambungFn(out, add, sisa, sambung);
+  if (add.length) {
+    const nums = [...new Set(out.map((s) => s[0][0]).concat(add.map((s) => s[0][0])))].sort((a, b) => a - b);
+    const byOld = new Map(), byAdd = new Map();
+    for (const s of out) { if (!byOld.has(s[0][0])) byOld.set(s[0][0], []); byOld.get(s[0][0]).push(s); }
+    for (const s of add) { if (!byAdd.has(s[0][0])) byAdd.set(s[0][0], []); byAdd.get(s[0][0]).push(s); }
+    const urut = out.every((s, i) => i === 0 || out[i - 1][0][0] <= s[0][0]);
+    out = urut ? nums.flatMap((n) => (byAdd.get(n) || []).concat(byOld.get(n) || [])) : out.concat(add);
+  }
+  st.titik_akhir = out.reduce((a, s) => a + s.length, 0);
+  return { segs: out, st, cekl };
+}
+function sambungFn(out, add, sisa, jarak) {
+  const cand = [];
+  add.forEach((d, di) => {
+    if (d.length < 2 || SPOT.has(d[0][0])) return;
+    for (const de of [0, 1]) {
+      const pd = de === 0 ? d[0] : d[d.length - 1];
+      sisa.forEach(([o, uj], oi) => { if (o[0][0] !== d[0][0]) return; for (const oe of uj) { const po = oe === 0 ? o[0] : o[o.length - 1]; const dist = Math.hypot(pd[1] - po[1], pd[2] - po[2]); if (dist <= jarak) cand.push([dist, di, de, oi, oe]); } });
+    }
+  });
+  cand.sort((a, b) => { for (let i = 0; i < 5; i++) if (a[i] !== b[i]) return a[i] - b[i]; return 0; });
+  const usedD = new Set(), usedOld = new Set(), ext = new Map(); let n = 0;
+  for (const [, di, de, oi, oe] of cand) {
+    if (usedD.has(di + ',' + de) || usedOld.has(oi)) continue;
+    usedD.add(di + ',' + de); usedOld.add(oi);
+    const o = sisa[oi][0], seq = oe === (de === 0 ? 1 : 0) ? o : o.slice().reverse();
+    if (!ext.has(di)) ext.set(di, [[], []]); ext.get(di)[de] = seq; n++;
+  }
+  const hapus = new Set([...usedOld].map((oi) => sisa[oi][0]));
+  out = out.filter((s) => !hapus.has(s));
+  const na = add.map((d, di) => { if (!ext.has(di)) return d; const [a, b] = ext.get(di), num = d[0][0]; return a.map((x) => [num, ...x.slice(1)]).concat(d, b.map((x) => [num, ...x.slice(1)])); });
+  return [out, na, n];
+}
+function titikPada(B, keep, gone) {
+  let best = null;
+  for (const b of B) { const t = b.potongRuas([keep[2], keep[1]], [gone[2], gone[1]]); if (t !== null && (best === null || t < best)) best = t; }
+  const t = best === null ? 0 : best;
+  return [keep[0], keep[1] + t * (gone[1] - keep[1]), keep[2] + t * (gone[2] - keep[2]), keep[3] + t * (gone[3] - keep[3]), 'POTONG,' + keep[4]];
+}
+
+/* ---------- 2. boundary ---------- */
+const area = (r) => { let a = 0; for (let i = 0; i < r.length; i++) { const p = r[i], q = r[(i + 1) % r.length]; a += p[0] * q[1] - q[0] * p[1]; } return a / 2; };
+function insideSet(rings, x, y) {
+  let c = false;
+  for (const r of rings) { const n = r.length; for (let i = 0; i < n; i++) { const [x1, y1] = r[i], [x2, y2] = r[(i + 1) % n]; if ((y1 > y) !== (y2 > y) && x < x1 + (y - y1) * (x2 - x1) / (y2 - y1)) c = !c; } }
+  return c;
+}
+function onSet(rings, x, y, tol = 1e-4) {
+  for (const r of rings) {
+    const n = r.length;
+    for (let i = 0; i < n; i++) {
+      const [x1, y1] = r[i], [x2, y2] = r[(i + 1) % n], dx = x2 - x1, dy = y2 - y1, L = dx * dx + dy * dy;
+      const t = L === 0 ? 0 : Math.max(0, Math.min(1, ((x - x1) * dx + (y - y1) * dy) / L));
+      if ((x1 + t * dx - x) ** 2 + (y1 + t * dy - y) ** 2 < tol * tol) return [dx, dy];
+    }
+  }
+  return null;
+}
+function orientRings(rings) {
+  const out = [], flip = [];
+  rings.forEach((r, i) => {
+    const x = r[0][0], y = r[0][1];
+    const depth = rings.filter((o, j) => j !== i && insideSet([o], x, y)).length;
+    const f = (area(r) > 0) !== (depth % 2 === 0);
+    out.push(f ? r.slice().reverse() : r.slice()); flip.push(f);
+  });
+  return [out, flip];
+}
+function split(ring, others, isA, own) {
+  const TOL = 1e-9, OE = [];
+  others.forEach((r, k) => { for (let j = 0; j < r.length; j++) OE.push([r[j], r[(j + 1) % r.length], k]); });
+  const out = [], n = ring.length;
+  for (let i = 0; i < n; i++) {
+    const p = ring[i], q = ring[(i + 1) % n];
+    const ts = new Map([[0, null], [1, null]]);
+    const ex = q[0] - p[0], ey = q[1] - p[1], L2 = ex * ex + ey * ey;
+    if (L2 === 0) continue;
+    const bx0 = Math.min(p[0], q[0]) - 1e-6, bx1 = Math.max(p[0], q[0]) + 1e-6, by0 = Math.min(p[1], q[1]) - 1e-6, by1 = Math.max(p[1], q[1]) + 1e-6;
+    for (const [a, b, ko] of OE) {
+      if (Math.max(a[0], b[0]) < bx0 || Math.min(a[0], b[0]) > bx1 || Math.max(a[1], b[1]) < by0 || Math.min(a[1], b[1]) > by1) continue;
+      const d = ex * (b[1] - a[1]) - ey * (b[0] - a[0]);
+      if (Math.abs(d) > 1e-12 * Math.max(1.0, L2)) {
+        const t = ((a[0] - p[0]) * (b[1] - a[1]) - (a[1] - p[1]) * (b[0] - a[0])) / d, u = ((a[0] - p[0]) * ey - (a[1] - p[1]) * ex) / d;
+        if (TOL < t && t < 1 - TOL && u >= -1e-9 && u <= 1 + 1e-9) {
+          const uu = Math.min(1, Math.max(0, u)), zo = a[2] + uu * (b[2] - a[2]), zs = p[2] + t * (q[2] - p[2]);
+          ts.set(t, [isA ? (2 * zs + zo) / 3 : (2 * zo + zs) / 3, isA ? ko : own]);
+        }
+      } else {
+        for (const w of [a, b]) {
+          const t = ((w[0] - p[0]) * ex + (w[1] - p[1]) * ey) / L2;
+          if (TOL < t && t < 1 - TOL && Math.abs((w[0] - p[0]) * ey - (w[1] - p[1]) * ex) / Math.sqrt(L2) < 1e-6) ts.set(t, [w[2], isA ? ko : own]);
+        }
+      }
+    }
+    const pts = [...ts.keys()].sort((a, b) => a - b).map((t) => t === 0 ? p : t === 1 ? q : [p[0] + t * ex, p[1] + t * ey, ts.get(t)[0], p[3], 'baru', ts.get(t)[1]]);
+    for (let k = 0; k + 1 < pts.length; k++) out.push([pts[k], pts[k + 1], i]);
+  }
+  return out;
+}
+const key = (p) => (Math.round(p[0] * 1e4) / 1e4) + ',' + (Math.round(p[1] * 1e4) / 1e4);
+function boundaryOp(A, B, op = 'tambah') {
+  const A0 = A.filter((r) => r.length >= 3).map(bukaRing), B0 = B.filter((r) => r.length >= 3).map(bukaRing);
+  const [A1, fa] = orientRings(A0), [B1, fb] = orientRings(B0);
+  const cls = (pieces, other) => pieces.map(([p, q, i]) => {
+    const mx = (p[0] + q[0]) / 2, my = (p[1] + q[1]) / 2, on = onSet(other, mx, my);
+    if (on) return [p, q, i, on[0] * (q[0] - p[0]) + on[1] * (q[1] - p[1]) > 0 ? 'sama' : 'lawan'];
+    return [p, q, i, insideSet(other, mx, my) ? 'dalam' : 'luar'];
+  });
+  const PA = A1.map((r) => cls(split(r, B1, true), B1)), PB = B1.map((r, k) => cls(split(r, A1, false, k), A1));
+  const keepA = { tambah: ['luar', 'sama'], kurangi: ['luar', 'lawan'], irisan: ['dalam', 'sama'] }[op];
+  const keepB = { tambah: ['luar'], kurangi: ['dalam'], irisan: ['dalam'] }[op];
+  const revB = op === 'kurangi';
+  const hasil = [], pieces = [];
+  PA.forEach((ps, k) => {
+    const utuh = op !== 'irisan' ? ps.every((x) => x[3] === 'luar') : ps.every((x) => x[3] === 'dalam');
+    if (utuh && ps.length === A1[k].length) { hasil.push([['A', k], A0[k]]); return; }
+    for (const [p, q, , c] of ps) if (keepA.includes(c)) pieces.push([p, q, ['A', k]]);
+  });
+  PB.forEach((ps, k) => {
+    const utuh = ps.every((x) => keepB.includes(x[3])) && ps.length === B1[k].length;
+    if (utuh && !revB) { hasil.push([['B', k], B0[k]]); return; }
+    for (const [p, q, , c] of ps) if (keepB.includes(c)) pieces.push(revB ? [q, p, ['B', k]] : [p, q, ['B', k]]);
+  });
+  const nxt = new Map();
+  for (const pc of pieces) { const k = key(pc[0]); if (!nxt.has(k)) nxt.set(k, []); nxt.get(k).push(pc); }
+  const used = new Set();
+  const prio = (pc) => { const src = pc[2], R = (src[0] === 'A' ? A1 : B1)[src[1]]; return [src[0] !== 'A' ? 1 : 0, src[1], key(pc[0]) === key(R[0]) ? 0 : 1]; };
+  const starts = pieces.map((pc) => [prio(pc), pc]).sort((a, b) => a[0][0] - b[0][0] || a[0][1] - b[0][1] || a[0][2] - b[0][2]).map((x) => x[1]);
+  for (const s0 of starts) {
+    if (used.has(s0)) continue;
+    let ring = [], cur = s0;
+    while (cur && !used.has(cur)) {
+      used.add(cur); ring.push(cur[0]);
+      const cand = (nxt.get(key(cur[1])) || []).filter((c) => !used.has(c));
+      cur = cand.length ? cand[0] : null;
+    }
+    if (ring.length >= 3) {
+      const src = s0[2], flip = (src[0] === 'A' ? fa : fb)[src[1]];
+      if (flip) ring = ring.reverse();
+      let dsc = null;
+      if (src[0] === 'A') { let g; [ring, g] = awalSurpac(ring, B0); if (g !== null) dsc = B0[g][0][3]; }
+      if (dsc !== null) ring = ring.map((p) => [p[0], p[1], p[2], dsc]);
+      hasil.push([src, ring]);
+    }
+  }
+  const order = (s) => s[0] === 'A' ? s[1] : A1.length + s[1];
+  hasil.sort((a, b) => order(a[0]) - order(b[0]));
+  return hasil.map(([, r]) => r.map((p) => p.slice(0, 4)));
+}
+function awalSurpac(ring, B0) {
+  const kb = B0.map((b) => { const m = new Map(); b.forEach((p, j) => m.set(key(p), j)); return m; });
+  let g = null;
+  for (const p of ring) {
+    let c;
+    if (p.length > 4) c = p[5];
+    else { c = null; for (let k = 0; k < B0.length; k++) if (kb[k].has(key(p))) c = c === null ? k : Math.max(c, k); }
+    if (c !== null && c !== undefined && (g === null || c > g)) g = c;
+  }
+  if (g === null) return [ring, null];
+  const kr = ring.map(key), b = B0[g];
+  const rot = (j) => ring.slice(j).concat(ring.slice(0, j));
+  if (kr.includes(key(b[0]))) return [rot(kr.indexOf(key(b[0]))), g];
+  const n = b.length;
+  for (let i = n - 1; i >= 0; i--) {
+    const u = b[i], v = b[(i + 1) % n], dx = v[0] - u[0], dy = v[1] - u[1], L2 = dx * dx + dy * dy;
+    if (L2 === 0) continue;
+    let best = null;
+    ring.forEach((p, j) => {
+      if (p.length > 4 && p[5] === g) {
+        const t = ((p[0] - u[0]) * dx + (p[1] - u[1]) * dy) / L2;
+        if (t >= -1e-9 && t <= 1 + 1e-9 && Math.abs((p[0] - u[0]) * dy - (p[1] - u[1]) * dx) / Math.sqrt(L2) < 1e-6) if (best === null || t > best[0]) best = [t, j];
+      }
+    });
+    if (best) return [rot(best[1]), g];
+    if (kr.includes(key(u))) return [rot(kr.indexOf(key(u))), g];
+  }
+  return [ring, g];
+}
+
+/* ---------- alur (sama dengan VBA PotongProgres / BoundaryOp / UpdateHarian) ---------- */
+const baseName = (n) => n.replace(/^.*[\\/]/, '').replace(/\.[^.]*$/, '');
+function jalankanPotong(g, gName, bds, bdyNo, mode, hr, outName, tgl, titikPotong = false, cek = 2.0) {
+  const r = potong(g, bds.map((b) => [b, bdyNo]), mode, hr, bdyNo, titikPotong, mode === 'dalam' ? cek : 0);
+  const nama = baseName(outName), ts = tglSurpac(tgl);
+  const files = [{ name: nama + '.str', data: tulis(kepala(g.head, nama, ts), r.segs, g.binary, g.axis) }];
+  if (r.cekl.length) files.push({ name: nama + '_CEK.str', data: tulis([nama + '_CEK', ts, '0', '0'], r.cekl.map((x) => [[9006, x[1], x[2], x[3], 'CEK,' + x[4]]]), false) });
+  return { files, st: r.st, cek: r.cekl.length };
+}
+function jalankanBdy(a, aNo, bList, bNo, op, outName, tgl, outNo) {
+  let B = []; for (const b of bList) B = B.concat(ringsDari(b.segs, bNo));
+  const R = boundaryOp(ringsDari(a.segs, aNo), B, op);
+  const nama = baseName(outName), ts = tglSurpac(tgl), head = kepala(a.head, nama, ts);
+  head[0] = nama; head[1] = ts;
+  const no = outNo || aNo;
+  const segs = R.map((r) => r.concat([r[0]]).map((p) => [no, p[1], p[0], p[2], p[3]]));
+  return { files: [{ name: nama + '.str', data: tulis(head, segs, a.binary, a.axis) }], rings: R.length };
+}
+/* global lama dipotong boundary harian (DALAM) + string harian; bdy lama + bdy harian */
+function updateHarian(g, gName, bdyLama, bdyLamaName, bdyNo, harian, harianNames, harianBdyNo, tglIn) {
+  const tgl = tglTeks(tglIn, baseName(harianNames[0] || ''), harian[0] && harian[0].head);
+  if (!tgl) throw new Error('Tanggal tidak ditemukan; isi tanggal');
+  const outG = namaTanggal(baseName(gName) + '.str', tgl);
+  const r1 = jalankanPotong(g, gName, harian, harianBdyNo, 'dalam', harian, outG, tgl, false, 2.0);
+  let r2 = null;
+  if (bdyLama) r2 = jalankanBdy(bdyLama, bdyNo, harian, harianBdyNo, 'tambah', namaTanggal(baseName(bdyLamaName) + '.str', tgl), tgl, bdyNo);
+  return { tgl, files: r1.files.concat(r2 ? r2.files : []), st: r1.st, cek: r1.cek, rings: r2 ? r2.rings : 0 };
+}
+
+return { baca, tulis, potong, boundaryOp, ringsDari, jalankanPotong, jalankanBdy, updateHarian, tglTeks, namaTanggal, tglSurpac, baseName };
+})();
+if (typeof module !== 'undefined') module.exports = PG;
+</script>
+<script id="workerSrc">/* SMA Viewer - pekerja latar (Web Worker): baca file, CREATE DTM, volume, update progress.
+   Digabung dengan parser.js, tin.js, vol.js, progres.js saat build. */
+'use strict';
+function rangePred(list) { return (n) => list.some(([a, b]) => n >= a && n <= b); }
+function smaJob(cmd, a, progress) {
+  if (cmd === 'parse') { const r = parseAny(a.name, a.buf); r.name = a.name; return [r, transferList(r)]; }
+  if (cmd === 'dtm') {
+    const r = createDtm(a.r, { skip: rangePred(a.skip), spot: rangePred(a.spot) });
+    return [r, [r.tris.buffer]];
+  }
+  if (cmd === 'vol') return [cutFill(a.first, a.second, a.rings, progress), []];
+  if (cmd === 'update') {
+    const b = (x) => PG.baca(x);
+    let r;
+    if (a.jenis === 'harian') r = PG.updateHarian(b(a.g), a.gName, a.bdy ? b(a.bdy) : null, a.bdyName, a.bdyNo, a.harian.map(b), a.harianNames, a.harianNo, a.tgl);
+    else if (a.jenis === 'potong') {
+      const tgl = PG.tglTeks(a.tgl, PG.baseName((a.harianNames[0] || a.bdyNames[0] || '')), null);
+      if (!tgl) throw new Error('Tanggal tidak ditemukan; isi tanggal');
+      const out = a.outName || PG.namaTanggal(PG.baseName(a.gName) + '.str', tgl);
+      r = PG.jalankanPotong(b(a.g), a.gName, a.bdys.map(b), a.bdyNo, a.mode, a.harian.map(b), out, tgl, a.titikPotong, 2.0);
+      r.tgl = tgl;
+    } else {
+      const tgl = PG.tglTeks(a.tgl, PG.baseName(a.bdyNames[0] || ''), null);
+      if (!tgl) throw new Error('Tanggal tidak ditemukan; isi tanggal');
+      const out = a.outName || PG.namaTanggal(PG.baseName(a.gName) + '.str', tgl);
+      r = PG.jalankanBdy(b(a.g), a.gNo, a.bdys.map(b), a.bdyNo, a.op, out, tgl, a.gNo);
+      r.tgl = tgl;
+    }
+    return [r, r.files.map((f) => f.data.buffer)];
+  }
+  throw new Error('perintah tidak dikenal: ' + cmd);
+}
+if (typeof window === 'undefined' && typeof self !== 'undefined' && typeof module === 'undefined') {
   self.onmessage = (ev) => {
-    const { id, name, buf } = ev.data;
-    try { const r = parseAny(name, buf); r.name = name; self.postMessage({ id, r }, transferList(r)); }
-    catch (err) { self.postMessage({ id, err: String(err && err.stack || err) }); }
+    const { id, cmd, args } = ev.data;
+    try {
+      const [r, tr] = smaJob(cmd, args, (ri, f) => self.postMessage({ id, progress: [ri, f] }));
+      self.postMessage({ id, r }, tr);
+    } catch (err) { self.postMessage({ id, err: String(err && err.stack || err) }); }
   };
 }
 </script>
@@ -400,21 +1444,29 @@ function parseRange(s) {
   return (n) => out.some(([a, b]) => n >= a && n <= b);
 }
 
-/* ---------- worker pembaca ---------- */
+/* ---------- pekerja latar: baca file, DTM, volume, update ---------- */
 let worker = null, wid = 0; const wcb = new Map();
 try {
-  const src = $('#parserSrc').textContent;
+  const src = ['parserSrc', 'tinSrc', 'volSrc', 'progresSrc', 'workerSrc'].map((id) => $('#' + id).textContent).join('\n;\n');
   worker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
-  worker.onmessage = (ev) => { const f = wcb.get(ev.data.id); wcb.delete(ev.data.id); f(ev.data); };
-  worker.onerror = (e) => { e.preventDefault && e.preventDefault(); worker = null; for (const f of wcb.values()) f({ err: 'worker' }); wcb.clear(); };
+  worker.onmessage = (ev) => {
+    const d = ev.data, f = wcb.get(d.id); if (!f) return;
+    if (d.progress) { f.prog && f.prog(...d.progress); return; }
+    wcb.delete(d.id); f.done(d);
+  };
+  worker.onerror = (e) => { e.preventDefault && e.preventDefault(); worker = null; for (const f of wcb.values()) f.done({ err: 'worker' }); wcb.clear(); };
 } catch (e) { worker = null; }
-function parseFile(name, buf) {
-  if (!worker) return Promise.resolve().then(() => { const r = parseAny(name, buf); r.name = name; return r; });
+/* jalankan pekerjaan berat di worker (atau di thread utama kalau worker tidak ada) */
+function run(cmd, args, transfer = [], prog = null) {
+  const local = () => Promise.resolve().then(() => smaJob(cmd, args, prog)[0]);
+  if (!worker) return local();
   return new Promise((res, rej) => {
-    const id = ++wid; wcb.set(id, (d) => d.err ? rej(new Error(d.err)) : res(d.r));
-    worker.postMessage({ id, name, buf }, [buf]);
+    const id = ++wid;
+    wcb.set(id, { prog, done: (d) => d.err === 'worker' ? local().then(res, rej) : d.err ? rej(new Error(d.err)) : res(d.r) });
+    worker.postMessage({ id, cmd, args }, transfer);
   });
 }
+function parseFile(name, buf) { return run('parse', { name, buf }, [buf]); }
 
 /* ---------- memuat file ---------- */
 const busy = (t) => { $('#busy').hidden = !t; if (t) $('#busyTxt').textContent = t; };
@@ -427,11 +1479,10 @@ async function loadFiles(files) {
     busy(`Membaca ${f.name} (${(f.size / 1048576).toFixed(1)} MB)…`);
     try {
       const t0 = performance.now();
-      let r;
-      try { r = await parseFile(f.name, await f.arrayBuffer()); }
-      catch (e) { if (worker) throw e; r = parseAny(f.name, await f.arrayBuffer()); r.name = f.name; }
+      const buf = await f.arrayBuffer(), raw = ext === 'str' ? buf.slice(0) : null;
+      const r = await parseFile(f.name, buf);
       r.ms = performance.now() - t0;
-      if (r.kind === 'dtm') addDtm(f.name, r, msgs); else addStr(f.name, r);
+      if (r.kind === 'dtm') addDtm(f.name, r, msgs); else addStr(f.name, r, raw);
     } catch (e) { msgs.push(`${f.name}: gagal dibaca (${e.message.split('\n')[0]})`); }
   }
   busy(null);
@@ -440,7 +1491,7 @@ async function loadFiles(files) {
   if (msgs.length) alert(msgs.join('\n'));
 }
 
-function addStr(name, r) {
+function addStr(name, r, raw = null) {
   if (!S.origin) {
     let mx = Infinity, my = Infinity, mz = Infinity;
     for (let i = 0; i < r.rows; i++) if (r.sn[i]) { if (r.x[i] < mx) mx = r.x[i]; if (r.y[i] < my) my = r.y[i]; if (r.z[i] < mz) mz = r.z[i]; }
@@ -464,7 +1515,7 @@ function addStr(name, r) {
   for (const [s, c] of segCnt) strs.get(s).segs = c;
   // string spot yang sangat rapat (titik drone) disembunyikan dulu supaya garis tetap terbaca; bisa dicentang di panel
   for (const [s, st] of strs) if (S.spot(s) && st.count > 20000) { st.vis = false; st.auto = true; }
-  const L = { id: S.nextId++, kind: 'str', name, r, pos, strs, segNo, ptNo, segs: seg, bbox: b0, vis: true, open: false, dtms: [] };
+  const L = { id: S.nextId++, kind: 'str', name, r, raw, pos, strs, segNo, ptNo, segs: seg, bbox: b0, vis: true, open: false, dtms: [] };
   L.vbo = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, L.vbo); gl.bufferData(gl.ARRAY_BUFFER, pos, gl.STATIC_DRAW);
   L.cbo = gl.createBuffer(); L.lineIbo = gl.createBuffer(); L.ptIbo = gl.createBuffer();
   buildColors(L); buildIndex(L);
@@ -822,7 +1873,7 @@ $('#measClr').onclick = () => { S.meas = []; S.measOpen = false; renderMeasure()
 /* ---------- panel layer ---------- */
 function renderLayers() {
   const box = $('#layers');
-  if (!S.layers.length) { box.innerHTML = '<div class="empty">Belum ada file.</div>'; info(); return; }
+  if (!S.layers.length) { box.innerHTML = '<div class="empty">Belum ada file.</div>'; info(); refreshTools(); return; }
   box.innerHTML = '';
   for (const L of S.layers) {
     const el = document.createElement('div'); el.className = 'layer';
@@ -856,6 +1907,7 @@ function renderLayers() {
     box.appendChild(el);
   }
   info();
+  refreshTools();
 }
 function removeLayer(L) {
   const kill = L.kind === 'str' ? [L, ...L.dtms] : [L];
@@ -912,7 +1964,7 @@ function setTool(t) {
   showTab(t === 'ident' ? 'tIdent' : 'tMeasure');
 }
 function showTab(id) { for (const b of document.querySelectorAll('.tabs button')) b.classList.toggle('on', b.dataset.t === id); for (const t of document.querySelectorAll('.tab')) t.hidden = t.id !== id; }
-document.querySelector('.tabs').onclick = (e) => { if (e.target.dataset.t) setTool(e.target.dataset.t === 'tIdent' ? 'ident' : 'meas'); };
+document.querySelector('.tabs').onclick = (e) => { const t = e.target.dataset.t; if (!t) return; if (t === 'tIdent') setTool('ident'); else if (t === 'tMeasure') setTool('meas'); else showTab(t); };
 window.addEventListener('keydown', (e) => {
   if (e.target.tagName === 'INPUT') return;
   const k = e.key.toLowerCase();
@@ -937,7 +1989,364 @@ view.addEventListener('dragover', (e) => { e.preventDefault(); $('#drop').classL
 view.addEventListener('dragleave', () => $('#drop').classList.remove('on'));
 view.addEventListener('drop', (e) => { e.preventDefault(); $('#drop').classList.remove('on'); loadFiles(e.dataTransfer.files); });
 
-window.SMA = { S, loadFiles, zoomAll, setPlan, setTool, nearest, zAt, camera, draw };   // untuk uji otomatis
+/* ---------- alat survey: CREATE DTM, STRING OVER DTM, volume, update progress, section ---------- */
+const strLayers = () => S.layers.filter((L) => L.kind === 'str');
+const dtmLayers = () => S.layers.filter((L) => L.kind === 'dtm');
+const byId = (id) => S.layers.find((L) => String(L.id) === String(id));
+function rangesOf(s) {
+  const out = [];
+  for (const part of String(s).split(/[,;\s]+/)) {
+    if (!part) continue;
+    const m = part.match(/^(\d+)\s*-\s*(\d+)$/);
+    if (m) out.push([+m[1], +m[2]]); else if (/^\d+$/.test(part)) out.push([+part, +part]);
+  }
+  return out;
+}
+function fillSelect(sel, list, empty, prefer) {
+  const v = sel.value, seen = new Set((sel.dataset.seen || '').split(',').filter(Boolean));
+  sel.innerHTML = (empty ? `<option value="">${empty}</option>` : '') + list.map((L) => `<option value="${L.id}">${esc(L.name)}</option>`).join('');
+  const p = prefer ? prefer(list) : null;
+  if (p && !seen.has(String(p.id))) sel.value = p.id;                // layer baru yang cocok: pilih otomatis
+  else if ([...sel.options].some((o) => o.value === v && v !== '')) sel.value = v;
+  else if (p) sel.value = p.id;
+  sel.dataset.seen = list.map((L) => L.id).join(',');
+}
+function fillChecks(box, list, prefer) {
+  const was = new Set([...box.querySelectorAll('input:checked')].map((i) => i.value));
+  const seen = new Set((box.dataset.seen || '').split(',').filter(Boolean));
+  box.innerHTML = list.length ? list.map((L) => `<label class="chk"><input type="checkbox" value="${L.id}" ${was.has(String(L.id)) || (!seen.has(String(L.id)) && prefer && prefer(L)) ? 'checked' : ''}> ${esc(L.name)}</label>`).join('') : '<span class="muted">Belum ada file .str</span>';
+  box.dataset.seen = list.map((L) => L.id).join(',');
+}
+const checked = (box) => [...box.querySelectorAll('input:checked')].map((i) => byId(i.value)).filter(Boolean);
+const isBdy = (L) => /_bdy\b|bdy|boundary/i.test(L.name);
+const isHarian = (L) => /^\d{6}(?!\d)|^\d{8}(?!\d)/.test(L.name);
+const isGlobal = (L) => !isBdy(L) && !isHarian(L) && !/_CEK|_sod/i.test(L.name);
+const lastOf = (f) => (list) => { const c = list.filter(f); return c[c.length - 1]; };
+
+function refreshTools() {
+  const sl = strLayers(), dl = dtmLayers();
+  fillSelect($('#dtmSrc'), sl, null, lastOf(isGlobal));
+  fillSelect($('#sodSrc'), sl, null, (l) => l[l.length - 1]);
+  fillSelect($('#sodDtm'), dl, null, (l) => l[l.length - 1]);
+  fillSelect($('#volA'), dl, null, (l) => l[0]);
+  fillSelect($('#volB'), dl, null, (l) => l[l.length - 1]);
+  fillSelect($('#volBdy'), sl, null, lastOf(isBdy));
+  fillSelect($('#upG'), sl, null, lastOf(isGlobal));
+  fillSelect($('#upBdy'), sl, '(tidak ada)', lastOf(isBdy));
+  fillChecks($('#upHarian'), sl, isHarian);
+  fillChecks($('#upB'), sl, isHarian);
+  $('#volBtn').disabled = dl.length < 2;
+  $('#sodBtn').disabled = !dl.length || !sl.length;
+  $('#secInfo').textContent = dl.length ? 'Garis section = garis Ukur. Klik titik di mode Ukur, lalu Buat section.' : 'Buka atau buat DTM dulu.';
+}
+
+/* ---------- simpan file ---------- */
+S.dir = null;
+async function pickDir() {
+  if (!window.showDirectoryPicker) { alert('Browser ini tidak bisa memilih folder. Hasil akan diunduh ke folder Downloads.'); return; }
+  try { S.dir = await window.showDirectoryPicker({ id: 'smaOut', mode: 'readwrite' }); }
+  catch (e) { return; }
+  for (const el of document.querySelectorAll('.dirName')) el.textContent = S.dir.name;
+}
+async function saveFile(name, bytes) {
+  if (S.dir) {
+    try {
+      let exists = true;
+      try { await S.dir.getFileHandle(name); } catch (e) { exists = false; }
+      if (exists && !confirm(`${name} sudah ada di folder ${S.dir.name}. Timpa?`)) return false;
+      const fh = await S.dir.getFileHandle(name, { create: true }), w = await fh.createWritable();
+      await w.write(bytes); await w.close(); return true;
+    } catch (e) { alert('Gagal menulis ke folder: ' + e.message + '\nFile diunduh saja.'); }
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([bytes])); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  return true;
+}
+const latin1 = (t) => { const u = new Uint8Array(t.length); for (let i = 0; i < t.length; i++) u[i] = t.charCodeAt(i) & 255; return u; };
+async function addLayerFromBytes(name, bytes) {
+  const raw = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+  const r = await parseFile(name, raw.slice(0));
+  const old = S.layers.find((L) => L.kind === 'str' && L.name === name);
+  if (old) removeLayer(old);
+  return addStr(name, r, raw);
+}
+
+/* ---------- CREATE DTM ---------- */
+async function doCreateDtm() {
+  const L = byId($('#dtmSrc').value); if (!L) return;
+  const out = $('#dtmOut');
+  busy(`Membuat DTM dari ${L.name}…`);
+  const t0 = performance.now();
+  try {
+    const r = await run('dtm', { r: { rows: L.r.rows, x: L.r.x, y: L.r.y, sn: L.r.sn }, skip: rangesOf($('#dtmSkip').value), spot: rangesOf($('#dtmSpot').value) });
+    const ms = performance.now() - t0;
+    for (const D of L.dtms.filter((d) => d.created)) removeLayer(D);
+    const nm = L.name.replace(/\.str$/i, '') + '.dtm';
+    attachDtm(nm, { tris: r.tris, strName: L.name }, L);
+    const D = L.dtms[L.dtms.length - 1]; D.created = true; D.name = nm + ' (dibuat)';
+    out.innerHTML = `<div class="big">DTM jadi: ${r.ntri.toLocaleString('id-ID')} segitiga</div>
+      <table><tr><td>Titik dipakai</td><td>${r.npts.toLocaleString('id-ID')}</td></tr><tr><td>Breakline dilewati</td><td>${r.skipped}</td></tr><tr><td>Waktu</td><td>${(ms / 1000).toFixed(1)} detik</td></tr></table>
+      <div class="muted">Aturan sama dengan CREATE DTM Surpac: string ${esc($('#dtmSkip').value)} tidak dipakai, string ${esc($('#dtmSpot').value)} = titik saja, string lain = breakline.</div>`;
+    renderLayers(); S.dirty = true;
+  } catch (e) { out.textContent = 'Gagal: ' + e.message.split('\n')[0]; }
+  busy(null);
+}
+
+/* ---------- string di atas DTM (SOD) ---------- */
+function legCross(D, ax, ay, bx, by) {
+  const g = dtmGrid(D), P = D.src.r, t = D.tris, ts = [];
+  const cells = new Set(), L = Math.hypot(bx - ax, by - ay), n = Math.max(1, Math.ceil(L / (g.cs * 0.5)));
+  for (let k = 0; k <= n; k++) {
+    const x = ax + (bx - ax) * k / n, y = ay + (by - ay) * k / n;
+    const i = Math.floor((x - g.x0) / g.cs), j = Math.floor((y - g.y0) / g.cs);
+    for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) { const ii = i + di, jj = j + dj; if (ii >= 0 && jj >= 0 && ii < g.nx && jj < g.ny) cells.add(jj * g.nx + ii); }
+  }
+  const seen = new Set();
+  for (const c of cells) for (let k = g.cnt[c]; k < g.cnt[c + 1]; k++) {
+    const q = g.list[k]; if (seen.has(q)) continue; seen.add(q);
+    for (let e = 0; e < 3; e++) {
+      const u = t[3 * q + e], v = t[3 * q + (e + 1) % 3], cx = P.x[u], cy = P.y[u], dx = P.x[v], dy = P.y[v];
+      const den = (bx - ax) * (dy - cy) - (by - ay) * (dx - cx); if (den === 0) continue;
+      const s = ((cx - ax) * (dy - cy) - (cy - ay) * (dx - cx)) / den, w = ((cx - ax) * (by - ay) - (cy - ay) * (bx - ax)) / den;
+      if (s > 1e-9 && s < 1 - 1e-9 && w >= 0 && w <= 1) ts.push(s);
+    }
+  }
+  ts.sort((a, b) => a - b);
+  return ts.filter((v, i) => i === 0 || v - ts[i - 1] > 1e-9);
+}
+/* pts: [{x,y,z,d}] -> titik di atas DTM; tambah = titik baru di tiap sisi segitiga yang dilewati */
+function drape(D, pts, tambah) {
+  const out = [];
+  for (let k = 0; k < pts.length; k++) {
+    const a = pts[k], za = dtmZ(D, a.x, a.y);
+    out.push({ x: a.x, y: a.y, z: isNaN(za) ? a.z : za, d: a.d || '', luar: isNaN(za) });
+    if (!tambah || k + 1 >= pts.length) continue;
+    const b = pts[k + 1];
+    for (const s of legCross(D, a.x, a.y, b.x, b.y)) {
+      const x = a.x + (b.x - a.x) * s, y = a.y + (b.y - a.y) * s, z = dtmZ(D, x, y);
+      if (!isNaN(z)) out.push({ x, y, z, d: 'SOD' });
+    }
+  }
+  return out;
+}
+const len2 = (p) => { let s = 0; for (let i = 1; i < p.length; i++) s += Math.hypot(p[i].x - p[i - 1].x, p[i].y - p[i - 1].y); return s; };
+const len3 = (p) => { let s = 0; for (let i = 1; i < p.length; i++) s += Math.hypot(p[i].x - p[i - 1].x, p[i].y - p[i - 1].y, p[i].z - p[i - 1].z); return s; };
+function strText(name, segs, axisHead) {   // segs: [{s, pts:[{x,y,z,d}]}]
+  const now = new Date(), mon = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][now.getMonth()];
+  const L = [axisHead || `${name},${String(now.getDate()).padStart(2, '0')}-${mon}-${String(now.getFullYear()).slice(2)},0,0`,
+    '0,           0.000,           0.000,           0.000,           0.000,           0.000,           0.000'];
+  for (const g of segs) { for (const p of g.pts) L.push(`${g.s}, ${p.y.toFixed(3)}, ${p.x.toFixed(3)}, ${p.z.toFixed(3)}, ${p.d || ''}`); L.push('0, 0.000, 0.000, 0.000,'); }
+  L.push('0, 0.000, 0.000, 0.000, END');
+  return latin1(L.join('\r\n') + '\r\n');
+}
+let sodLast = null;
+async function doSod() {
+  const L = byId($('#sodSrc').value), D = byId($('#sodDtm').value); if (!L || !D) return;
+  const want = rangesOf($('#sodStr').value), ok = (s) => !want.length || want.some(([a, b]) => s >= a && s <= b);
+  const r = L.r, segs = []; let cur = null;
+  for (let i = 0; i < r.rows; i++) {
+    const s = r.sn[i];
+    if (!s) { cur = null; continue; }
+    if (!ok(s)) continue;
+    if (!cur) { cur = { s, pts: [] }; segs.push(cur); }
+    cur.pts.push({ x: r.x[i], y: r.y[i], z: r.z[i], d: new TextDecoder('latin1').decode(r.descBuf.subarray(r.descOff[i], r.descOff[i + 1])) });
+  }
+  busy('Menempel string ke DTM…');
+  await new Promise((f) => setTimeout(f, 30));
+  const tambah = $('#sodAdd').checked, res = segs.map((g) => ({ s: g.s, seg: 0, pts: drape(D, g.pts, tambah), n0: g.pts.length }));
+  const cnt = new Map(); for (const g of res) { cnt.set(g.s, (cnt.get(g.s) || 0) + 1); g.seg = cnt.get(g.s); }
+  const name = L.name.replace(/\.str$/i, '') + '_sod.str';
+  const bytes = strText(name.replace(/\.str$/, ''), res);
+  await addLayerFromBytes(name, bytes);
+  sodLast = { name, bytes, res };
+  const luar = res.reduce((a, g) => a + g.pts.filter((p) => p.luar).length, 0);
+  $('#sodOut').innerHTML = `<div class="big">${res.length} segmen ditempel ke ${esc(D.name)}</div>
+    <table class="mini"><thead><tr><th>String</th><th>Seg</th><th>Titik</th><th>Datar (m)</th><th>3D (m)</th></tr></thead><tbody>
+    ${res.slice(0, 200).map((g) => `<tr><td>${g.s}</td><td>${g.seg}</td><td>${g.n0} → ${g.pts.length}</td><td>${len2(g.pts).toFixed(3)}</td><td>${len3(g.pts).toFixed(3)}</td></tr>`).join('')}</tbody></table>
+    ${res.length > 200 ? `<div class="muted">… ${res.length - 200} segmen lagi (lengkap di Salin ke Excel)</div>` : ''}
+    ${luar ? `<div class="warn">${luar} titik di luar DTM: Z-nya tidak diubah.</div>` : ''}
+    <div class="acts"><button id="sodSave">Simpan ${esc(name)}</button><button id="sodCopy">Salin ke Excel</button></div>`;
+  $('#sodSave').onclick = () => saveFile(name, bytes);
+  $('#sodCopy').onclick = (e) => { copyText(['String\tSegmen\tTitik\tDatar\t3D', ...res.map((g) => [g.s, g.seg, g.pts.length, len2(g.pts).toFixed(3), len3(g.pts).toFixed(3)].join('\t'))].join('\r\n')); flash(e.target, 'Tersalin ✓'); };
+  busy(null); renderLayers();
+}
+/* garis ukur ditempel ke DTM teratas lalu disimpan */
+async function measSod() {
+  const D = [...S.layers].reverse().find((x) => x.kind === 'dtm' && x.vis);
+  if (!D || S.meas.length < 2) { alert('Perlu garis ukur (≥ 2 titik) dan DTM yang tampil.'); return; }
+  const pts = drape(D, S.meas.map((p) => ({ x: p.x, y: p.y, z: isNaN(p.z) ? 0 : p.z })), true);
+  const s = Math.max(1, parseInt($('#measNo').value) || 1);
+  const name = 'garis_ukur_sod';
+  await saveFile(name + '.str', strText(name, [{ s, pts }]));
+  $('#measSum').insertAdjacentHTML('beforeend', `<div class="muted">SOD ke ${esc(D.name)}: ${pts.length} titik, datar ${len2(pts).toFixed(3)} m, 3D ${len3(pts).toFixed(3)} m.</div>`);
+}
+
+/* ---------- volume ---------- */
+let volLast = null;
+const tinOf = (D) => ({ x: D.src.r.x, y: D.src.r.y, z: D.src.r.z, tris: D.tris });
+function bdyRings(L, no) {
+  const r = L.r, out = []; let cur = [];
+  for (let i = 0; i < r.rows; i++) { if (r.sn[i] === no) cur.push(r.x[i], r.y[i]); else { if (cur.length >= 6) out.push(Float64Array.from(cur)); cur = []; } }
+  if (cur.length >= 6) out.push(Float64Array.from(cur));
+  return out;
+}
+async function doVolume() {
+  const A = byId($('#volA').value), B = byId($('#volB').value), Bd = byId($('#volBdy').value), no = parseInt($('#volNo').value) || 1;
+  if (!A || !B || !Bd) return;
+  if (A === B) { alert('Pilih dua DTM yang berbeda.'); return; }
+  const rings = bdyRings(Bd, no);
+  if (!rings.length) { alert(`String ${no} tidak ada di ${Bd.name}.`); return; }
+  const t0 = performance.now();
+  busy('Menghitung volume…');
+  try {
+    const res = await run('vol', { first: tinOf(A), second: tinOf(B), rings }, [], (ri, f) => busy(`Menghitung volume… segmen ${ri + 1}/${rings.length} (${Math.round(f * 100)}%)`));
+    const ms = performance.now() - t0;
+    volLast = { A: A.name.replace(' (dibuat)', ''), B: B.name.replace(' (dibuat)', ''), bdy: Bd.name, no, res, ms, date: new Date() };
+    renderVolume();
+  } catch (e) { $('#volOut').textContent = 'Gagal: ' + e.message.split('\n')[0]; }
+  busy(null);
+}
+const fv = (v) => v.toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+function volTotals(res) { const T = { cut: 0, cutArea: 0, fill: 0, fillArea: 0, nett: 0, common: 0 }; for (const v of res) for (const k in T) T[k] += v[k]; return T; }
+function renderVolume() {
+  const V = volLast; if (!V) return;
+  const T = volTotals(V.res), kem = parseFloat(String($('#volKemarin').value).replace(/,/g, ''));
+  const row = (k, v) => `<tr><td>${k}</td><td>${fv(v.cut)}</td><td>${fv(v.cutArea)}</td><td>${fv(v.fill)}</td><td>${fv(v.fillArea)}</td><td><b>${fv(v.nett)}</b></td><td>${fv(v.common)}</td></tr>`;
+  $('#volOut').innerHTML = `<div class="big">Nett ${fv(T.nett)} m³</div>
+    ${isNaN(kem) ? '' : `<div>Volume hari ini (nett − nett kemarin): <b>${fv(T.nett - kem)} m³</b></div>`}
+    <div class="muted">${esc(V.A)} → ${esc(V.B)} · ${esc(V.bdy)} string ${V.no} · ${(V.ms / 1000).toFixed(1)} detik</div>
+    <div class="scroll"><table class="mini"><thead><tr><th>Seg</th><th>Cut</th><th>Cut area</th><th>Fill</th><th>Fill area</th><th>Nett</th><th>Common</th></tr></thead>
+    <tbody>${V.res.map((v, i) => row(i + 1, v)).join('')}${row('<b>Total</b>', T)}</tbody></table></div>
+    <div class="acts"><button id="volCopy">Salin ke Excel</button><button id="volCsv">Simpan CSV</button><button id="volRep">Report (cetak / PDF)</button></div>`;
+  $('#volCopy').onclick = (e) => { copyText(volTsv('\t')); flash(e.target, 'Tersalin ✓'); };
+  $('#volCsv').onclick = () => saveFile(V.B.replace(/\.dtm$/i, '') + '_vol.csv', latin1(volTsv(';')));
+  $('#volRep').onclick = volReport;
+}
+function volTsv(sep) {
+  const V = volLast, T = volTotals(V.res), n = (v) => v.toFixed(3);
+  const L = [['Segment', 'Cut Vol', 'Cut Area', 'Fill Vol', 'Fill Area', 'Nett Vol', 'Common Area'].join(sep)];
+  V.res.forEach((v, i) => L.push([i + 1, n(v.cut), n(v.cutArea), n(v.fill), n(v.fillArea), n(v.nett), n(v.common)].join(sep)));
+  L.push(['Total', n(T.cut), n(T.cutArea), n(T.fill), n(T.fillArea), n(T.nett), n(T.common)].join(sep));
+  return L.join('\r\n');
+}
+function volReport() {
+  const V = volLast, T = volTotals(V.res), kem = parseFloat(String($('#volKemarin').value).replace(/,/g, ''));
+  const d = V.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const rows = V.res.map((v, i) => `<tr><td>${i + 1}</td><td>${fv(v.cut)}</td><td>${fv(v.cutArea)}</td><td>${fv(v.fill)}</td><td>${fv(v.fillArea)}</td><td>${fv(v.nett)}</td><td>${fv(v.nett)}</td><td>${fv(v.common)}</td></tr>`).join('');
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>${esc(V.B)} - volume</title>
+  <style>body{font:12px Arial,sans-serif;margin:28px;color:#000}h1{font-size:15px;text-align:center}table{border-collapse:collapse;width:100%;margin-top:6px}
+  td,th{padding:3px 6px;text-align:right;white-space:nowrap}th{border-bottom:1px solid #000}td:first-child,th:first-child{text-align:left}tr.t td{border-top:1px solid #000;font-weight:bold}
+  .k td{text-align:left;padding:1px 6px}.n{color:#555;margin-top:18px;font-size:11px}@media print{button{display:none}}</style></head><body>
+  <button onclick="print()">Cetak / Simpan PDF</button>
+  <h1>DTM CUT AND FILL VOLUME REPORT</h1><div style="text-align:right">${d}</div>
+  <table class="k"><tr><td>First DTM:</td><td>${esc(V.A)}</td></tr><tr><td>Second DTM:</td><td>${esc(V.B)}</td></tr>
+  <tr><td>Boundary file:</td><td>${esc(V.bdy)}</td></tr><tr><td>Boundary string:</td><td>${V.no}</td></tr><tr><td>Number of segments:</td><td>${V.res.length}</td></tr></table>
+  <h3>Volumes</h3><table><thead><tr><th>Segment</th><th>Cut Vol</th><th>Cut Area</th><th>Fill Vol</th><th>Fill Area</th><th>Nett Vol</th><th>Nett Tonnage</th><th>Common Area</th></tr></thead>
+  <tbody>${rows}<tr class="t"><td>Total</td><td>${fv(T.cut)}</td><td>${fv(T.cutArea)}</td><td>${fv(T.fill)}</td><td>${fv(T.fillArea)}</td><td>${fv(T.nett)}</td><td>${fv(T.nett)}</td><td>${fv(T.common)}</td></tr></tbody></table>
+  ${isNaN(kem) ? '' : `<p><b>Volume hari ini</b> = ${fv(T.nett)} − (${fv(kem)}) = <b>${fv(T.nett - kem)}</b> m³</p>`}
+  <div class="n">Dihitung dengan SMA Viewer (metode irisan TIN eksak, density 1.000).</div></body></html>`;
+  const w = window.open('', '_blank');
+  if (!w) { saveFile(V.B.replace(/\.dtm$/i, '') + '_vol.html', latin1(unescape(encodeURIComponent(html)))); return; }
+  w.document.write(html); w.document.close();
+}
+
+/* ---------- update progress ---------- */
+function upJenis() { const j = $('#upJenis').value; for (const el of document.querySelectorAll('[data-up]')) el.hidden = !el.dataset.up.split(' ').includes(j); }
+async function doUpdate() {
+  const j = $('#upJenis').value, G = byId($('#upG').value);
+  if (!G) { alert('Pilih file utama.'); return; }
+  if (!G.raw) { alert('File ini bukan .str.'); return; }
+  const args = { jenis: j, g: G.raw.slice(0), gName: G.name, tgl: $('#upTgl').value };
+  const tr = [args.g];
+  const raws = (list) => list.map((L) => { const b = L.raw.slice(0); tr.push(b); return b; });
+  if (j === 'harian') {
+    const H = checked($('#upHarian')); if (!H.length) { alert('Centang file harian.'); return; }
+    const Bd = byId($('#upBdy').value);
+    Object.assign(args, { bdy: Bd ? raws([Bd])[0] : null, bdyName: Bd ? Bd.name : '', bdyNo: parseInt($('#upBdyNo').value) || 1, harian: raws(H), harianNames: H.map((L) => L.name), harianNo: parseInt($('#upHarianNo').value) || 1 });
+  } else if (j === 'potong') {
+    const Bs = checked($('#upB')), H = $('#upAdd').checked ? checked($('#upHarian')) : [];
+    if (!Bs.length) { alert('Centang file boundary.'); return; }
+    Object.assign(args, { bdys: raws(Bs), bdyNames: Bs.map((L) => L.name), bdyNo: parseInt($('#upBNo').value) || 1, mode: $('#upMode').value, harian: raws(H), harianNames: H.map((L) => L.name), titikPotong: $('#upTitik').checked, outName: $('#upNama').value.trim() });
+  } else {
+    const Bs = checked($('#upB')); if (!Bs.length) { alert('Centang boundary B.'); return; }
+    Object.assign(args, { gNo: parseInt($('#upGNo').value) || 1, bdys: raws(Bs), bdyNames: Bs.map((L) => L.name), bdyNo: parseInt($('#upBNo').value) || 1, op: $('#upOp').value, outName: $('#upNama').value.trim() });
+  }
+  busy('Memproses…');
+  const t0 = performance.now();
+  try {
+    const r = await run('update', args, tr);
+    const ms = performance.now() - t0;
+    for (const f of r.files) await addLayerFromBytes(f.name, f.data);
+    const st = r.st ? `<tr><td>Titik awal</td><td>${r.st.titik_awal.toLocaleString('id-ID')}</td></tr><tr><td>Titik dibuang</td><td>${r.st.titik_dibuang.toLocaleString('id-ID')}</td></tr><tr><td>Titik harian ditambah</td><td>${r.st.titik_harian.toLocaleString('id-ID')}</td></tr><tr><td>Titik akhir</td><td>${r.st.titik_akhir.toLocaleString('id-ID')}</td></tr>` : '';
+    $('#upOut').innerHTML = `<div class="big">Selesai (${(ms / 1000).toFixed(1)} detik)</div>
+      <table>${st}${r.cek ? `<tr><td>Titik dicek (_CEK, string 9006)</td><td>${r.cek}</td></tr>` : ''}</table>
+      <div class="files">${r.files.map((f, i) => `<div class="frow"><span>${esc(f.name)}</span><button data-i="${i}">Simpan</button></div>`).join('')}</div>
+      <div class="acts"><button id="upAll">Simpan semua</button></div>
+      <div class="muted">Hasil sudah dibuka sebagai layer. Folder simpan: <b class="dirName">${S.dir ? esc(S.dir.name) : 'Downloads'}</b>.</div>`;
+    $('#upOut .files').onclick = (e) => { const i = e.target.dataset.i; if (i !== undefined) saveFile(r.files[i].name, r.files[i].data).then((ok) => ok && flash(e.target, 'Tersimpan ✓')); };
+    $('#upAll').onclick = async (e) => { for (const f of r.files) await saveFile(f.name, f.data); flash(e.target, 'Tersimpan ✓'); };
+    renderLayers(); zoomAll();
+  } catch (e) { $('#upOut').textContent = 'Gagal: ' + e.message.split('\n')[0]; }
+  busy(null);
+}
+
+/* ---------- section ---------- */
+let secLast = null;
+function doSection() {
+  const D = dtmLayers().filter((x) => x.vis);
+  if (!D.length) { alert('Tampilkan minimal satu DTM.'); return; }
+  if (S.meas.length < 2) { alert('Buat garis dulu di mode Ukur (klik ≥ 2 titik).'); setTool('meas'); return; }
+  const m = S.meas, ch = [];       // {c, x, y}
+  let c0 = 0;
+  for (let k = 0; k + 1 < m.length; k++) {
+    const a = m[k], b = m[k + 1], L = Math.hypot(b.x - a.x, b.y - a.y);
+    const ts = new Set([0]);
+    for (const d of D) for (const s of legCross(d, a.x, a.y, b.x, b.y)) ts.add(s);
+    if (k + 2 === m.length) ts.add(1);
+    for (const s of [...ts].sort((p, q) => p - q)) ch.push({ c: c0 + s * L, x: a.x + (b.x - a.x) * s, y: a.y + (b.y - a.y) * s });
+    c0 += L;
+  }
+  const z = D.map((d) => ch.map((p) => dtmZ(d, p.x, p.y)));
+  secLast = { D, ch, z };
+  const W = 400, H = 220, pad = 38;
+  let zmin = Infinity, zmax = -Infinity;
+  for (const r of z) for (const v of r) if (!isNaN(v)) { zmin = Math.min(zmin, v); zmax = Math.max(zmax, v); }
+  if (!isFinite(zmin)) { $('#secOut').textContent = 'Garis tidak melewati DTM.'; return; }
+  const span = Math.max(zmax - zmin, 1); zmin -= span * 0.05; zmax += span * 0.05;
+  const cl = ch[ch.length - 1].c || 1, sx = (c) => pad + c / cl * (W - pad - 8), sy = (v) => H - 22 - (v - zmin) / (zmax - zmin) * (H - 32);
+  const cols = ['#d64545', '#1f6feb', '#2e9d5b', '#c47f00', '#8e44ad'];
+  const paths = z.map((r, i) => {
+    let d = '', pen = false;
+    r.forEach((v, j) => { if (isNaN(v)) { pen = false; return; } d += (pen ? 'L' : 'M') + sx(ch[j].c).toFixed(1) + ',' + sy(v).toFixed(1); pen = true; });
+    return `<path d="${d}" fill="none" stroke="${cols[i % cols.length]}" stroke-width="1.6"/>`;
+  }).join('');
+  const ticks = [0, 0.25, 0.5, 0.75, 1].map((f) => { const v = zmin + f * (zmax - zmin); return `<text x="${pad - 4}" y="${sy(v) + 3}" text-anchor="end">${v.toFixed(0)}</text><line x1="${pad}" x2="${W - 8}" y1="${sy(v)}" y2="${sy(v)}" class="gr"/>`; }).join('')
+    + [0, 0.5, 1].map((f) => `<text x="${sx(f * cl)}" y="${H - 6}" text-anchor="${f === 0 ? 'start' : f === 1 ? 'end' : 'middle'}">${(f * cl).toFixed(0)} m</text>`).join('');
+  $('#secOut').innerHTML = `<svg viewBox="0 0 ${W} ${H}" class="sec">${ticks}${paths}</svg>
+    <div class="legend">${D.map((d, i) => `<span><i style="background:${cols[i % cols.length]}"></i>${esc(d.name)}</span>`).join('')}</div>
+    <div class="muted">Panjang ${f3(cl)} m · ${ch.length} titik (tiap perpotongan sisi segitiga).</div>
+    <div class="acts"><button id="secCopy">Salin ke Excel</button></div>`;
+  $('#secCopy').onclick = (e) => {
+    const L = [['Jarak', 'Y', 'X', ...D.map((d) => 'Z ' + d.name)].join('\t')];
+    ch.forEach((p, j) => L.push([p.c.toFixed(3), p.y.toFixed(3), p.x.toFixed(3), ...z.map((r) => isNaN(r[j]) ? '' : r[j].toFixed(3))].join('\t')));
+    copyText(L.join('\r\n')); flash(e.target, 'Tersalin ✓');
+  };
+}
+
+$('#dtmBtn').onclick = doCreateDtm;
+$('#sodBtn').onclick = doSod;
+$('#volBtn').onclick = doVolume;
+$('#volKemarin').oninput = renderVolume;
+$('#upJenis').onchange = upJenis; upJenis();
+$('#upBtn').onclick = doUpdate;
+$('#secBtn').onclick = doSection;
+$('#measSod').onclick = measSod;
+for (const b of document.querySelectorAll('.pickDir')) b.onclick = pickDir;
+refreshTools();
+
+window.SMA = { S, run, addStr, attachDtm, loadFiles, zoomAll, setPlan, setTool, nearest, zAt, camera, draw };   // untuk uji otomatis
 })();
 </script>
 </body>

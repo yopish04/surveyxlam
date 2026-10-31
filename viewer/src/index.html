@@ -37,7 +37,7 @@
     <div id="north" title="Arah utara">N<div class="arrow"></div></div>
   </section>
   <aside id="right">
-    <div class="tabs"><button data-t="tIdent" class="on">Identify</button><button data-t="tMeasure">Ukur</button></div>
+    <div class="tabs"><button data-t="tIdent" class="on">Identify</button><button data-t="tMeasure">Ukur</button><button data-t="tSec">Section</button><button data-t="tDtm">DTM</button><button data-t="tVol">Volume</button><button data-t="tUp">Update</button></div>
     <div id="tIdent" class="tab">
       <div id="identCur" class="card muted">Klik titik di layar.</div>
       <table id="identTbl"><thead><tr><th>#</th><th>Str</th><th>Y</th><th>X</th><th>Z</th><th>Desc</th></tr></thead><tbody></tbody></table>
@@ -47,6 +47,69 @@
       <div id="measSum" class="card muted">Mode Ukur: klik titik-titik (menempel ke titik terdekat). Esc = selesai, klik lagi = ukuran baru.</div>
       <table id="measTbl"><thead><tr><th>#</th><th>Y</th><th>X</th><th>Z</th><th>Datar</th><th>Miring</th><th>Bearing</th><th>Grade</th></tr></thead><tbody></tbody></table>
       <div class="acts"><button id="measCopy">Salin ke Excel</button><button id="measStr">Simpan .str</button><button id="measClr">Hapus</button></div>
+      <div class="acts"><label class="fld">String<input id="measNo" type="number" value="1" min="1" style="width:64px"></label><button id="measSod" title="Garis ukur ditempel ke DTM teratas (titik di tiap sisi segitiga), lalu disimpan">Tempel ke DTM &amp; simpan .str</button></div>
+    </div>
+    <div id="tSec" class="tab" hidden>
+      <div class="card"><div class="big">Section DTM</div><div id="secInfo" class="muted"></div></div>
+      <div class="acts"><button id="secBtn" class="primary">Buat section</button></div>
+      <div id="secOut"></div>
+    </div>
+    <div id="tDtm" class="tab" hidden>
+      <div class="card"><div class="big">CREATE DTM</div>
+        <div class="form">
+          <label>String file<select id="dtmSrc"></select></label>
+          <label>String tidak dipakai<input id="dtmSkip" value="1" title="Boundary, mis. 1"></label>
+          <label>String spot (titik saja)<input id="dtmSpot" value="500-999"></label>
+        </div>
+        <div class="acts"><button id="dtmBtn" class="primary">Buat DTM</button></div>
+        <div id="dtmOut"></div>
+      </div>
+      <div class="card"><div class="big">String over DTM (SOD)</div>
+        <div class="form">
+          <label>String file<select id="sodSrc"></select></label>
+          <label>Nomor string<input id="sodStr" value="" placeholder="kosong = semua"></label>
+          <label>DTM<select id="sodDtm"></select></label>
+          <label class="chk"><input id="sodAdd" type="checkbox" checked> tambah titik di tiap sisi segitiga</label>
+        </div>
+        <div class="acts"><button id="sodBtn" class="primary">Tempel ke DTM</button></div>
+        <div id="sodOut"></div>
+      </div>
+    </div>
+    <div id="tVol" class="tab" hidden>
+      <div class="card"><div class="big">DTM CUT AND FILL VOLUMES</div>
+        <div class="form">
+          <label>DTM pertama (base)<select id="volA"></select></label>
+          <label>DTM kedua (update)<select id="volB"></select></label>
+          <label>Boundary<select id="volBdy"></select></label>
+          <label>String boundary<input id="volNo" type="number" value="1" min="1"></label>
+          <label>Nett kemarin (opsional)<input id="volKemarin" placeholder="mis. -5640000.000"></label>
+        </div>
+        <div class="acts"><button id="volBtn" class="primary">Hitung volume</button></div>
+      </div>
+      <div id="volOut"></div>
+    </div>
+    <div id="tUp" class="tab" hidden>
+      <div class="card">
+        <div class="form">
+          <label>Pekerjaan<select id="upJenis"><option value="harian">Update harian</option><option value="potong">Potong progress</option><option value="bdy">Boundary (tambah/kurangi)</option></select></label>
+          <label><span data-up="harian potong">File global / progress</span><span data-up="bdy">Boundary A</span><select id="upG"></select></label>
+          <label data-up="bdy">String A<input id="upGNo" type="number" value="1" min="1"></label>
+          <label data-up="harian">Boundary lama<select id="upBdy"></select></label>
+          <label data-up="harian">String boundary lama<input id="upBdyNo" type="number" value="1" min="1"></label>
+          <div data-up="harian potong"><span class="lbl"><span data-up="harian">Data harian</span><span data-up="potong"><label class="chk"><input id="upAdd" type="checkbox"> tambahkan data harian:</label></span></span><div id="upHarian" class="checks"></div></div>
+          <label data-up="harian">String boundary harian<input id="upHarianNo" type="number" value="1" min="1"></label>
+          <div data-up="potong bdy"><span class="lbl"><span data-up="potong">File boundary</span><span data-up="bdy">Boundary B</span></span><div id="upB" class="checks"></div></div>
+          <label data-up="potong bdy">String boundary<input id="upBNo" type="number" value="1" min="1"></label>
+          <label data-up="potong">Mode<select id="upMode"><option value="dalam">DALAM (buang titik di dalam boundary)</option><option value="luar">LUAR (buang titik di luar boundary)</option></select></label>
+          <label data-up="potong" class="chk"><input id="upTitik" type="checkbox"> tambah titik potong di garis boundary</label>
+          <label data-up="bdy">Operasi<select id="upOp"><option value="tambah">TAMBAH (A + B)</option><option value="kurangi">KURANGI (A − B)</option><option value="irisan">IRISAN</option></select></label>
+          <label>Tanggal<input id="upTgl" value="auto" title="auto (dari nama file harian), 27/10/2026, 2026-10-27"></label>
+          <label data-up="potong bdy">Nama hasil<input id="upNama" placeholder="kosong = otomatis"></label>
+        </div>
+        <div class="acts"><button id="upBtn" class="primary">Jalankan</button><button class="pickDir" title="Pilih folder tempat menyimpan hasil (mis. D:\yopi\...)">Folder simpan: <b class="dirName">Downloads</b></button></div>
+      </div>
+      <div id="upOut"></div>
+      <div class="muted">Hasilnya sama byte per byte dengan add-in Excel "Update Progress". File asal tidak diubah.</div>
     </div>
   </aside>
 </main>
@@ -59,11 +122,19 @@
     <li><b>Identify</b>: klik titik → nomor string, Y, X, Z, deskripsi. <b>Ukur</b>: klik beberapa titik → jarak datar, miring, bearing, grade; di atas DTM juga jarak mengikuti permukaan DTM.</li>
     <li><b>Salin ke Excel</b>: tabel disalin, tinggal Ctrl+V di Excel. <b>Simpan .str</b>: titik yang dipilih/diukur disimpan sebagai string file Surpac.</li>
     <li>Layer: centang untuk tampil/sembunyi, klik kotak warna untuk ganti warna, klik ▸ untuk daftar nomor string.</li>
+    <li><b>Section</b>: buat garis di mode Ukur, lalu Buat section (semua DTM yang tampil).</li>
+    <li><b>DTM</b>: CREATE DTM dari string file (aturan sama dengan Surpac) dan String over DTM (SOD) untuk jalan/distance.</li>
+    <li><b>Volume</b>: DTM cut/fill per segmen boundary, sama dengan report Surpac. Isi nett kemarin untuk volume hari ini.</li>
+    <li><b>Update</b>: update harian (potong global + tambah harian + boundary), potong progress, atau boundary tambah/kurangi. Hasil langsung jadi layer; simpan ke folder pilihan.</li>
     <li>Tombol: F zoom semua, P plan, 3 tampak 3D, I identify, M ukur, Esc selesai ukur.</li>
   </ul>
   <form method="dialog"><button>Tutup</button></form>
 </dialog>
 <script id="parserSrc">/*PARSER*/</script>
+<script id="tinSrc">/*TIN*/</script>
+<script id="volSrc">/*VOL*/</script>
+<script id="progresSrc">/*PROGRES*/</script>
+<script id="workerSrc">/*WORKER*/</script>
 <script>/*APP*/</script>
 </body>
 </html>

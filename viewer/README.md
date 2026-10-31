@@ -1,12 +1,34 @@
 # SMA Viewer
 
-Viewer ringan untuk file Surpac. Bentuknya satu file HTML, dibuka di Chrome/Edge, offline, tanpa instalasi.
+Aplikasi survey ringan yang kompatibel dengan file Surpac.
+- Bentuknya satu file HTML, dibuka di Chrome atau Edge.
+- Berjalan offline, tanpa instalasi dan tanpa pustaka luar.
+- Pekerjaan berat dijalankan di Web Worker.
 
-- Membaca `.str` (teks/biner), `.dtm` (teks/biner, dipilih bersama `.str`-nya), dan `.shp`.
-- Tampak plan dan 3D (WebGL2), pembesaran Z, layer, dan string per nomor (tampil/sembunyi, warna).
-- Identify titik: string, segmen, titik, Y, X, Z, deskripsi.
-- Ukur: jarak datar, jarak miring, jarak mengikuti permukaan DTM (sampel tiap 1 m), bearing DMS, grade.
-- Salin tabel ke Excel (TSV). Titik juga bisa disimpan sebagai `.str` Surpac.
+| Tab | Isi | Uji |
+|---|---|---|
+| Layer / tampilan | `.str` teks/biner, `.dtm` teks/biner, `.shp`; tampilan Plan/3D | pembacaan sama dengan `strio.py` |
+| Identify / Ukur | koordinat, jarak datar/miring/di permukaan DTM, bearing, grade; salin ke Excel, simpan `.str`, SOD garis ukur | jarak DTM = Python ±1 mm |
+| Section | profil semua DTM yang tampil sepanjang garis ukur, dengan titik di setiap perpotongan sisi segitiga | – |
+| DTM | lihat rincian di bawah | lihat rincian di bawah |
+| Volume | cut/fill eksak per segmen boundary, common area, volume hari ini, report cetak/PDF, CSV | lihat rincian di bawah |
+| Update | update harian, potong progress (DALAM/LUAR), boundary TAMBAH/KURANGI/IRISAN | lihat rincian di bawah |
 
-Kode ada di `src/` (`parser.js`, `app.js`, `style.css`, `index.html`). Jalankan `python3 build.py` untuk membuat `SMA_Viewer.html`.
-Pembaca file sudah diuji: hasilnya sama dengan `riset/volume/strio.py` untuk LD03 dan Tofu 9 (888.676 titik, 1.759.530 segitiga; terbaca < 1 detik).
+**DTM**
+- CREATE DTM: Delaunay sweep-hull ditambah breakline (port `cdt2.py`); kalau ada seri ko-sirkular, dipilih diagonal NW–SE.
+- String over DTM (SOD): string ditempel ke DTM.
+- Uji:
+  - LD03: identik dengan TIN Surpac.
+  - Tofu 9: 99,76% sisi sama, waktu 1,9 detik.
+
+**Volume**
+- Uji dengan TIN Surpac:
+  - LD03: selisih ±0,008 m³ dari PDF.
+  - Tofu 9: selisih 5 m³ dari 5,68 juta m³ (0,0001%), waktu 15 detik.
+
+**Update**
+- Port dari `progres.py`.
+- Uji: hasil byte-identik dengan Python dan Excel (LD03, Tofu 9).
+
+Kode sumber ada di `src/`: `parser.js`, `tin.js`, `vol.js`, `progres.js`, `worker.js`, `app.js`, `tools.js`, `index.html`, `style.css`.
+Jalankan `python3 build.py` untuk membuat `SMA_Viewer.html`.
