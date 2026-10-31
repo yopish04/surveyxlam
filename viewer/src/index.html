@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SMA Viewer</title>
+<style>/*CSS*/</style>
+</head>
+<body>
+<header id="bar">
+  <span class="brand">SMA Viewer</span>
+  <label class="btn primary" title="Buka .str, .dtm, .shp (boleh banyak sekaligus, atau seret file ke layar)">Buka file<input id="fileIn" type="file" multiple accept=".str,.dtm,.shp" hidden></label>
+  <span class="sep"></span>
+  <button id="bZoom" title="Zoom semua (F)">Zoom semua</button>
+  <button id="bPlan" class="tog on" title="Tampak atas (P)">Plan</button>
+  <button id="b3d" class="tog" title="Tampak 3D (3)">3D</button>
+  <label class="fld" title="Pembesaran vertikal">Z×<input id="zEx" type="number" value="1" min="0.1" max="20" step="0.5"></label>
+  <span class="sep"></span>
+  <button id="bIdent" class="tog on" title="Klik titik untuk info (I)">Identify</button>
+  <button id="bMeasure" class="tog" title="Ukur jarak/bearing; Esc = selesai (M)">Ukur</button>
+  <span class="sep"></span>
+  <label class="fld" title="Nomor string yang digambar sebagai titik (spot), mis. 500-999">Spot<input id="spotIn" value="500-999"></label>
+  <label class="fld"><input id="showPts" type="checkbox"> Titik</label>
+  <span class="grow"></span>
+  <button id="bTheme" title="Ganti latar">Latar</button>
+  <button id="bHelp">Bantuan</button>
+</header>
+<main>
+  <aside id="left">
+    <div class="ptitle">Layer</div>
+    <div id="layers"><div class="empty">Belum ada file.<br>Klik <b>Buka file</b> atau seret file .str / .dtm / .shp ke sini.<br><br>Untuk DTM, pilih file .dtm bersama .str-nya.</div></div>
+  </aside>
+  <section id="view">
+    <canvas id="gl"></canvas>
+    <div id="drop">Lepaskan file di sini</div>
+    <div id="busy" hidden><div class="spin"></div><span id="busyTxt">Membaca…</span></div>
+    <div id="north" title="Arah utara">N<div class="arrow"></div></div>
+  </section>
+  <aside id="right">
+    <div class="tabs"><button data-t="tIdent" class="on">Identify</button><button data-t="tMeasure">Ukur</button></div>
+    <div id="tIdent" class="tab">
+      <div id="identCur" class="card muted">Klik titik di layar.</div>
+      <table id="identTbl"><thead><tr><th>#</th><th>Str</th><th>Y</th><th>X</th><th>Z</th><th>Desc</th></tr></thead><tbody></tbody></table>
+      <div class="acts"><button id="identCopy">Salin ke Excel</button><button id="identStr">Simpan .str</button><button id="identClr">Hapus</button></div>
+    </div>
+    <div id="tMeasure" class="tab" hidden>
+      <div id="measSum" class="card muted">Mode Ukur: klik titik-titik (menempel ke titik terdekat). Esc = selesai, klik lagi = ukuran baru.</div>
+      <table id="measTbl"><thead><tr><th>#</th><th>Y</th><th>X</th><th>Z</th><th>Datar</th><th>Miring</th><th>Bearing</th><th>Grade</th></tr></thead><tbody></tbody></table>
+      <div class="acts"><button id="measCopy">Salin ke Excel</button><button id="measStr">Simpan .str</button><button id="measClr">Hapus</button></div>
+    </div>
+  </aside>
+</main>
+<footer id="status"><span id="sXY">Y –  X –  Z –</span><span id="sInfo"></span></footer>
+<dialog id="help">
+  <h3>SMA Viewer — cara pakai</h3>
+  <ul>
+    <li><b>Buka file</b>: pilih .str (teks/biner), .dtm (pilih bersama .str-nya) dan .shp. Bisa juga seret file ke layar. File hanya dibaca di komputer ini, tidak dikirim ke mana pun.</li>
+    <li><b>Plan</b>: seret kiri = geser, roda = zoom di kursor. <b>3D</b>: seret kiri = putar, seret kanan / Shift+seret = geser.</li>
+    <li><b>Identify</b>: klik titik → nomor string, Y, X, Z, deskripsi. <b>Ukur</b>: klik beberapa titik → jarak datar, miring, bearing, grade; di atas DTM juga jarak mengikuti permukaan DTM.</li>
+    <li><b>Salin ke Excel</b>: tabel disalin, tinggal Ctrl+V di Excel. <b>Simpan .str</b>: titik yang dipilih/diukur disimpan sebagai string file Surpac.</li>
+    <li>Layer: centang untuk tampil/sembunyi, klik kotak warna untuk ganti warna, klik ▸ untuk daftar nomor string.</li>
+    <li>Tombol: F zoom semua, P plan, 3 tampak 3D, I identify, M ukur, Esc selesai ukur.</li>
+  </ul>
+  <form method="dialog"><button>Tutup</button></form>
+</dialog>
+<script id="parserSrc">/*PARSER*/</script>
+<script>/*APP*/</script>
+</body>
+</html>

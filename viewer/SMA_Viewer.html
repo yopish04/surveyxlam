@@ -1,0 +1,944 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SMA Viewer</title>
+<style>:root{
+  --bg:#f4f5f7; --panel:#ffffff; --line:#d9dce2; --text:#1d2330; --muted:#677084; --accent:#1f6feb; --accent-ink:#fff;
+  --view:#e9ecf1; --hover:#eef2f8; --chip:#f0f2f5;
+}
+:root[data-theme="dark"]{
+  --bg:#15181e; --panel:#1c2028; --line:#2e3440; --text:#e3e7ee; --muted:#8a93a6; --accent:#4c8dff; --accent-ink:#fff;
+  --view:#0f1115; --hover:#262c37; --chip:#252a33;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{display:flex;flex-direction:column;background:var(--bg);color:var(--text);font:13px/1.35 "Segoe UI",system-ui,sans-serif;overflow:hidden}
+button,.btn{font:inherit;color:var(--text);background:var(--chip);border:1px solid var(--line);border-radius:6px;padding:4px 10px;cursor:pointer;white-space:nowrap}
+button:hover,.btn:hover{background:var(--hover)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.tog.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+input{font:inherit;color:var(--text);background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:3px 6px}
+#bar{display:flex;align-items:center;gap:6px;padding:6px 10px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
+#bar .brand{font-weight:700;margin-right:6px;letter-spacing:.2px}
+#bar .sep{width:1px;height:22px;background:var(--line);margin:0 4px}
+#bar .grow{flex:1}
+.fld{display:flex;align-items:center;gap:4px;color:var(--muted)}
+#zEx{width:56px} #spotIn{width:80px}
+main{flex:1;display:flex;min-height:0}
+#left{width:260px;background:var(--panel);border-right:1px solid var(--line);overflow:auto;flex-shrink:0}
+#right{width:440px;background:var(--panel);border-left:1px solid var(--line);display:flex;flex-direction:column;flex-shrink:0;min-height:0}
+.ptitle{font-weight:600;padding:8px 10px;border-bottom:1px solid var(--line)}
+.empty{padding:14px 12px;color:var(--muted)}
+#view{flex:1;position:relative;background:var(--view);min-width:0}
+#gl{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:crosshair}
+#drop{position:absolute;inset:12px;border:2px dashed var(--accent);border-radius:12px;display:none;align-items:center;justify-content:center;font-size:18px;color:var(--accent);background:color-mix(in srgb,var(--view) 80%,transparent);pointer-events:none}
+#drop.on{display:flex}
+#busy{position:absolute;left:50%;top:14px;transform:translateX(-50%);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 14px;display:flex;gap:10px;align-items:center;box-shadow:0 4px 14px rgba(0,0,0,.15)}
+#busy[hidden]{display:none}
+.spin{width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp 0.8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+#north{position:absolute;right:14px;top:12px;width:34px;height:46px;text-align:center;font-weight:700;color:var(--muted);pointer-events:none}
+#north .arrow{margin:2px auto 0;width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:22px solid #d64545}
+.layer{border-bottom:1px solid var(--line)}
+.lrow{display:flex;align-items:center;gap:6px;padding:6px 8px}
+.lrow:hover{background:var(--hover)}
+.lname{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lmeta{color:var(--muted);font-size:11px;padding:0 8px 6px 30px}
+.caret{width:16px;cursor:pointer;color:var(--muted);user-select:none}
+.sw{width:14px;height:14px;border-radius:3px;border:1px solid rgba(0,0,0,.25);cursor:pointer;flex-shrink:0;padding:0}
+.x{color:var(--muted);cursor:pointer;padding:0 4px}
+.x:hover{color:#d64545}
+.strs{padding:0 0 6px 22px;max-height:260px;overflow:auto}
+.srow{display:flex;align-items:center;gap:6px;padding:2px 8px;font-size:12px}
+.srow .cnt{margin-left:auto;color:var(--muted)}
+.dtmopt{display:flex;gap:10px;padding:0 8px 6px 30px;color:var(--muted);font-size:12px;flex-wrap:wrap}
+.tabs{display:flex;gap:4px;padding:6px;border-bottom:1px solid var(--line)}
+.tab{flex:1;overflow:auto;padding:8px;display:flex;flex-direction:column;gap:8px;min-height:0}
+.tab[hidden]{display:none}
+.card{background:var(--chip);border-radius:8px;padding:8px 10px;font-variant-numeric:tabular-nums}
+.card .big{font-size:15px;font-weight:600}
+.card table{border-collapse:collapse}
+.card td{padding:1px 8px 1px 0}
+.muted{color:var(--muted)}
+table{border-collapse:collapse;width:100%;font-size:12px;font-variant-numeric:tabular-nums}
+th{position:sticky;top:0;background:var(--panel);text-align:left;color:var(--muted);font-weight:600;border-bottom:1px solid var(--line);padding:3px 4px}
+td{padding:2px 4px;border-bottom:1px solid var(--line);white-space:nowrap}
+.acts{display:flex;gap:6px;flex-wrap:wrap}
+#status{display:flex;justify-content:space-between;gap:12px;padding:4px 10px;background:var(--panel);border-top:1px solid var(--line);color:var(--muted);font-variant-numeric:tabular-nums;font-size:12px}
+dialog{border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--text);max-width:620px}
+dialog li{margin:4px 0}
+@media (max-width:900px){#right{width:280px}#left{width:200px}}
+</style>
+</head>
+<body>
+<header id="bar">
+  <span class="brand">SMA Viewer</span>
+  <label class="btn primary" title="Buka .str, .dtm, .shp (boleh banyak sekaligus, atau seret file ke layar)">Buka file<input id="fileIn" type="file" multiple accept=".str,.dtm,.shp" hidden></label>
+  <span class="sep"></span>
+  <button id="bZoom" title="Zoom semua (F)">Zoom semua</button>
+  <button id="bPlan" class="tog on" title="Tampak atas (P)">Plan</button>
+  <button id="b3d" class="tog" title="Tampak 3D (3)">3D</button>
+  <label class="fld" title="Pembesaran vertikal">Z×<input id="zEx" type="number" value="1" min="0.1" max="20" step="0.5"></label>
+  <span class="sep"></span>
+  <button id="bIdent" class="tog on" title="Klik titik untuk info (I)">Identify</button>
+  <button id="bMeasure" class="tog" title="Ukur jarak/bearing; Esc = selesai (M)">Ukur</button>
+  <span class="sep"></span>
+  <label class="fld" title="Nomor string yang digambar sebagai titik (spot), mis. 500-999">Spot<input id="spotIn" value="500-999"></label>
+  <label class="fld"><input id="showPts" type="checkbox"> Titik</label>
+  <span class="grow"></span>
+  <button id="bTheme" title="Ganti latar">Latar</button>
+  <button id="bHelp">Bantuan</button>
+</header>
+<main>
+  <aside id="left">
+    <div class="ptitle">Layer</div>
+    <div id="layers"><div class="empty">Belum ada file.<br>Klik <b>Buka file</b> atau seret file .str / .dtm / .shp ke sini.<br><br>Untuk DTM, pilih file .dtm bersama .str-nya.</div></div>
+  </aside>
+  <section id="view">
+    <canvas id="gl"></canvas>
+    <div id="drop">Lepaskan file di sini</div>
+    <div id="busy" hidden><div class="spin"></div><span id="busyTxt">Membaca…</span></div>
+    <div id="north" title="Arah utara">N<div class="arrow"></div></div>
+  </section>
+  <aside id="right">
+    <div class="tabs"><button data-t="tIdent" class="on">Identify</button><button data-t="tMeasure">Ukur</button></div>
+    <div id="tIdent" class="tab">
+      <div id="identCur" class="card muted">Klik titik di layar.</div>
+      <table id="identTbl"><thead><tr><th>#</th><th>Str</th><th>Y</th><th>X</th><th>Z</th><th>Desc</th></tr></thead><tbody></tbody></table>
+      <div class="acts"><button id="identCopy">Salin ke Excel</button><button id="identStr">Simpan .str</button><button id="identClr">Hapus</button></div>
+    </div>
+    <div id="tMeasure" class="tab" hidden>
+      <div id="measSum" class="card muted">Mode Ukur: klik titik-titik (menempel ke titik terdekat). Esc = selesai, klik lagi = ukuran baru.</div>
+      <table id="measTbl"><thead><tr><th>#</th><th>Y</th><th>X</th><th>Z</th><th>Datar</th><th>Miring</th><th>Bearing</th><th>Grade</th></tr></thead><tbody></tbody></table>
+      <div class="acts"><button id="measCopy">Salin ke Excel</button><button id="measStr">Simpan .str</button><button id="measClr">Hapus</button></div>
+    </div>
+  </aside>
+</main>
+<footer id="status"><span id="sXY">Y –  X –  Z –</span><span id="sInfo"></span></footer>
+<dialog id="help">
+  <h3>SMA Viewer — cara pakai</h3>
+  <ul>
+    <li><b>Buka file</b>: pilih .str (teks/biner), .dtm (pilih bersama .str-nya) dan .shp. Bisa juga seret file ke layar. File hanya dibaca di komputer ini, tidak dikirim ke mana pun.</li>
+    <li><b>Plan</b>: seret kiri = geser, roda = zoom di kursor. <b>3D</b>: seret kiri = putar, seret kanan / Shift+seret = geser.</li>
+    <li><b>Identify</b>: klik titik → nomor string, Y, X, Z, deskripsi. <b>Ukur</b>: klik beberapa titik → jarak datar, miring, bearing, grade; di atas DTM juga jarak mengikuti permukaan DTM.</li>
+    <li><b>Salin ke Excel</b>: tabel disalin, tinggal Ctrl+V di Excel. <b>Simpan .str</b>: titik yang dipilih/diukur disimpan sebagai string file Surpac.</li>
+    <li>Layer: centang untuk tampil/sembunyi, klik kotak warna untuk ganti warna, klik ▸ untuk daftar nomor string.</li>
+    <li>Tombol: F zoom semua, P plan, 3 tampak 3D, I identify, M ukur, Esc selesai ukur.</li>
+  </ul>
+  <form method="dialog"><button>Tutup</button></form>
+</dialog>
+<script id="parserSrc">/* SMA Viewer - pembaca file Surpac (.str/.dtm teks & biner) dan ESRI .shp.
+   Dipakai di Web Worker dan di thread utama (cadangan), juga di uji Node.
+   Hasil str: { kind:'str', head, rows, x,y,z (Float64, baris pemisah = NaN), sn (Int32 nomor string, 0 = pemisah),
+               descBuf (Uint8 latin1), descOff (Uint32, rows+1) }
+   Hasil dtm: { kind:'dtm', strName, tris (Int32, indeks baris .str 0-based, 3 per segitiga), objects } */
+'use strict';
+
+function _lineEnd(u, p) { while (p < u.length && u[p] !== 10) p++; return p; }
+function _latin1(u, a, b) {
+  let s = '';
+  for (let i = a; i < b; i += 8192) s += String.fromCharCode.apply(null, u.subarray(i, Math.min(b, i + 8192)));
+  return s;
+}
+
+class RowBuf {
+  constructor(cap) { this.n = 0; this.cap = cap; this.x = new Float64Array(cap); this.y = new Float64Array(cap); this.z = new Float64Array(cap); this.sn = new Int32Array(cap); this.dOff = new Uint32Array(cap + 1); this.dBuf = new Uint8Array(cap * 8); this.dLen = 0; }
+  grow() {
+    const c = this.cap * 2;
+    for (const k of ['x', 'y', 'z']) { const a = new Float64Array(c); a.set(this[k]); this[k] = a; }
+    const s = new Int32Array(c); s.set(this.sn); this.sn = s;
+    const o = new Uint32Array(c + 1); o.set(this.dOff); this.dOff = o; this.cap = c;
+  }
+  push(sn, y, x, z, u, da, db) {
+    if (this.n >= this.cap) this.grow();
+    const i = this.n++;
+    this.sn[i] = sn; this.y[i] = y; this.x[i] = x; this.z[i] = z;
+    const L = db - da;
+    if (this.dLen + L > this.dBuf.length) { const b = new Uint8Array(Math.max(this.dBuf.length * 2, this.dLen + L + 1024)); b.set(this.dBuf.subarray(0, this.dLen)); this.dBuf = b; }
+    if (L > 0) { this.dBuf.set(u.subarray(da, db), this.dLen); this.dLen += L; }
+    this.dOff[i + 1] = this.dLen;
+  }
+  sep() {   // pemisah segmen = satu baris (dihitung oleh nomor titik di .dtm); pemisah ganda diabaikan
+    if (this.n === 0 || this.sn[this.n - 1] === 0) return;
+    this.push(0, NaN, NaN, NaN, null, 0, 0);
+  }
+  done(head) {
+    if (this.n > 0 && this.sn[this.n - 1] !== 0) this.sep();
+    const n = this.n;
+    return { kind: 'str', head, rows: n, x: this.x.slice(0, n), y: this.y.slice(0, n), z: this.z.slice(0, n), sn: this.sn.slice(0, n), descOff: this.dOff.slice(0, n + 1), descBuf: this.dBuf.slice(0, this.dLen) };
+  }
+}
+
+/* rekaman biner Surpac: int32 BE nomor, float64 BE y, x, z, deskripsi diakhiri NUL; nomor 0 = pemisah, deskripsi END = selesai */
+function _parseBinRecords(u, dv, p, R) {
+  const n = u.length;
+  while (p + 28 <= n) {
+    const num = dv.getInt32(p, false);
+    const y = dv.getFloat64(p + 4, false), x = dv.getFloat64(p + 12, false), z = dv.getFloat64(p + 20, false);
+    let e = p + 28; while (e < n && u[e] !== 0) e++;
+    if (num === 0) {
+      R.sep();
+      if (e - p - 28 >= 3 && u[e - 3] === 69 && u[e - 2] === 78 && u[e - 1] === 68) return e + 1;   // END
+    } else R.push(num, y, x, z, u, p + 28, e);
+    p = e + 1;
+  }
+  return p;
+}
+
+/* baris teks: nomor, y, x, z, deskripsi... */
+function _parseTextRows(u, p, R, stopAtTri) {
+  const n = u.length;
+  while (p < n) {
+    const e = _lineEnd(u, p);
+    let b = e; if (b > p && u[b - 1] === 13) b--;
+    if (b > p) {
+      if (stopAtTri && (u[p] === 79 || u[p] === 84)) return p;     // OBJECT / TRISOLATION
+      const c = [];               // posisi koma
+      for (let i = p; i < b && c.length < 4; i++) if (u[i] === 44) c.push(i);
+      const f0 = _latin1(u, p, c.length ? c[0] : b).trim();
+      if (f0 !== '') {
+        const num = Math.trunc(parseFloat(f0));
+        if (num === 0) {
+          R.sep();
+          if (c.length >= 4 && _latin1(u, c[3] + 1, b).trim().endsWith('END')) return e + 1;
+        } else if (c.length >= 3) {
+          const y = parseFloat(_latin1(u, c[0] + 1, c[1])), x = parseFloat(_latin1(u, c[1] + 1, c[2]));
+          const z = parseFloat(_latin1(u, c[2] + 1, c.length >= 4 ? c[3] : b));
+          let da = c.length >= 4 ? c[3] + 1 : b;
+          while (da < b && u[da] === 32) da++;
+          let db = b; while (db > da && u[db - 1] === 32) db--;
+          R.push(num, y, x, z, u, da, db);
+        }
+      }
+    }
+    p = e + 1;
+  }
+  return p;
+}
+
+function parseStr(buf) {
+  const u = new Uint8Array(buf), dv = new DataView(buf);
+  const e1 = _lineEnd(u, 0), head = _latin1(u, 0, e1).replace(/\r$/, '');
+  const e2 = _lineEnd(u, e1 + 1);
+  let p = e2 + 1;
+  const R = new RowBuf(Math.max(1024, Math.floor(u.length / 40)));
+  const probe = u.subarray(p, Math.min(u.length, p + 64));
+  const bin = (probe.length >= 5 && probe[0] === 0 && probe[1] === 0 && probe[2] === 0 && probe[3] === 0 && probe[4] === 0) || probe.indexOf(0) >= 0;
+  if (bin) {
+    if (u[p] === 0 && u[p + 1] === 0 && u[p + 2] === 0 && u[p + 3] === 0 && u[p + 4] === 0) p += 5;
+    _parseBinRecords(u, dv, p, R);
+  } else _parseTextRows(u, p, R, false);
+  const r = R.done(head); r.binary = bin; return r;
+}
+
+function parseDtm(buf) {
+  const u = new Uint8Array(buf), dv = new DataView(buf);
+  const e1 = _lineEnd(u, 0), head = _latin1(u, 0, e1).replace(/\r$/, '');
+  const strName = head.split(',')[0].trim();
+  let p = e1 + 1;
+  let tris = new Int32Array(1 << 16), nt = 0, objects = 0;
+  const addTri = (a, b, c) => {
+    if (nt + 3 > tris.length) { const t = new Int32Array(tris.length * 2); t.set(tris); tris = t; }
+    tris[nt++] = a - 1; tris[nt++] = b - 1; tris[nt++] = c - 1;
+  };
+  const bin = u[p] === 0 && u[p + 1] === 0 && u[p + 2] === 0 && u[p + 3] === 0 && u[p + 4] === 0;
+  if (bin) {
+    p = _parseBinRecords(u, dv, p + 5, new RowBuf(1024));          // string hull, dilewati
+    const n = u.length;
+    while (p + 8 <= n) {
+      const typ = dv.getInt32(p, false); p += 8;
+      if (typ !== 1 && typ !== 2 && typ !== 3) break;
+      if (typ === 1) objects++;
+      if (typ === 3) { addTri(dv.getInt32(p, false), dv.getInt32(p + 4, false), dv.getInt32(p + 8, false)); p += 24; }
+      while (p < n && u[p] !== 0) p++;
+      p++;
+    }
+  } else {
+    p = _parseTextRows(u, p, new RowBuf(1024), true);              // hull
+    const n = u.length;
+    let inTri = false;
+    while (p < n) {
+      const e = _lineEnd(u, p);
+      const c0 = u[p];
+      if (c0 === 79) { objects++; inTri = false; }                 // OBJECT
+      else if (c0 === 84) inTri = true;                            // TRISOLATION
+      else if (c0 === 69) break;                                   // END
+      else if (inTri && c0 >= 48 && c0 <= 57) {
+        const f = _latin1(u, p, Math.min(e, p + 200)).split(',');
+        if (f.length >= 4) addTri(parseInt(f[1]), parseInt(f[2]), parseInt(f[3]));
+      }
+      p = e + 1;
+    }
+  }
+  return { kind: 'dtm', head, strName, binary: bin, objects, tris: tris.slice(0, nt) };
+}
+
+/* ESRI shapefile (.shp): titik, polyline, polygon, multipoint (+Z/M). Hasil seperti str: tiap part = segmen, string 1. */
+function parseShp(buf) {
+  const dv = new DataView(buf), n = buf.byteLength;
+  const R = new RowBuf(1024);
+  let p = 100, rec = 0;
+  while (p + 12 <= n) {
+    const len = dv.getInt32(p + 4, false) * 2; const b = p + 8; p = b + len;
+    const t = dv.getInt32(b, true); rec++;
+    const hasZ = t === 11 || t === 13 || t === 15 || t === 18;
+    if (t === 1 || t === 11 || t === 21) {
+      R.push(rec, dv.getFloat64(b + 12, true), dv.getFloat64(b + 4, true), t === 11 ? dv.getFloat64(b + 20, true) : 0, null, 0, 0); R.sep();
+    } else if (t === 3 || t === 5 || t === 13 || t === 15 || t === 23 || t === 25) {
+      const np = dv.getInt32(b + 36, true), npt = dv.getInt32(b + 40, true);
+      const parts = []; for (let i = 0; i < np; i++) parts.push(dv.getInt32(b + 44 + 4 * i, true));
+      const xy = b + 44 + 4 * np, zb = xy + 16 * npt + 16;
+      for (let k = 0; k < np; k++) {
+        const a = parts[k], e = k + 1 < np ? parts[k + 1] : npt;
+        for (let i = a; i < e; i++) R.push(rec, dv.getFloat64(xy + 16 * i + 8, true), dv.getFloat64(xy + 16 * i, true), hasZ ? dv.getFloat64(zb + 8 * i, true) : 0, null, 0, 0);
+        R.sep();
+      }
+    } else if (t === 8 || t === 18 || t === 28) {
+      const npt = dv.getInt32(b + 36, true), xy = b + 40, zb = xy + 16 * npt + 16;
+      for (let i = 0; i < npt; i++) { R.push(rec, dv.getFloat64(xy + 16 * i + 8, true), dv.getFloat64(xy + 16 * i, true), hasZ ? dv.getFloat64(zb + 8 * i, true) : 0, null, 0, 0); R.sep(); }
+    }
+  }
+  const r = R.done('shp'); r.shp = true; return r;
+}
+
+function parseAny(name, buf) {
+  const ext = name.toLowerCase().split('.').pop();
+  if (ext === 'dtm') return parseDtm(buf);
+  if (ext === 'shp') return parseShp(buf);
+  return parseStr(buf);
+}
+
+function transferList(r) {
+  const t = [];
+  for (const k of ['x', 'y', 'z', 'sn', 'descOff', 'descBuf', 'tris']) if (r[k]) t.push(r[k].buffer);
+  return t;
+}
+
+if (typeof module !== 'undefined') module.exports = { parseStr, parseDtm, parseShp, parseAny };
+if (typeof self !== 'undefined' && typeof window === 'undefined' && typeof module === 'undefined') {
+  self.onmessage = (ev) => {
+    const { id, name, buf } = ev.data;
+    try { const r = parseAny(name, buf); r.name = name; self.postMessage({ id, r }, transferList(r)); }
+    catch (err) { self.postMessage({ id, err: String(err && err.stack || err) }); }
+  };
+}
+</script>
+<script>'use strict';
+/* SMA Viewer - tampilan ringan file Surpac. WebGL2 murni, tanpa pustaka luar, bisa dibuka offline. */
+(() => {
+const $ = (s) => document.querySelector(s);
+const canvas = $('#gl');
+const gl = canvas.getContext('webgl2', { antialias: true, preserveDrawingBuffer: true });
+if (!gl) { document.body.innerHTML = '<p style="padding:20px">Browser ini tidak mendukung WebGL2. Pakai Chrome atau Edge versi baru.</p>'; return; }
+
+/* ---------- matriks (kolom-mayor) ---------- */
+const M4 = {
+  mul(a, b) { const o = new Float32Array(16); for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) { let s = 0; for (let k = 0; k < 4; k++) s += a[k * 4 + r] * b[c * 4 + k]; o[c * 4 + r] = s; } return o; },
+  persp(fy, asp, n, f) { const t = 1 / Math.tan(fy / 2), o = new Float32Array(16); o[0] = t / asp; o[5] = t; o[10] = (f + n) / (n - f); o[11] = -1; o[14] = 2 * f * n / (n - f); return o; },
+  ortho(l, r, b, t, n, f) { const o = new Float32Array(16); o[0] = 2 / (r - l); o[5] = 2 / (t - b); o[10] = -2 / (f - n); o[12] = -(r + l) / (r - l); o[13] = -(t + b) / (t - b); o[14] = -(f + n) / (f - n); o[15] = 1; return o; },
+  look(e, R, U, F) { // basis kamera: kanan R, atas U, depan F
+    const o = new Float32Array(16);
+    o[0] = R[0]; o[4] = R[1]; o[8] = R[2];
+    o[1] = U[0]; o[5] = U[1]; o[9] = U[2];
+    o[2] = -F[0]; o[6] = -F[1]; o[10] = -F[2];
+    o[12] = -(R[0] * e[0] + R[1] * e[1] + R[2] * e[2]);
+    o[13] = -(U[0] * e[0] + U[1] * e[1] + U[2] * e[2]);
+    o[14] = (F[0] * e[0] + F[1] * e[1] + F[2] * e[2]);
+    o[15] = 1; return o;
+  },
+};
+const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const norm = (a) => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
+
+/* ---------- shader ---------- */
+function prog(vs, fs) {
+  const sh = (t, s) => { const o = gl.createShader(t); gl.shaderSource(o, s); gl.compileShader(o); if (!gl.getShaderParameter(o, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(o)); return o; };
+  const p = gl.createProgram(); gl.attachShader(p, sh(gl.VERTEX_SHADER, vs)); gl.attachShader(p, sh(gl.FRAGMENT_SHADER, fs));
+  gl.bindAttribLocation(p, 0, 'p'); gl.bindAttribLocation(p, 1, 'c'); gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+  const u = {}; const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
+  for (let i = 0; i < n; i++) { const a = gl.getActiveUniform(p, i); u[a.name] = gl.getUniformLocation(p, a.name); }
+  return { p, u };
+}
+const meshP = prog(`#version 300 es
+in vec3 p; uniform mat4 M; uniform float ex; out vec3 w; out float zr;
+void main(){ vec3 q=vec3(p.xy,p.z*ex); w=q; zr=p.z; gl_Position=M*vec4(q,1.); }`,
+`#version 300 es
+precision highp float; in vec3 w; in float zr; uniform vec2 zrng; uniform int mode; uniform vec3 L; out vec4 o;
+vec3 ramp(float t){
+  vec3 c0=vec3(.17,.37,.66),c1=vec3(.25,.65,.63),c2=vec3(.55,.78,.42),c3=vec3(.89,.76,.35),c4=vec3(.71,.39,.24);
+  if(t<.25) return mix(c0,c1,t*4.); if(t<.5) return mix(c1,c2,(t-.25)*4.); if(t<.75) return mix(c2,c3,(t-.5)*4.); return mix(c3,c4,(t-.75)*4.);
+}
+void main(){ vec3 n=normalize(cross(dFdx(w),dFdy(w))); if(n.z<0.) n=-n; float d=max(dot(n,L),0.);
+  vec3 c = mode==0 ? ramp(clamp((zr-zrng.x)/max(zrng.y-zrng.x,1e-6),0.,1.)) : vec3(.8);
+  o=vec4(c*(.35+.65*d),1.); }`);
+const lineP = prog(`#version 300 es
+in vec3 p; in vec3 c; uniform mat4 M; uniform float ex; uniform float ps; out vec3 vc;
+void main(){ vc=c; gl_PointSize=ps; gl_Position=M*vec4(p.xy,p.z*ex,1.); }`,
+`#version 300 es
+precision mediump float; in vec3 vc; out vec4 o; void main(){ o=vec4(vc,1.); }`);
+
+/* ---------- keadaan ---------- */
+const S = {
+  layers: [], origin: null, ex: 1, plan: true, tool: 'ident', showPts: false, spot: parseRange('500-999'),
+  cam: { t: [0, 0, 0], dist: 1000, az: 0, el: 90, fov: 45 * Math.PI / 180 },
+  picks: [], meas: [], measOpen: false, pending: [], dirty: true, nextId: 1,
+};
+const PAL = ['#e6194b', '#3cb44b', '#4363d8', '#f58231', '#911eb4', '#42d4f4', '#f032e6', '#bfef45', '#ff8fab', '#469990', '#b39ddb', '#9a6324', '#a52a2a', '#00c08b', '#808000', '#1e88e5'];
+const colorOf = (num) => num === 1 ? '#e6194b' : PAL[(num - 1) % PAL.length];
+const hex2rgb = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+
+function parseRange(s) {
+  const out = [];
+  for (const part of String(s).split(/[,;\s]+/)) {
+    if (!part) continue;
+    const m = part.match(/^(\d+)\s*-\s*(\d+)$/);
+    if (m) out.push([+m[1], +m[2]]); else if (/^\d+$/.test(part)) out.push([+part, +part]);
+  }
+  return (n) => out.some(([a, b]) => n >= a && n <= b);
+}
+
+/* ---------- worker pembaca ---------- */
+let worker = null, wid = 0; const wcb = new Map();
+try {
+  const src = $('#parserSrc').textContent;
+  worker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+  worker.onmessage = (ev) => { const f = wcb.get(ev.data.id); wcb.delete(ev.data.id); f(ev.data); };
+  worker.onerror = (e) => { e.preventDefault && e.preventDefault(); worker = null; for (const f of wcb.values()) f({ err: 'worker' }); wcb.clear(); };
+} catch (e) { worker = null; }
+function parseFile(name, buf) {
+  if (!worker) return Promise.resolve().then(() => { const r = parseAny(name, buf); r.name = name; return r; });
+  return new Promise((res, rej) => {
+    const id = ++wid; wcb.set(id, (d) => d.err ? rej(new Error(d.err)) : res(d.r));
+    worker.postMessage({ id, name, buf }, [buf]);
+  });
+}
+
+/* ---------- memuat file ---------- */
+const busy = (t) => { $('#busy').hidden = !t; if (t) $('#busyTxt').textContent = t; };
+async function loadFiles(files) {
+  files = [...files].sort((a, b) => (a.name.toLowerCase().endsWith('.dtm') ? 1 : 0) - (b.name.toLowerCase().endsWith('.dtm') ? 1 : 0));
+  const msgs = [];
+  for (const f of files) {
+    const ext = f.name.toLowerCase().split('.').pop();
+    if (!['str', 'dtm', 'shp'].includes(ext)) { msgs.push(`${f.name}: jenis file belum didukung`); continue; }
+    busy(`Membaca ${f.name} (${(f.size / 1048576).toFixed(1)} MB)…`);
+    try {
+      const t0 = performance.now();
+      let r;
+      try { r = await parseFile(f.name, await f.arrayBuffer()); }
+      catch (e) { if (worker) throw e; r = parseAny(f.name, await f.arrayBuffer()); r.name = f.name; }
+      r.ms = performance.now() - t0;
+      if (r.kind === 'dtm') addDtm(f.name, r, msgs); else addStr(f.name, r);
+    } catch (e) { msgs.push(`${f.name}: gagal dibaca (${e.message.split('\n')[0]})`); }
+  }
+  busy(null);
+  if (S.pending.length) msgs.push(...S.pending.map((d) => `${d.name} butuh file ${d.r.strName}. Buka juga file .str itu.`));
+  renderLayers(); zoomAll();
+  if (msgs.length) alert(msgs.join('\n'));
+}
+
+function addStr(name, r) {
+  if (!S.origin) {
+    let mx = Infinity, my = Infinity, mz = Infinity;
+    for (let i = 0; i < r.rows; i++) if (r.sn[i]) { if (r.x[i] < mx) mx = r.x[i]; if (r.y[i] < my) my = r.y[i]; if (r.z[i] < mz) mz = r.z[i]; }
+    if (!isFinite(mx)) { mx = my = mz = 0; }
+    S.origin = [Math.floor(mx / 100) * 100, Math.floor(my / 100) * 100, Math.floor(mz / 10) * 10];
+  }
+  const [E0, N0, Z0] = S.origin, n = r.rows;
+  const pos = new Float32Array(n * 3);
+  const strs = new Map(); let seg = 0;
+  const segNo = new Int32Array(n), ptNo = new Int32Array(n), segCnt = new Map();
+  let cur = 0, k = 0, b0 = [Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity];
+  for (let i = 0; i < n; i++) {
+    const s = r.sn[i];
+    if (!s) { cur = 0; continue; }
+    pos[3 * i] = r.x[i] - E0; pos[3 * i + 1] = r.y[i] - N0; pos[3 * i + 2] = r.z[i] - Z0;
+    if (cur !== s || i === 0 || !r.sn[i - 1]) { segCnt.set(s, (segCnt.get(s) || 0) + 1); cur = s; k = 0; seg++; }
+    segNo[i] = segCnt.get(s); ptNo[i] = ++k;
+    const st = strs.get(s); if (st) st.count++; else strs.set(s, { count: 1, segs: 0, vis: true, color: colorOf(s) });
+    for (let a = 0; a < 3; a++) { const v = pos[3 * i + a]; if (v < b0[a]) b0[a] = v; if (v > b0[a + 3]) b0[a + 3] = v; }
+  }
+  for (const [s, c] of segCnt) strs.get(s).segs = c;
+  // string spot yang sangat rapat (titik drone) disembunyikan dulu supaya garis tetap terbaca; bisa dicentang di panel
+  for (const [s, st] of strs) if (S.spot(s) && st.count > 20000) { st.vis = false; st.auto = true; }
+  const L = { id: S.nextId++, kind: 'str', name, r, pos, strs, segNo, ptNo, segs: seg, bbox: b0, vis: true, open: false, dtms: [] };
+  L.vbo = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, L.vbo); gl.bufferData(gl.ARRAY_BUFFER, pos, gl.STATIC_DRAW);
+  L.cbo = gl.createBuffer(); L.lineIbo = gl.createBuffer(); L.ptIbo = gl.createBuffer();
+  buildColors(L); buildIndex(L);
+  S.layers.push(L);
+  // DTM yang menunggu .str ini
+  for (const d of [...S.pending]) if (d.r.strName.toLowerCase() === name.toLowerCase()) { S.pending.splice(S.pending.indexOf(d), 1); attachDtm(d.name, d.r, L); }
+  return L;
+}
+
+function buildColors(L) {
+  const n = L.r.rows, c = new Uint8Array(n * 3), sn = L.r.sn, cache = new Map();
+  for (const [s, st] of L.strs) cache.set(s, hex2rgb(st.color));
+  for (let i = 0; i < n; i++) { const s = sn[i]; if (!s) continue; const v = cache.get(s); c[3 * i] = v[0]; c[3 * i + 1] = v[1]; c[3 * i + 2] = v[2]; }
+  gl.bindBuffer(gl.ARRAY_BUFFER, L.cbo); gl.bufferData(gl.ARRAY_BUFFER, c, gl.STATIC_DRAW); S.dirty = true;
+}
+
+/* indeks garis & titik dikelompokkan per nomor string supaya bisa disembunyikan per string tanpa membangun ulang */
+function buildIndex(L) {
+  const sn = L.r.sn, n = L.r.rows;
+  const nums = [...L.strs.keys()].sort((a, b) => a - b);
+  const lineCnt = new Map(), ptCnt = new Map();
+  for (const s of nums) { lineCnt.set(s, 0); ptCnt.set(s, 0); }
+  const spot = (s) => S.spot(s);
+  for (let i = 0; i < n; i++) {
+    const s = sn[i]; if (!s) continue;
+    const single = (i === 0 || !sn[i - 1]) && (i + 1 >= n || !sn[i + 1]);
+    if (spot(s) || single || S.showPts) ptCnt.set(s, ptCnt.get(s) + 1);
+    if (!spot(s) && i + 1 < n && sn[i + 1]) lineCnt.set(s, lineCnt.get(s) + 2);
+  }
+  const lo = new Map(), po = new Map(); let a = 0, b = 0;
+  for (const s of nums) { lo.set(s, a); a += lineCnt.get(s); po.set(s, b); b += ptCnt.get(s); }
+  const li = new Uint32Array(a), pi = new Uint32Array(b);
+  const lw = new Map(lo), pw = new Map(po);
+  for (let i = 0; i < n; i++) {
+    const s = sn[i]; if (!s) continue;
+    const single = (i === 0 || !sn[i - 1]) && (i + 1 >= n || !sn[i + 1]);
+    if (spot(s) || single || S.showPts) { const k = pw.get(s); pi[k] = i; pw.set(s, k + 1); }
+    if (!spot(s) && i + 1 < n && sn[i + 1]) { const k = lw.get(s); li[k] = i; li[k + 1] = i + 1; lw.set(s, k + 2); }
+  }
+  L.lineR = new Map(nums.map((s) => [s, [lo.get(s), lineCnt.get(s)]]));
+  L.ptR = new Map(nums.map((s) => [s, [po.get(s), ptCnt.get(s)]]));
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, L.lineIbo); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, li, gl.STATIC_DRAW);
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, L.ptIbo); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, pi, gl.STATIC_DRAW);
+  S.dirty = true;
+}
+
+function addDtm(name, r, msgs) {
+  const want = r.strName.toLowerCase();
+  const src = [...S.layers].reverse().find((L) => L.kind === 'str' && L.name.toLowerCase() === want);
+  if (!src) { S.pending.push({ name, r }); return; }
+  attachDtm(name, r, src);
+}
+function attachDtm(name, r, src) {
+  const t = r.tris; let bad = 0;
+  for (let i = 0; i < t.length; i++) if (t[i] < 0 || t[i] >= src.r.rows || !src.r.sn[t[i]]) { bad++; t[i] = 0; }
+  let zmin = Infinity, zmax = -Infinity; const p = src.pos;
+  for (let i = 0; i < t.length; i++) { const z = p[3 * t[i] + 2]; if (z < zmin) zmin = z; if (z > zmax) zmax = z; }
+  const D = { id: S.nextId++, kind: 'dtm', name, r, src, tris: t, ntri: t.length / 3, vis: true, shade: 0, wire: false, zr: [zmin, zmax], bad };
+  D.ibo = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, D.ibo); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, t, gl.STATIC_DRAW);
+  src.dtms.push(D); S.layers.push(D); S.dirty = true;
+}
+function buildWire(D) {
+  const t = D.tris, e = new Uint32Array(t.length * 2);
+  for (let i = 0, k = 0; i < t.length; i += 3) { e[k++] = t[i]; e[k++] = t[i + 1]; e[k++] = t[i + 1]; e[k++] = t[i + 2]; e[k++] = t[i + 2]; e[k++] = t[i]; }
+  D.wireIbo = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, D.wireIbo); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, e, gl.STATIC_DRAW); D.nwire = e.length;
+}
+
+/* indeks grid segitiga untuk mencari Z di bawah kursor / jarak mengikuti DTM */
+function dtmGrid(D) {
+  if (D.grid) return D.grid;
+  const P = D.src.r, t = D.tris, n = D.ntri;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (let i = 0; i < t.length; i++) { const x = P.x[t[i]], y = P.y[t[i]]; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  const cs = Math.max(Math.sqrt((x1 - x0) * (y1 - y0) / Math.max(n, 1)) * 2, 0.5);
+  const nx = Math.ceil((x1 - x0) / cs) + 1, ny = Math.ceil((y1 - y0) / cs) + 1;
+  const cnt = new Uint32Array(nx * ny + 1);
+  const each = (j, f) => {
+    const a = t[3 * j], b = t[3 * j + 1], c = t[3 * j + 2];
+    const ia = Math.floor((Math.min(P.x[a], P.x[b], P.x[c]) - x0) / cs), ib = Math.floor((Math.max(P.x[a], P.x[b], P.x[c]) - x0) / cs);
+    const ja = Math.floor((Math.min(P.y[a], P.y[b], P.y[c]) - y0) / cs), jb = Math.floor((Math.max(P.y[a], P.y[b], P.y[c]) - y0) / cs);
+    for (let jj = ja; jj <= jb; jj++) for (let ii = ia; ii <= ib; ii++) f(jj * nx + ii);
+  };
+  for (let j = 0; j < n; j++) each(j, (c) => cnt[c + 1]++);
+  for (let c = 0; c < nx * ny; c++) cnt[c + 1] += cnt[c];
+  const fill = cnt.slice(), list = new Uint32Array(cnt[nx * ny]);
+  for (let j = 0; j < n; j++) each(j, (c) => { list[fill[c]++] = j; });
+  return (D.grid = { x0, y0, cs, nx, ny, cnt, list });
+}
+function dtmZ(D, x, y) {
+  const g = dtmGrid(D), P = D.src.r, t = D.tris;
+  const i = Math.floor((x - g.x0) / g.cs), j = Math.floor((y - g.y0) / g.cs);
+  if (i < 0 || j < 0 || i >= g.nx || j >= g.ny) return NaN;
+  const c = j * g.nx + i;
+  for (let k = g.cnt[c]; k < g.cnt[c + 1]; k++) {
+    const q = g.list[k], a = t[3 * q], b = t[3 * q + 1], d = t[3 * q + 2];
+    const ax = P.x[a], ay = P.y[a], bx = P.x[b], by = P.y[b], dx = P.x[d], dy = P.y[d];
+    const den = (by - dy) * (ax - dx) + (dx - bx) * (ay - dy);
+    if (den === 0) continue;
+    const l1 = ((by - dy) * (x - dx) + (dx - bx) * (y - dy)) / den, l2 = ((dy - ay) * (x - dx) + (ax - dx) * (y - dy)) / den, l3 = 1 - l1 - l2;
+    const e = -1e-9;
+    if (l1 >= e && l2 >= e && l3 >= e) return l1 * P.z[a] + l2 * P.z[b] + l3 * P.z[d];
+  }
+  return NaN;
+}
+function zAt(x, y) {
+  for (let i = S.layers.length - 1; i >= 0; i--) { const D = S.layers[i]; if (D.kind === 'dtm' && D.vis) { const z = dtmZ(D, x, y); if (!isNaN(z)) return z; } }
+  return NaN;
+}
+
+/* ---------- kamera ---------- */
+function camera() {
+  const W = canvas.clientWidth || 1, H = canvas.clientHeight || 1, c = S.cam;
+  const az = c.az * Math.PI / 180, el = c.el * Math.PI / 180;
+  const F = norm([Math.cos(el) * Math.sin(az), Math.cos(el) * Math.cos(az), -Math.sin(el)]);
+  const R = [Math.cos(az), -Math.sin(az), 0];
+  const U = cross(R, F);
+  const e = [c.t[0] - F[0] * c.dist, c.t[1] - F[1] * c.dist, c.t[2] - F[2] * c.dist];
+  const halfH = c.dist * Math.tan(c.fov / 2), halfW = halfH * W / H;
+  const V = M4.look(e, R, U, F);
+  const ext = sceneSize() * 4 + c.dist;
+  const P = S.plan ? M4.ortho(-halfW, halfW, -halfH, halfH, -ext, ext + c.dist) : M4.persp(c.fov, W / H, Math.max(c.dist * 0.002, 0.05), ext * 2);
+  return { M: M4.mul(P, V), R, U, F, e, halfH, halfW, W, H };
+}
+function sceneSize() {
+  const b = sceneBox(); if (!b) return 1000;
+  return Math.max(b[3] - b[0], b[4] - b[1], (b[5] - b[2]) * S.ex, 1);
+}
+function sceneBox() {
+  let b = null;
+  for (const L of S.layers) {
+    if (!L.vis || L.kind !== 'str') continue;
+    if (!b) b = L.bbox.slice(); else for (let a = 0; a < 3; a++) { b[a] = Math.min(b[a], L.bbox[a]); b[a + 3] = Math.max(b[a + 3], L.bbox[a + 3]); }
+  }
+  return b;
+}
+function zoomAll() {
+  const b = sceneBox(); if (!b) return;
+  const c = S.cam, W = canvas.clientWidth || 1, H = canvas.clientHeight || 1;
+  c.t = [(b[0] + b[3]) / 2, (b[1] + b[4]) / 2, (b[2] + b[5]) / 2 * S.ex];
+  const half = Math.max((b[4] - b[1]) / 2, (b[3] - b[0]) / 2 * H / W, 1) * 1.08;
+  c.dist = half / Math.tan(c.fov / 2) * (S.plan ? 1 : 1.25);
+  S.dirty = true;
+}
+function setPlan(on) {
+  S.plan = on; $('#bPlan').classList.toggle('on', on); $('#b3d').classList.toggle('on', !on);
+  if (on) { S.cam.el = 90; S.cam.az = 0; } else if (S.cam.el > 80) { S.cam.el = 35; S.cam.az = 20; }
+  S.dirty = true;
+}
+
+/* ---------- gambar ---------- */
+let ovBuf = gl.createBuffer();
+function bg() { const v = getComputedStyle(canvas.parentElement).backgroundColor.match(/\d+/g).map(Number); return [v[0] / 255, v[1] / 255, v[2] / 255]; }
+function draw() {
+  S.dirty = false;
+  const dpr = window.devicePixelRatio || 1, W = Math.round(canvas.clientWidth * dpr), H = Math.round(canvas.clientHeight * dpr);
+  if (canvas.width !== W || canvas.height !== H) { canvas.width = W; canvas.height = H; }
+  gl.viewport(0, 0, W, H);
+  const b = bg(); gl.clearColor(b[0], b[1], b[2], 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  const cam = camera();
+  gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL);
+  // DTM
+  gl.useProgram(meshP.p);
+  gl.uniformMatrix4fv(meshP.u.M, false, cam.M); gl.uniform1f(meshP.u.ex, S.ex);
+  const Ld = norm([-0.5, 0.6, 0.75]); gl.uniform3f(meshP.u.L, Ld[0], Ld[1], Ld[2]);
+  gl.enable(gl.POLYGON_OFFSET_FILL); gl.polygonOffset(1, 1);
+  for (const D of S.layers) {
+    if (D.kind !== 'dtm' || !D.vis) continue;
+    gl.bindBuffer(gl.ARRAY_BUFFER, D.src.vbo); gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+    gl.uniform2f(meshP.u.zrng, D.zr[0], D.zr[1]); gl.uniform1i(meshP.u.mode, D.shade);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, D.ibo); gl.drawElements(gl.TRIANGLES, D.tris.length, gl.UNSIGNED_INT, 0);
+  }
+  gl.disable(gl.POLYGON_OFFSET_FILL);
+  // garis & titik
+  gl.useProgram(lineP.p);
+  gl.uniformMatrix4fv(lineP.u.M, false, cam.M); gl.uniform1f(lineP.u.ex, S.ex);
+  for (const D of S.layers) {
+    if (D.kind !== 'dtm' || !D.vis || !D.wire) continue;
+    if (!D.wireIbo) buildWire(D);
+    gl.bindBuffer(gl.ARRAY_BUFFER, D.src.vbo); gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+    gl.disableVertexAttribArray(1); gl.vertexAttrib3f(1, 0.15, 0.15, 0.15);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, D.wireIbo); gl.drawElements(gl.LINES, D.nwire, gl.UNSIGNED_INT, 0);
+  }
+  if (S.plan) gl.disable(gl.DEPTH_TEST);
+  gl.uniform1f(lineP.u.ps, 2.5 * dpr);
+  for (const L of S.layers) {
+    if (L.kind !== 'str' || !L.vis) continue;
+    gl.bindBuffer(gl.ARRAY_BUFFER, L.vbo); gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, L.cbo); gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 3, gl.UNSIGNED_BYTE, true, 0, 0);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, L.lineIbo);
+    drawRanges(L, L.lineR, gl.LINES);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, L.ptIbo);
+    drawRanges(L, L.ptR, gl.POINTS);
+  }
+  // overlay: titik identify & garis ukur
+  gl.disable(gl.DEPTH_TEST);
+  gl.disableVertexAttribArray(1);
+  const ov = [], O = S.origin || [0, 0, 0];
+  const put = (p) => ov.push(p.x - O[0], p.y - O[1], (isNaN(p.z) ? 0 : p.z) - O[2]);
+  for (const p of S.picks) put(p);
+  const nPick = S.picks.length;
+  for (const p of S.meas) put(p);
+  if (ov.length) {
+    gl.bindBuffer(gl.ARRAY_BUFFER, ovBuf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(ov), gl.DYNAMIC_DRAW);
+    gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+    gl.uniform1f(lineP.u.ps, 9 * dpr);
+    gl.vertexAttrib3f(1, 1, 0.84, 0); if (nPick) gl.drawArrays(gl.POINTS, 0, nPick);
+    gl.vertexAttrib3f(1, 1, 0.2, 0.9);
+    if (S.meas.length > 1) gl.drawArrays(gl.LINE_STRIP, nPick, S.meas.length);
+    gl.uniform1f(lineP.u.ps, 7 * dpr); if (S.meas.length) gl.drawArrays(gl.POINTS, nPick, S.meas.length);
+  }
+  $('#north').style.transform = `rotate(${-S.cam.az}deg)`;
+}
+function drawRanges(L, R, mode) {
+  // gabungkan rentang string yang berurutan dan sama-sama tampil
+  let a = -1, n = 0;
+  for (const [s, [off, cnt]] of R) {
+    const vis = L.strs.get(s).vis && cnt > 0;
+    if (vis && a >= 0 && a + n === off) { n += cnt; continue; }
+    if (a >= 0 && n) gl.drawElements(mode, n, gl.UNSIGNED_INT, a * 4);
+    a = vis ? off : -1; n = vis ? cnt : 0;
+  }
+  if (a >= 0 && n) gl.drawElements(mode, n, gl.UNSIGNED_INT, a * 4);
+}
+(function loop() { if (S.dirty) draw(); requestAnimationFrame(loop); })();
+new ResizeObserver(() => { S.dirty = true; }).observe(canvas);
+
+/* ---------- memilih titik ---------- */
+function nearest(px, py, maxPx = 12) {
+  const cam = camera(), M = cam.M, W = cam.W, H = cam.H, ex = S.ex;
+  let best = null, bd = maxPx * maxPx;
+  for (const L of S.layers) {
+    if (L.kind !== 'str' || !L.vis) continue;
+    const p = L.pos, sn = L.r.sn, n = L.r.rows;
+    for (let i = 0; i < n; i++) {
+      const s = sn[i]; if (!s) continue;
+      const x = p[3 * i], y = p[3 * i + 1], z = p[3 * i + 2] * ex;
+      const w = M[3] * x + M[7] * y + M[11] * z + M[15]; if (w <= 0) continue;
+      const sx = ((M[0] * x + M[4] * y + M[8] * z + M[12]) / w + 1) * W / 2 - px;
+      const sy = (1 - (M[1] * x + M[5] * y + M[9] * z + M[13]) / w) * H / 2 - py;
+      const d = sx * sx + sy * sy;
+      if (d < bd && L.strs.get(s).vis) { bd = d; best = { L, i }; }
+    }
+  }
+  return best;
+}
+function ground(px, py) {      // titik di bidang tampak (plan: koordinat sebenarnya)
+  const c = camera(), nx = px / c.W * 2 - 1, ny = 1 - py / c.H * 2, t = S.cam.t, O = S.origin || [0, 0, 0];
+  const q = [0, 1, 2].map((a) => t[a] + c.R[a] * nx * c.halfW + c.U[a] * ny * c.halfH);
+  return { x: q[0] + O[0], y: q[1] + O[1], q };
+}
+function pointInfo(L, i) {
+  const r = L.r, d = new TextDecoder('latin1').decode(r.descBuf.subarray(r.descOff[i], r.descOff[i + 1]));
+  return { layer: L.name, s: r.sn[i], seg: L.segNo[i], pt: L.ptNo[i], x: r.x[i], y: r.y[i], z: r.z[i], d };
+}
+
+/* ---------- format ---------- */
+const f3 = (v) => isNaN(v) ? '–' : v.toLocaleString('id-ID', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+const fx = (v) => isNaN(v) ? '' : v.toFixed(3);
+function dms(deg) {
+  deg = ((deg % 360) + 360) % 360;
+  let d = Math.floor(deg), mf = (deg - d) * 60, m = Math.floor(mf), s = Math.round((mf - m) * 60);
+  if (s === 60) { s = 0; m++; } if (m === 60) { m = 0; d = (d + 1) % 360; }
+  return `${String(d).padStart(3, '0')}°${String(m).padStart(2, '0')}'${String(s).padStart(2, '0')}"`;
+}
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+/* ---------- identify ---------- */
+function doIdent(px, py) {
+  const h = nearest(px, py);
+  if (!h) { $('#identCur').innerHTML = '<span class="muted">Tidak ada titik di dekat kursor.</span>'; return; }
+  const p = pointInfo(h.L, h.i); S.picks.push(p); S.dirty = true;
+  $('#identCur').innerHTML = `<div class="big">String ${p.s} · segmen ${p.seg} · titik ${p.pt}</div>
+    <table><tr><td>Y</td><td>${f3(p.y)}</td></tr><tr><td>X</td><td>${f3(p.x)}</td></tr><tr><td>Z</td><td>${f3(p.z)}</td></tr>
+    <tr><td>Desc</td><td>${esc(p.d) || '<span class="muted">–</span>'}</td></tr><tr><td>Layer</td><td>${esc(p.layer)}</td></tr></table>`;
+  renderPicks();
+}
+function renderPicks() {
+  $('#identTbl tbody').innerHTML = S.picks.map((p, k) => `<tr><td>${k + 1}</td><td>${p.s}</td><td>${fx(p.y)}</td><td>${fx(p.x)}</td><td>${fx(p.z)}</td><td>${esc(p.d)}</td></tr>`).join('');
+}
+
+/* ---------- ukur ---------- */
+function doMeasure(px, py) {
+  if (!S.measOpen) { S.meas = []; S.measOpen = true; }
+  const h = nearest(px, py);
+  let p;
+  if (h) { const q = pointInfo(h.L, h.i); p = { x: q.x, y: q.y, z: q.z, snap: true }; }
+  else if (S.plan) { const g = ground(px, py); p = { x: g.x, y: g.y, z: zAt(g.x, g.y), snap: false }; }
+  else return;
+  S.meas.push(p); S.dirty = true; renderMeasure();
+}
+function surfLen(a, b) {      // panjang mengikuti permukaan DTM (sampel tiap 1 m)
+  const L = Math.hypot(b.x - a.x, b.y - a.y), n = Math.max(1, Math.ceil(L));
+  let s = 0, pz = zAt(a.x, a.y);
+  if (isNaN(pz)) return NaN;
+  for (let k = 1; k <= n; k++) {
+    const t = k / n, z = zAt(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t);
+    if (isNaN(z)) return NaN;
+    s += Math.hypot(L / n, z - pz); pz = z;
+  }
+  return s;
+}
+function legs() {
+  const out = []; const m = S.meas;
+  for (let k = 1; k < m.length; k++) {
+    const a = m[k - 1], b = m[k], dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z, h = Math.hypot(dx, dy);
+    out.push({ h, sl: isNaN(dz) ? NaN : Math.hypot(h, dz), br: Math.atan2(dx, dy) * 180 / Math.PI, gr: isNaN(dz) || h === 0 ? NaN : dz / h * 100, dz });
+  }
+  return out;
+}
+function renderMeasure() {
+  const lg = legs(), m = S.meas;
+  $('#measTbl tbody').innerHTML = m.map((p, k) => {
+    const l = lg[k - 1];
+    return `<tr><td>${k + 1}${p.snap ? '' : '*'}</td><td>${fx(p.y)}</td><td>${fx(p.x)}</td><td>${fx(p.z)}</td><td>${l ? l.h.toFixed(3) : ''}</td><td>${l ? fx(l.sl) : ''}</td><td>${l ? dms(l.br) : ''}</td><td>${l && !isNaN(l.gr) ? l.gr.toFixed(2) + '%' : ''}</td></tr>`;
+  }).join('');
+  if (!lg.length) { $('#measSum').innerHTML = m.length ? 'Klik titik berikutnya…' : $('#measSum').innerHTML; return; }
+  const H = lg.reduce((s, l) => s + l.h, 0), SL = lg.reduce((s, l) => s + l.sl, 0);
+  let SF = 0; for (let k = 1; k < m.length; k++) SF += surfLen(m[k - 1], m[k]);
+  const last = lg[lg.length - 1];
+  $('#measSum').innerHTML = `<div class="big">Datar ${f3(H)} m</div>
+    <table><tr><td>Miring (lurus antar titik)</td><td>${f3(SL)} m</td></tr>
+    <tr><td>Mengikuti permukaan DTM</td><td>${isNaN(SF) ? '<span class="muted">di luar DTM</span>' : f3(SF) + ' m'}</td></tr>
+    <tr><td>Bearing ruas terakhir</td><td>${dms(last.br)}</td></tr><tr><td>ΔZ total</td><td>${f3(m[m.length - 1].z - m[0].z)} m</td></tr></table>
+    <div class="muted" style="margin-top:4px">${S.measOpen ? 'Esc = selesai.' : 'Selesai. Klik lagi untuk ukuran baru.'} * = titik bebas (tidak menempel ke titik string).</div>`;
+}
+
+/* ---------- ekspor ---------- */
+async function copyText(t) {
+  try { await navigator.clipboard.writeText(t); }
+  catch (e) { const a = document.createElement('textarea'); a.value = t; document.body.appendChild(a); a.select(); document.execCommand('copy'); a.remove(); }
+}
+function flash(btn, t) { const o = btn.textContent; btn.textContent = t; setTimeout(() => { btn.textContent = o; }, 1200); }
+const num = (v) => isNaN(v) ? '' : v.toFixed(3);
+function saveStr(name, rows) {   // rows: [{s,x,y,z,d}] ; s = null -> pemisah segmen
+  const now = new Date(), mon = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][now.getMonth()];
+  const L = [`${name},${String(now.getDate()).padStart(2, '0')}-${mon}-${String(now.getFullYear()).slice(2)},0,0`,
+    '0,           0.000,           0.000,           0.000,           0.000,           0.000,           0.000'];
+  for (const r of rows) L.push(r ? `${r.s}, ${r.y.toFixed(3)}, ${r.x.toFixed(3)}, ${(isNaN(r.z) ? 0 : r.z).toFixed(3)}, ${r.d || ''}` : '0, 0.000, 0.000, 0.000,');
+  L.push('0, 0.000, 0.000, 0.000, END');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([L.join('\r\n') + '\r\n'], { type: 'text/plain' }));
+  a.download = name + '.str'; document.body.appendChild(a); a.click(); a.remove();
+}
+$('#identCopy').onclick = (e) => { copyText(['No\tString\tSegmen\tTitik\tY\tX\tZ\tDesc\tLayer', ...S.picks.map((p, k) => [k + 1, p.s, p.seg, p.pt, num(p.y), num(p.x), num(p.z), p.d, p.layer].join('\t'))].join('\r\n')); flash(e.target, 'Tersalin ✓'); };
+$('#identStr').onclick = () => { if (S.picks.length) saveStr('titik_identify', S.picks.flatMap((p) => [{ s: p.s, x: p.x, y: p.y, z: p.z, d: p.d }, null])); };
+$('#identClr').onclick = () => { S.picks = []; renderPicks(); $('#identCur').innerHTML = '<span class="muted">Klik titik di layar.</span>'; S.dirty = true; };
+$('#measCopy').onclick = (e) => {
+  const lg = legs();
+  copyText(['No\tY\tX\tZ\tDatar\tMiring\tBearing\tGrade %', ...S.meas.map((p, k) => { const l = lg[k - 1]; return [k + 1, num(p.y), num(p.x), num(p.z), l ? num(l.h) : '', l ? num(l.sl) : '', l ? dms(l.br) : '', l && !isNaN(l.gr) ? l.gr.toFixed(2) : ''].join('\t'); })].join('\r\n'));
+  flash(e.target, 'Tersalin ✓');
+};
+$('#measStr').onclick = () => { if (S.meas.length) saveStr('garis_ukur', [...S.meas.map((p) => ({ s: 1, x: p.x, y: p.y, z: p.z, d: '' })), null]); };
+$('#measClr').onclick = () => { S.meas = []; S.measOpen = false; renderMeasure(); $('#measSum').innerHTML = 'Mode Ukur: klik titik-titik (menempel ke titik terdekat). Esc = selesai.'; S.dirty = true; };
+
+/* ---------- panel layer ---------- */
+function renderLayers() {
+  const box = $('#layers');
+  if (!S.layers.length) { box.innerHTML = '<div class="empty">Belum ada file.</div>'; info(); return; }
+  box.innerHTML = '';
+  for (const L of S.layers) {
+    const el = document.createElement('div'); el.className = 'layer';
+    if (L.kind === 'str') {
+      const nums = [...L.strs.keys()].sort((a, b) => a - b);
+      const pts = [...L.strs.values()].reduce((s, v) => s + v.count, 0);
+      el.innerHTML = `<div class="lrow"><span class="caret">${L.open ? '▾' : '▸'}</span><input type="checkbox" ${L.vis ? 'checked' : ''}>
+        <span class="lname" title="${esc(L.name)}">${esc(L.name)}</span><span class="x" title="Tutup layer">✕</span></div>
+        <div class="lmeta">${pts.toLocaleString('id-ID')} titik · ${L.segs.toLocaleString('id-ID')} segmen · ${nums.length} string${L.r.binary ? ' · biner' : ''} · ${Math.round(L.r.ms || 0)} ms</div>`;
+      if (L.open) {
+        const sb = document.createElement('div'); sb.className = 'strs';
+        sb.innerHTML = `<div class="srow"><a href="#" data-a="all">semua</a> · <a href="#" data-a="none">tidak ada</a></div>` + nums.map((s) => { const st = L.strs.get(s); return `<div class="srow" data-s="${s}"><input type="checkbox" ${st.vis ? 'checked' : ''}><input type="color" class="sw" value="${st.color}"><span>String ${s}${S.spot(s) ? ' (spot)' : ''}${st.auto && !st.vis ? ' <span class="muted">· disembunyikan</span>' : ''}</span><span class="cnt">${st.count.toLocaleString('id-ID')} / ${st.segs}</span></div>`; }).join('');
+        sb.onchange = (e) => {
+          const row = e.target.closest('.srow'); if (!row || !row.dataset.s) return; const st = L.strs.get(+row.dataset.s);
+          if (e.target.type === 'checkbox') st.vis = e.target.checked; else { st.color = e.target.value; buildColors(L); } info();
+          S.dirty = true;
+        };
+        sb.onclick = (e) => { const a = e.target.dataset && e.target.dataset.a; if (!a) return; e.preventDefault(); for (const st of L.strs.values()) st.vis = a === 'all'; renderLayers(); S.dirty = true; };
+        el.appendChild(sb);
+      }
+      el.querySelector('.caret').onclick = () => { L.open = !L.open; renderLayers(); };
+    } else {
+      el.innerHTML = `<div class="lrow"><span class="caret"></span><input type="checkbox" ${L.vis ? 'checked' : ''}>
+        <span class="lname" title="${esc(L.name)}">${esc(L.name)}</span><span class="x" title="Tutup layer">✕</span></div>
+        <div class="lmeta">DTM · ${L.ntri.toLocaleString('id-ID')} segitiga · Z ${(L.zr[0] + S.origin[2]).toFixed(1)}–${(L.zr[1] + S.origin[2]).toFixed(1)}${L.bad ? ` · ${L.bad} indeks salah` : ''}</div>
+        <div class="dtmopt"><label><input type="radio" name="sh${L.id}" value="0" ${L.shade === 0 ? 'checked' : ''}> warna elevasi</label><label><input type="radio" name="sh${L.id}" value="1" ${L.shade === 1 ? 'checked' : ''}> abu-abu</label><label><input type="checkbox" class="wire" ${L.wire ? 'checked' : ''}> garis segitiga</label></div>`;
+      el.querySelector('.dtmopt').onchange = (e) => { if (e.target.classList.contains('wire')) L.wire = e.target.checked; else L.shade = +e.target.value; S.dirty = true; };
+    }
+    el.querySelector('.lrow input').onchange = (e) => { L.vis = e.target.checked; S.dirty = true; info(); };
+    el.querySelector('.x').onclick = () => removeLayer(L);
+    box.appendChild(el);
+  }
+  info();
+}
+function removeLayer(L) {
+  const kill = L.kind === 'str' ? [L, ...L.dtms] : [L];
+  for (const k of kill) {
+    for (const b of ['vbo', 'cbo', 'lineIbo', 'ptIbo', 'ibo', 'wireIbo']) if (k[b]) gl.deleteBuffer(k[b]);
+    S.layers.splice(S.layers.indexOf(k), 1);
+    if (k.kind === 'dtm' && L.kind === 'dtm') k.src.dtms.splice(k.src.dtms.indexOf(k), 1);
+  }
+  if (!S.layers.length) S.origin = null;
+  renderLayers(); S.dirty = true;
+}
+function info() {
+  let p = 0, t = 0;
+  for (const L of S.layers) if (L.vis) { if (L.kind === 'str') { for (const st of L.strs.values()) if (st.vis) p += st.count; } else t += L.ntri; }
+  $('#sInfo').textContent = S.layers.length ? `${p.toLocaleString('id-ID')} titik · ${t.toLocaleString('id-ID')} segitiga tampil` : '';
+}
+
+/* ---------- mouse & keyboard ---------- */
+let drag = null;
+canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+canvas.addEventListener('pointerdown', (e) => { canvas.setPointerCapture(e.pointerId); drag = { x: e.clientX, y: e.clientY, b: e.button, sh: e.shiftKey, moved: false }; });
+canvas.addEventListener('pointermove', (e) => {
+  const r = canvas.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top;
+  if (S.plan && S.origin) { const g = ground(px, py); $('#sXY').textContent = `Y ${f3(g.y)}   X ${f3(g.x)}   Z ${f3(zAt(g.x, g.y))}`; }
+  else if (!S.plan) $('#sXY').textContent = 'Tampak 3D — klik titik untuk koordinat';
+  if (!drag) return;
+  const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+  if (!drag.moved && Math.hypot(dx, dy) < 4) return;
+  drag.moved = true; drag.x = e.clientX; drag.y = e.clientY;
+  const c = S.cam, cam = camera();
+  const pan = S.plan ? drag.b === 0 && !drag.sh : (drag.b !== 0 || drag.sh);
+  if (pan) {
+    const wpp = 2 * cam.halfH / cam.H;
+    for (let a = 0; a < 3; a++) c.t[a] += -cam.R[a] * dx * wpp + cam.U[a] * dy * wpp;
+  } else if (!S.plan) {
+    c.az = (c.az + dx * 0.4) % 360; c.el = Math.max(1, Math.min(89.5, c.el - dy * 0.3));
+  }
+  S.dirty = true;
+});
+canvas.addEventListener('pointerup', (e) => {
+  const d = drag; drag = null; if (!d || d.moved || d.b !== 0) return;
+  const r = canvas.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top;
+  if (S.tool === 'ident') doIdent(px, py); else doMeasure(px, py);
+});
+canvas.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const r = canvas.getBoundingClientRect(), g = ground(e.clientX - r.left, e.clientY - r.top), c = S.cam;
+  const k = Math.pow(1.0015, e.deltaY);
+  for (let a = 0; a < 3; a++) c.t[a] = g.q[a] + (c.t[a] - g.q[a]) * k;
+  c.dist *= k; S.dirty = true;
+}, { passive: false });
+function setTool(t) {
+  S.tool = t; $('#bIdent').classList.toggle('on', t === 'ident'); $('#bMeasure').classList.toggle('on', t === 'meas');
+  showTab(t === 'ident' ? 'tIdent' : 'tMeasure');
+}
+function showTab(id) { for (const b of document.querySelectorAll('.tabs button')) b.classList.toggle('on', b.dataset.t === id); for (const t of document.querySelectorAll('.tab')) t.hidden = t.id !== id; }
+document.querySelector('.tabs').onclick = (e) => { if (e.target.dataset.t) setTool(e.target.dataset.t === 'tIdent' ? 'ident' : 'meas'); };
+window.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT') return;
+  const k = e.key.toLowerCase();
+  if (k === 'escape') { S.measOpen = false; renderMeasure(); }
+  else if (k === 'f') zoomAll(); else if (k === 'p') setPlan(true); else if (k === '3') setPlan(false);
+  else if (k === 'i') setTool('ident'); else if (k === 'm') setTool('meas');
+});
+$('#bZoom').onclick = zoomAll;
+$('#bPlan').onclick = () => setPlan(true);
+$('#b3d').onclick = () => setPlan(false);
+$('#bIdent').onclick = () => setTool('ident');
+$('#bMeasure').onclick = () => setTool('meas');
+$('#zEx').onchange = (e) => { const v = Math.max(0.1, +e.target.value || 1); S.cam.t[2] *= v / S.ex; S.ex = v; S.dirty = true; };
+$('#spotIn').onchange = (e) => { S.spot = parseRange(e.target.value); for (const L of S.layers) if (L.kind === 'str') buildIndex(L); renderLayers(); };
+$('#showPts').onchange = (e) => { S.showPts = e.target.checked; for (const L of S.layers) if (L.kind === 'str') buildIndex(L); };
+$('#bTheme').onclick = () => { const r = document.documentElement; r.dataset.theme = r.dataset.theme === 'dark' ? 'light' : 'dark'; try { localStorage.setItem('smaTheme', r.dataset.theme); } catch (e) {} S.dirty = true; };
+try { const t = localStorage.getItem('smaTheme'); if (t) document.documentElement.dataset.theme = t; else if (matchMedia('(prefers-color-scheme: dark)').matches) document.documentElement.dataset.theme = 'dark'; } catch (e) {}
+$('#bHelp').onclick = () => $('#help').showModal();
+$('#fileIn').onchange = (e) => { loadFiles(e.target.files); e.target.value = ''; };
+const view = $('#view');
+view.addEventListener('dragover', (e) => { e.preventDefault(); $('#drop').classList.add('on'); });
+view.addEventListener('dragleave', () => $('#drop').classList.remove('on'));
+view.addEventListener('drop', (e) => { e.preventDefault(); $('#drop').classList.remove('on'); loadFiles(e.dataTransfer.files); });
+
+window.SMA = { S, loadFiles, zoomAll, setPlan, setTool, nearest, zAt, camera, draw };   // untuk uji otomatis
+})();
+</script>
+</body>
+</html>
