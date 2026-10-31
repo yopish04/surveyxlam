@@ -17,11 +17,14 @@ const IDB = {
 };
 
 /* ---- Navigator ---- */
+/* handle folder: dari browser (File System Access API) atau dari aplikasi desktop (TAURI_FS, berbasis path) */
+const sameH = (a, b) => !!a && !!b && (a === b || (!!a.path && a.path === b.path));
 const NAV = { roots: [], sel: null, filter: 'surpac', drag: null };
 const EXT_OK = /\.(str|dtm|shp)$/i;
 function mkNode(h, parent, root) { return { h, name: h.name, kind: h.kind, parent, root, kids: null, open: false, size: null, mod: null }; }
 async function navAddRoot(ro, handle = null) {
   let h = handle;
+  if (!h && window.TAURI_FS) { h = await TAURI_FS.pickDir(ro); if (!h) return; }
   if (!h) {
     if (!window.showDirectoryPicker) { alert('Browser ini belum bisa membuka folder. Pakai Google Chrome atau Microsoft Edge versi baru.'); return; }
     try { h = await window.showDirectoryPicker({ id: ro ? 'smaServer' : 'smaKerja', mode: ro ? 'read' : 'readwrite' }); } catch (e) { return; }
@@ -31,7 +34,7 @@ async function navAddRoot(ro, handle = null) {
   const root = { id, ro, ok: true, node: null };
   root.node = mkNode(h, null, root); root.node.open = true;
   NAV.roots.push(root);
-  if (!handle || handle._persist !== false) IDB.put({ id, h, ro });
+  if (!handle || handle._persist !== false) IDB.put(h.path ? { id, path: h.path, ro } : { id, h, ro });
   await loadKids(root.node);
   if (!ro && !S.dir) setSaveDir(root.node);
   msg(`Folder ${ro ? 'server (baca saja)' : 'kerja'}: ${h.name}`);
@@ -40,6 +43,7 @@ async function navAddRoot(ro, handle = null) {
 async function navRestore() {
   for (const v of await IDB.all()) {
     const root = { id: v.id, ro: v.ro, ok: false, node: null };
+    if (v.path) { if (!window.TAURI_FS) continue; v.h = TAURI_FS.dir(v.path); }
     root.node = mkNode(v.h, null, root);
     try { root.ok = (await v.h.queryPermission({ mode: v.ro ? 'read' : 'readwrite' })) === 'granted'; } catch (e) { root.ok = false; }
     NAV.roots.push(root);
@@ -59,9 +63,9 @@ async function loadKids(n) {
   kids.sort((a, b) => (a.kind === b.kind ? 0 : a.kind === 'directory' ? -1 : 1) || a.name.localeCompare(b.name, 'id', { numeric: true, sensitivity: 'base' }));
   n.kids = kids;
   // ukuran & tanggal file diisi belakangan (tidak menghambat tampilan)
-  (async () => { for (const k of kids) if (k.kind === 'file' && (NAV.filter === 'all' || EXT_OK.test(k.name))) { try { const f = await k.h.getFile(); k.size = f.size; k.mod = f.lastModified; } catch (e) {} } renderTree(); })();
+  (async () => { for (const k of kids) if (k.kind === 'file' && (NAV.filter === 'all' || EXT_OK.test(k.name))) { if (k.h.size !== undefined) { k.size = k.h.size; k.mod = k.h.mod; } else try { const f = await k.h.getFile(); k.size = f.size; k.mod = f.lastModified; } catch (e) {} } renderTree(); })();
 }
-function pathOf(n) { const p = []; for (let x = n; x; x = x.parent) p.unshift(x.name); return p.join('\\'); }
+function pathOf(n) { if (n.h && n.h.path) return n.h.path; const p = []; for (let x = n; x; x = x.parent) p.unshift(x.name); return p.join('\\'); }
 function fmtSize(b) { return b == null ? '' : b < 1024 ? b + ' B' : b < 1048576 ? (b / 1024).toFixed(0) + ' KB' : (b / 1048576).toFixed(1) + ' MB'; }
 function iconOf(n) {
   if (!n.parent) return '<span class="ti root">▣</span>';
@@ -81,7 +85,7 @@ function renderTree() {
     const lock = root && !root.ok;
     html.push(`<div class="tn${NAV.sel === n ? ' sel' : ''}${lock ? ' lock' : ''}" data-i="${rowsMap.length - 1}" draggable="${isDir ? 'false' : 'true'}" style="padding-left:${6 + d * 14}px" title="${esc(pathOf(n))}">
       <span class="tc">${isDir ? (n.open ? '▾' : '▸') : ''}</span>${iconOf(n)}<span class="tnm">${esc(n.name)}${lock ? ' — klik untuk izinkan akses' : ''}</span>
-      ${root && root.ro ? '<span class="ro">baca saja</span>' : ''}${S.dir && n.h === S.dir ? '<span class="ro" style="color:#2e9d5b;border-color:#2e9d5b">simpan</span>' : ''}<span class="tsz">${isDir ? '' : fmtSize(n.size)}</span></div>`);
+      ${root && root.ro ? '<span class="ro">baca saja</span>' : ''}${sameH(S.dir, n.h) ? '<span class="ro" style="color:#2e9d5b;border-color:#2e9d5b">simpan</span>' : ''}<span class="tsz">${isDir ? '' : fmtSize(n.size)}</span></div>`);
     if (isDir && n.open && n.kids) for (const k of n.kids) walk(k, d + 1);
   };
   for (const r of NAV.roots) walk(r.node, 0);
@@ -94,7 +98,7 @@ async function toggleDir(n) {
   renderTree();
 }
 async function navRefreshDir(h) {
-  const find = (n) => { if (n.h === h) return n; if (n.kids) for (const k of n.kids) { const r = find(k); if (r) return r; } return null; };
+  const find = (n) => { if (sameH(n.h, h)) return n; if (n.kids) for (const k of n.kids) { const r = find(k); if (r) return r; } return null; };
   for (const r of NAV.roots) { const n = find(r.node); if (n && n.kids) { await loadKids(n); renderTree(); } }
 }
 async function navRefresh() { for (const r of NAV.roots) if (r.ok) { const re = async (n) => { if (n.kids) { const open = new Set(n.kids.filter((k) => k.open).map((k) => k.name)); await loadKids(n); for (const k of n.kids) if (open.has(k.name)) { k.open = true; await re(k); } } }; await re(r.node); } renderTree(); }
@@ -160,7 +164,7 @@ tree.addEventListener('contextmenu', (e) => {
     '-',
     ['Salin path', () => copyText(pathOf(n))],
     ['Segarkan', () => (dir ? navRefreshDir(n.h) : navRefreshDir(n.parent.h))],
-    isRoot && ['Hapus dari Navigator', () => { NAV.roots = NAV.roots.filter((r) => r !== n.root); IDB.del(n.root.id); if (S.dir === n.h) { S.dir = null; for (const el of document.querySelectorAll('.dirName')) el.textContent = 'Downloads'; } renderTree(); }],
+    isRoot && ['Hapus dari Navigator', () => { NAV.roots = NAV.roots.filter((r) => r !== n.root); IDB.del(n.root.id); if (sameH(S.dir, n.h)) { S.dir = null; for (const el of document.querySelectorAll('.dirName')) el.textContent = 'Downloads'; } renderTree(); }],
   ].filter(Boolean);
   showCtx(e.clientX, e.clientY, items);
 });
@@ -253,5 +257,5 @@ $('#navFilter').onchange = (e) => { NAV.filter = e.target.value; for (const r of
 })();
 try { if (localStorage.getItem('smaBg') === 'l') $('#view').classList.add('light'); } catch (e) {}
 msg('SMA Survey siap. File › Set work directory untuk membuka folder kerja (mis. D:\\yopi).');
-if (!window.showDirectoryPicker) msg('Browser ini belum mendukung Navigator folder. Pakai Chrome atau Edge; untuk sementara pakai Open file.', 'w');
+if (!window.showDirectoryPicker && !window.TAURI_FS) msg('Browser ini belum mendukung Navigator folder. Pakai Chrome atau Edge; untuk sementara pakai Open file.', 'w');
 navRestore();

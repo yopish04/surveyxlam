@@ -1,0 +1,28 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "SMA Survey",
+  "version": "0.4.0",
+  "identifier": "id.sma.survey",
+  "build": {
+    "frontendDist": "../dist",
+    "beforeBuildCommand": "python scripts/prepare.py"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      { "label": "main", "title": "SMA Survey", "width": 1400, "height": 900, "minWidth": 900, "minHeight": 600, "maximized": true }
+    ],
+    "security": { "csp": null }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["msi", "nsis"],
+    "publisher": "SMA Survey",
+    "shortDescription": "Survey tambang ringan, kompatibel Surpac",
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.png", "icons/icon.ico"],
+    "fileAssociations": [
+      { "ext": ["str"], "name": "Surpac String File", "description": "Surpac string file", "role": "Editor" },
+      { "ext": ["dtm"], "name": "Surpac DTM File", "description": "Surpac DTM", "role": "Editor" }
+    ]
+  }
+}

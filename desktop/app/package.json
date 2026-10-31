@@ -1,0 +1,14 @@
+{
+  "name": "sma-survey-desktop",
+  "private": true,
+  "version": "0.4.0",
+  "description": "SMA Survey Desktop: aplikasi survey ringan kompatibel Surpac (Tauri 2 + Rust)",
+  "scripts": {
+    "tauri": "tauri",
+    "build": "tauri build",
+    "dev": "tauri dev"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}

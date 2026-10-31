@@ -15,3 +15,23 @@ Alat uji: `cargo build --release`, lalu `target/release/sma info|dtm|vol|update|
 ## Berikutnya
 `app/` berisi kerangka Tauri 2: frontend = `viewer/src`, backend = perintah Rust yang memanggil `sma-core`, SQLite, dan Excel.
 Kerangka ini dibangun lewat GitHub Actions (Windows) setelah repo bisa di-push.
+
+## `app/` — aplikasi desktop Tauri 2 (kerangka, belum dikompilasi)
+- `src-tauri/src/lib.rs` — perintah Rust:
+  - **file**: `list_dir`, `stat_path`, `read_file`, `write_file`, `make_dir`, `rename_path`, `remove_path`, `drives`, `startup_files`. Folder server (Y:\, Z:\, \\server) ditolak untuk ditulis.
+  - **mesin**: `engine_dtm`, `engine_vol` (multi-core), `engine_update`.
+  - **riwayat volume**: `vol_save`, `vol_last`, `vol_history` (SQLite).
+- `src-tauri/src/pack.rs` — paket biner frontend ↔ Rust: `[u32 panjang JSON][JSON][bagian kelipatan 8 byte]`.
+- `src-tauri/src/db.rs` — tabel `volumes` (riwayat volume harian per pit).
+- Frontend: `viewer/src` (dibangun oleh `scripts/prepare.py` ke `dist/index.html`). `viewer/src/tauri.js` aktif hanya di dalam aplikasi desktop:
+  - Navigator memakai path Windows asli lewat Rust;
+  - DTM, volume, dan update memakai mesin Rust; kalau gagal, otomatis kembali ke mesin JavaScript;
+  - "Nett kemarin" terisi otomatis dari riwayat.
+- Asosiasi file: klik dua kali `.str` / `.dtm` di Explorer membuka SMA Survey.
+- Build: `.github/workflows/desktop.yml` (uji `sma-core` di Ubuntu → installer `.msi` + setup `.exe` di Windows).
+
+Sudah diuji di cloud dengan backend tiruan:
+- Navigator, simpan ke folder, riwayat volume, dan jalur cadangan JS berjalan.
+- Format paket DTM dan volume cocok dengan spesifikasi (volume LD03 sama).
+
+Kompilasi Rust/Tauri yang sebenarnya baru terjadi di GitHub Actions.

@@ -46,6 +46,7 @@ function refreshTools() {
   fillChecks($('#upB'), sl, isHarian);
   $('#volBtn').disabled = dl.length < 2;
   $('#sodBtn').disabled = !dl.length || !sl.length;
+  autoKemarin();
   $('#secInfo').textContent = dl.length ? 'Garis section = garis Ukur. Klik titik di mode Ukur, lalu Buat section.' : 'Buka atau buat DTM dulu.';
 }
 
@@ -217,10 +218,25 @@ async function doVolume() {
     volLast = { A: A.name.replace(' (dibuat)', ''), B: B.name.replace(' (dibuat)', ''), bdy: Bd.name, no, res, ms, date: new Date() };
     renderVolume();
     msg(`VOLUME ${volLast.A} → ${volLast.B} (${Bd.name} str ${no}): nett ${fv(volTotals(res).nett)} m³, ${(ms / 1000).toFixed(1)} s`, 'ok');
+    if (window.SMA_DB) {          // aplikasi desktop: simpan ke riwayat volume (SQLite)
+      const T = volTotals(res), pi = pitInfo(Bd.name);
+      SMA_DB.save({ tanggal: pi.tgl, pit: pi.pit, first_dtm: volLast.A, second_dtm: volLast.B, bdy: Bd.name, string_no: no, cut: T.cut, fill: T.fill, nett: T.nett, cut_area: T.cutArea, fill_area: T.fillArea, segments: JSON.stringify(res) });
+    }
   } catch (e) { $('#volOut').textContent = 'Gagal: ' + e.message.split('\n')[0]; }
   busy(null);
 }
 const fv = (v) => v.toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+/* nama pit & tanggal dari nama boundary: 2026_10_27_update_topo_x_bdy.str -> pit update_topo_x, 2026-10-27 */
+function pitInfo(name) {
+  const b = name.replace(/\.[^.]*$/, ''), m = b.match(/^(\d{4})_(\d{2})_(\d{2})_?(.*)$/);
+  const pit = (m ? m[4] : b).replace(/_bdy$/i, '');
+  return { pit, tgl: m ? `${m[1]}-${m[2]}-${m[3]}` : new Date().toISOString().slice(0, 10) };
+}
+function autoKemarin() {
+  const Bd = byId($('#volBdy').value); if (!window.SMA_DB || !Bd || $('#volKemarin').dataset.manual) return;
+  const pi = pitInfo(Bd.name);
+  SMA_DB.last(pi.pit, pi.tgl).then((r) => { if (r) { $('#volKemarin').value = r.nett.toFixed(3); $('#volKemarin').title = `dari riwayat ${r.tanggal} (${r.second_dtm})`; renderVolume(); } });
+}
 function volTotals(res) { const T = { cut: 0, cutArea: 0, fill: 0, fillArea: 0, nett: 0, common: 0 }; for (const v of res) for (const k in T) T[k] += v[k]; return T; }
 function renderVolume() {
   const V = volLast; if (!V) return;
@@ -352,7 +368,8 @@ function doSection() {
 $('#dtmBtn').onclick = doCreateDtm;
 $('#sodBtn').onclick = doSod;
 $('#volBtn').onclick = doVolume;
-$('#volKemarin').oninput = renderVolume;
+$('#volKemarin').oninput = (e) => { e.target.dataset.manual = e.target.value ? '1' : ''; renderVolume(); };
+$('#volBdy').addEventListener('change', autoKemarin);
 $('#upJenis').onchange = upJenis; upJenis();
 $('#upBtn').onclick = doUpdate;
 $('#secBtn').onclick = doSection;

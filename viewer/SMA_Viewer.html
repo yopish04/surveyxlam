@@ -2181,6 +2181,7 @@ function refreshTools() {
   fillChecks($('#upB'), sl, isHarian);
   $('#volBtn').disabled = dl.length < 2;
   $('#sodBtn').disabled = !dl.length || !sl.length;
+  autoKemarin();
   $('#secInfo').textContent = dl.length ? 'Garis section = garis Ukur. Klik titik di mode Ukur, lalu Buat section.' : 'Buka atau buat DTM dulu.';
 }
 
@@ -2352,10 +2353,25 @@ async function doVolume() {
     volLast = { A: A.name.replace(' (dibuat)', ''), B: B.name.replace(' (dibuat)', ''), bdy: Bd.name, no, res, ms, date: new Date() };
     renderVolume();
     msg(`VOLUME ${volLast.A} → ${volLast.B} (${Bd.name} str ${no}): nett ${fv(volTotals(res).nett)} m³, ${(ms / 1000).toFixed(1)} s`, 'ok');
+    if (window.SMA_DB) {          // aplikasi desktop: simpan ke riwayat volume (SQLite)
+      const T = volTotals(res), pi = pitInfo(Bd.name);
+      SMA_DB.save({ tanggal: pi.tgl, pit: pi.pit, first_dtm: volLast.A, second_dtm: volLast.B, bdy: Bd.name, string_no: no, cut: T.cut, fill: T.fill, nett: T.nett, cut_area: T.cutArea, fill_area: T.fillArea, segments: JSON.stringify(res) });
+    }
   } catch (e) { $('#volOut').textContent = 'Gagal: ' + e.message.split('\n')[0]; }
   busy(null);
 }
 const fv = (v) => v.toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+/* nama pit & tanggal dari nama boundary: 2026_10_27_update_topo_x_bdy.str -> pit update_topo_x, 2026-10-27 */
+function pitInfo(name) {
+  const b = name.replace(/\.[^.]*$/, ''), m = b.match(/^(\d{4})_(\d{2})_(\d{2})_?(.*)$/);
+  const pit = (m ? m[4] : b).replace(/_bdy$/i, '');
+  return { pit, tgl: m ? `${m[1]}-${m[2]}-${m[3]}` : new Date().toISOString().slice(0, 10) };
+}
+function autoKemarin() {
+  const Bd = byId($('#volBdy').value); if (!window.SMA_DB || !Bd || $('#volKemarin').dataset.manual) return;
+  const pi = pitInfo(Bd.name);
+  SMA_DB.last(pi.pit, pi.tgl).then((r) => { if (r) { $('#volKemarin').value = r.nett.toFixed(3); $('#volKemarin').title = `dari riwayat ${r.tanggal} (${r.second_dtm})`; renderVolume(); } });
+}
 function volTotals(res) { const T = { cut: 0, cutArea: 0, fill: 0, fillArea: 0, nett: 0, common: 0 }; for (const v of res) for (const k in T) T[k] += v[k]; return T; }
 function renderVolume() {
   const V = volLast; if (!V) return;
@@ -2487,12 +2503,131 @@ function doSection() {
 $('#dtmBtn').onclick = doCreateDtm;
 $('#sodBtn').onclick = doSod;
 $('#volBtn').onclick = doVolume;
-$('#volKemarin').oninput = renderVolume;
+$('#volKemarin').oninput = (e) => { e.target.dataset.manual = e.target.value ? '1' : ''; renderVolume(); };
+$('#volBdy').addEventListener('change', autoKemarin);
 $('#upJenis').onchange = upJenis; upJenis();
 $('#upBtn').onclick = doUpdate;
 $('#secBtn').onclick = doSection;
 $('#measSod').onclick = measSod;
 refreshTools();
+
+/* ---------- jembatan ke aplikasi desktop (Tauri + Rust) ----------
+   Hanya aktif kalau halaman berjalan di dalam SMA Survey Desktop (window.__TAURI__ ada).
+   - TAURI_FS: folder/file lewat Rust (path Windows asli, Z:\ baca saja ditolak di Rust juga)
+   - run(): CREATE DTM, volume, update dikerjakan mesin Rust (sma-core, multi-core); kalau gagal kembali ke mesin JS
+   - riwayat volume di SQLite */
+const TA = window.__TAURI__;
+const inv = (c, a, o) => TA.core.invoke(c, a, o);
+const pjoin = (a, b) => a.replace(/[\\/]+$/, '') + '\\' + b;
+const pname = (p) => p.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || p;
+if (TA) {
+  class TFile {
+    constructor(path, size, mod) { this.kind = 'file'; this.path = path; this.name = pname(path); this.size = size; this.mod = mod; }
+    async getFile() { const buf = await inv('read_file', { path: this.path }); return new File([buf], this.name, { lastModified: this.mod || Date.now() }); }
+    async createWritable() {
+      const parts = [], path = this.path;
+      return {
+        write: async (d) => { parts.push(d instanceof Uint8Array ? d : new Uint8Array(d.buffer || d)); },
+        close: async () => { const all = new Uint8Array(parts.reduce((a, p) => a + p.length, 0)); let o = 0; for (const p of parts) { all.set(p, o); o += p.length; } await inv('write_file', all, { headers: { 'x-path': encodeURIComponent(path) } }); },
+      };
+    }
+    async isSameEntry(o) { return !!o && o.path === this.path; }
+    async move(n) { const np = pjoin(this.path.replace(/[\\/][^\\/]*$/, ''), n); await inv('rename_path', { from: this.path, to: np }); this.path = np; this.name = n; }
+  }
+  class TDir {
+    constructor(path) { this.kind = 'directory'; this.path = path; this.name = pname(path); }
+    async *values() { for (const e of await inv('list_dir', { path: this.path })) yield e.dir ? new TDir(pjoin(this.path, e.name)) : new TFile(pjoin(this.path, e.name), e.size, e.modified); }
+    async getFileHandle(name, opt = {}) {
+      const p = pjoin(this.path, name), st = await inv('stat_path', { path: p });
+      if (!st) { if (!opt.create) throw new DOMException('tidak ada', 'NotFoundError'); return new TFile(p, 0, Date.now()); }
+      if (st.dir) throw new DOMException('folder', 'TypeMismatchError');
+      return new TFile(p, st.size, st.modified);
+    }
+    async getDirectoryHandle(name, opt = {}) {
+      const p = pjoin(this.path, name), st = await inv('stat_path', { path: p });
+      if (!st) { if (!opt.create) throw new DOMException('tidak ada', 'NotFoundError'); await inv('make_dir', { path: p }); }
+      return new TDir(p);
+    }
+    async removeEntry(name, opt = {}) { await inv('remove_path', { path: pjoin(this.path, name), recursive: !!opt.recursive }); }
+    async isSameEntry(o) { return !!o && o.path === this.path; }
+    async queryPermission() { return 'granted'; }
+    async requestPermission() { return 'granted'; }
+  }
+  window.TAURI_FS = {
+    dir: (p) => new TDir(p),
+    async pickDir(ro) {
+      const p = await TA.dialog.open({ directory: true, title: ro ? 'Pilih folder server (baca saja), mis. Z:\\' : 'Pilih folder kerja, mis. D:\\yopi' });
+      return p ? new TDir(Array.isArray(p) ? p[0] : p) : null;
+    },
+  };
+
+  /* ---- paket biner untuk mesin Rust: [u32 panjang JSON][JSON][bagian-bagian, masing-masing kelipatan 8 byte] ---- */
+  const asU8 = (p) => p instanceof Uint8Array ? p : p instanceof ArrayBuffer ? new Uint8Array(p) : new Uint8Array(p.buffer, p.byteOffset, p.byteLength);
+  const pad8 = (n) => Math.ceil(n / 8) * 8;
+  function pack(head, parts) {
+    const bs = parts.map(asU8); head.lens = bs.map((b) => b.length);
+    const hj = new TextEncoder().encode(JSON.stringify(head)), hl = pad8(4 + hj.length);
+    const out = new Uint8Array(hl + bs.reduce((a, b) => a + pad8(b.length), 0));
+    new DataView(out.buffer).setUint32(0, hj.length, true); out.set(hj, 4);
+    let o = hl; for (const b of bs) { out.set(b, o); o += pad8(b.length); }
+    return out;
+  }
+  function unpack(buf) {
+    const u = new Uint8Array(buf), L = new DataView(u.buffer, u.byteOffset).getUint32(0, true);
+    const head = JSON.parse(new TextDecoder().decode(u.subarray(4, 4 + L)));
+    let o = pad8(4 + L); const parts = (head.lens || []).map((n) => { const b = u.slice(o, o + n); o += pad8(n); return b; });
+    return { head, parts };
+  }
+  const f64 = (a) => a instanceof Float64Array ? a : Float64Array.from(a);
+  const rustJob = {
+    async dtm(a) {
+      const head = { rows: a.r.rows, skip: a.skip.map(([x, y]) => `${x}-${y}`).join(','), spot: a.spot.map(([x, y]) => `${x}-${y}`).join(',') };
+      const r = unpack(await inv('engine_dtm', pack(head, [f64(a.r.x), f64(a.r.y), Int32Array.from(a.r.sn)])));
+      const tris = new Int32Array(r.parts[0].buffer);
+      return { tris, ntri: tris.length / 3, npts: r.head.npts, skipped: r.head.skipped, flips: r.head.flips, engine: 'rust' };
+    },
+    async vol(a) {
+      const head = { n1: a.first.x.length, t1: a.first.tris.length, n2: a.second.x.length, t2: a.second.tris.length, rings: a.rings.map((r) => r.length) };
+      const parts = [f64(a.first.x), f64(a.first.y), f64(a.first.z), f64(a.second.x), f64(a.second.y), f64(a.second.z), ...a.rings.map(f64), Int32Array.from(a.first.tris), Int32Array.from(a.second.tris)];
+      return await inv('engine_vol', pack(head, parts));
+    },
+    async update(a) {
+      const files = [a.g, ...(a.bdy ? [a.bdy] : []), ...(a.harian || []), ...(a.bdys || [])];
+      const head = { ...a, g: undefined, bdy: undefined, harian: undefined, bdys: undefined, hasBdy: !!a.bdy, nHarian: (a.harian || []).length, nBdys: (a.bdys || []).length };
+      const r = unpack(await inv('engine_update', pack(head, files)));
+      return { ...r.head, files: r.head.files.map((f, i) => ({ name: f.name, data: r.parts[i] })) };
+    },
+  };
+  const runJs = run;
+  run = async (cmd, args, transfer, prog) => {
+    if (rustJob[cmd]) {
+      try { const t0 = performance.now(); const r = await rustJob[cmd](args); msg(`Mesin Rust: ${cmd} ${Math.round(performance.now() - t0)} ms`); return r; }
+      catch (e) { msg(`Mesin Rust gagal (${String(e).slice(0, 120)}); pakai mesin JavaScript.`, 'w'); }
+    }
+    return runJs(cmd, args, transfer, prog);
+  };
+
+  /* ---- riwayat volume (SQLite) ---- */
+  window.SMA_DB = {
+    save: (rec) => inv('vol_save', { rec }).catch((e) => msg('Gagal menyimpan riwayat volume: ' + e, 'e')),
+    last: (pit, before) => inv('vol_last', { pit, before }).catch(() => null),
+    history: (pit) => inv('vol_history', { pit, limit: 60 }).catch(() => []),
+  };
+
+  /* ---- file yang dibuka dari Windows Explorer (klik dua kali .str/.dtm) ---- */
+  inv('startup_files').then(async (paths) => {
+    if (!paths || !paths.length) return;
+    const files = [];
+    for (const p of paths) {
+      const fh = await TAURI_FS.dir(p.replace(/[\\/][^\\/]*$/, '')).getFileHandle(pname(p)).catch(() => null);
+      if (fh) files.push({ kind: 'file', name: fh.name, h: fh, parent: { h: TAURI_FS.dir(p.replace(/[\\/][^\\/]*$/, '')), kids: null }, root: { ro: true } });
+    }
+    for (const f of files) { const kids = []; for await (const h of f.parent.h.values()) kids.push({ kind: h.kind, name: h.name, h }); f.parent.kids = kids; }
+    openNodes(files);
+  }).catch(() => {});
+  document.title = 'SMA Survey Desktop';
+  $('#menubar .brand').textContent = 'SMA Survey Desktop';
+}
 
 /* ---------- kerangka mirip Surpac: menu, Navigator (folder kerja), message window, simpan layer ---------- */
 function msg(t, kind = '') {
@@ -2513,11 +2648,14 @@ const IDB = {
 };
 
 /* ---- Navigator ---- */
+/* handle folder: dari browser (File System Access API) atau dari aplikasi desktop (TAURI_FS, berbasis path) */
+const sameH = (a, b) => !!a && !!b && (a === b || (!!a.path && a.path === b.path));
 const NAV = { roots: [], sel: null, filter: 'surpac', drag: null };
 const EXT_OK = /\.(str|dtm|shp)$/i;
 function mkNode(h, parent, root) { return { h, name: h.name, kind: h.kind, parent, root, kids: null, open: false, size: null, mod: null }; }
 async function navAddRoot(ro, handle = null) {
   let h = handle;
+  if (!h && window.TAURI_FS) { h = await TAURI_FS.pickDir(ro); if (!h) return; }
   if (!h) {
     if (!window.showDirectoryPicker) { alert('Browser ini belum bisa membuka folder. Pakai Google Chrome atau Microsoft Edge versi baru.'); return; }
     try { h = await window.showDirectoryPicker({ id: ro ? 'smaServer' : 'smaKerja', mode: ro ? 'read' : 'readwrite' }); } catch (e) { return; }
@@ -2527,7 +2665,7 @@ async function navAddRoot(ro, handle = null) {
   const root = { id, ro, ok: true, node: null };
   root.node = mkNode(h, null, root); root.node.open = true;
   NAV.roots.push(root);
-  if (!handle || handle._persist !== false) IDB.put({ id, h, ro });
+  if (!handle || handle._persist !== false) IDB.put(h.path ? { id, path: h.path, ro } : { id, h, ro });
   await loadKids(root.node);
   if (!ro && !S.dir) setSaveDir(root.node);
   msg(`Folder ${ro ? 'server (baca saja)' : 'kerja'}: ${h.name}`);
@@ -2536,6 +2674,7 @@ async function navAddRoot(ro, handle = null) {
 async function navRestore() {
   for (const v of await IDB.all()) {
     const root = { id: v.id, ro: v.ro, ok: false, node: null };
+    if (v.path) { if (!window.TAURI_FS) continue; v.h = TAURI_FS.dir(v.path); }
     root.node = mkNode(v.h, null, root);
     try { root.ok = (await v.h.queryPermission({ mode: v.ro ? 'read' : 'readwrite' })) === 'granted'; } catch (e) { root.ok = false; }
     NAV.roots.push(root);
@@ -2555,9 +2694,9 @@ async function loadKids(n) {
   kids.sort((a, b) => (a.kind === b.kind ? 0 : a.kind === 'directory' ? -1 : 1) || a.name.localeCompare(b.name, 'id', { numeric: true, sensitivity: 'base' }));
   n.kids = kids;
   // ukuran & tanggal file diisi belakangan (tidak menghambat tampilan)
-  (async () => { for (const k of kids) if (k.kind === 'file' && (NAV.filter === 'all' || EXT_OK.test(k.name))) { try { const f = await k.h.getFile(); k.size = f.size; k.mod = f.lastModified; } catch (e) {} } renderTree(); })();
+  (async () => { for (const k of kids) if (k.kind === 'file' && (NAV.filter === 'all' || EXT_OK.test(k.name))) { if (k.h.size !== undefined) { k.size = k.h.size; k.mod = k.h.mod; } else try { const f = await k.h.getFile(); k.size = f.size; k.mod = f.lastModified; } catch (e) {} } renderTree(); })();
 }
-function pathOf(n) { const p = []; for (let x = n; x; x = x.parent) p.unshift(x.name); return p.join('\\'); }
+function pathOf(n) { if (n.h && n.h.path) return n.h.path; const p = []; for (let x = n; x; x = x.parent) p.unshift(x.name); return p.join('\\'); }
 function fmtSize(b) { return b == null ? '' : b < 1024 ? b + ' B' : b < 1048576 ? (b / 1024).toFixed(0) + ' KB' : (b / 1048576).toFixed(1) + ' MB'; }
 function iconOf(n) {
   if (!n.parent) return '<span class="ti root">▣</span>';
@@ -2577,7 +2716,7 @@ function renderTree() {
     const lock = root && !root.ok;
     html.push(`<div class="tn${NAV.sel === n ? ' sel' : ''}${lock ? ' lock' : ''}" data-i="${rowsMap.length - 1}" draggable="${isDir ? 'false' : 'true'}" style="padding-left:${6 + d * 14}px" title="${esc(pathOf(n))}">
       <span class="tc">${isDir ? (n.open ? '▾' : '▸') : ''}</span>${iconOf(n)}<span class="tnm">${esc(n.name)}${lock ? ' — klik untuk izinkan akses' : ''}</span>
-      ${root && root.ro ? '<span class="ro">baca saja</span>' : ''}${S.dir && n.h === S.dir ? '<span class="ro" style="color:#2e9d5b;border-color:#2e9d5b">simpan</span>' : ''}<span class="tsz">${isDir ? '' : fmtSize(n.size)}</span></div>`);
+      ${root && root.ro ? '<span class="ro">baca saja</span>' : ''}${sameH(S.dir, n.h) ? '<span class="ro" style="color:#2e9d5b;border-color:#2e9d5b">simpan</span>' : ''}<span class="tsz">${isDir ? '' : fmtSize(n.size)}</span></div>`);
     if (isDir && n.open && n.kids) for (const k of n.kids) walk(k, d + 1);
   };
   for (const r of NAV.roots) walk(r.node, 0);
@@ -2590,7 +2729,7 @@ async function toggleDir(n) {
   renderTree();
 }
 async function navRefreshDir(h) {
-  const find = (n) => { if (n.h === h) return n; if (n.kids) for (const k of n.kids) { const r = find(k); if (r) return r; } return null; };
+  const find = (n) => { if (sameH(n.h, h)) return n; if (n.kids) for (const k of n.kids) { const r = find(k); if (r) return r; } return null; };
   for (const r of NAV.roots) { const n = find(r.node); if (n && n.kids) { await loadKids(n); renderTree(); } }
 }
 async function navRefresh() { for (const r of NAV.roots) if (r.ok) { const re = async (n) => { if (n.kids) { const open = new Set(n.kids.filter((k) => k.open).map((k) => k.name)); await loadKids(n); for (const k of n.kids) if (open.has(k.name)) { k.open = true; await re(k); } } }; await re(r.node); } renderTree(); }
@@ -2656,7 +2795,7 @@ tree.addEventListener('contextmenu', (e) => {
     '-',
     ['Salin path', () => copyText(pathOf(n))],
     ['Segarkan', () => (dir ? navRefreshDir(n.h) : navRefreshDir(n.parent.h))],
-    isRoot && ['Hapus dari Navigator', () => { NAV.roots = NAV.roots.filter((r) => r !== n.root); IDB.del(n.root.id); if (S.dir === n.h) { S.dir = null; for (const el of document.querySelectorAll('.dirName')) el.textContent = 'Downloads'; } renderTree(); }],
+    isRoot && ['Hapus dari Navigator', () => { NAV.roots = NAV.roots.filter((r) => r !== n.root); IDB.del(n.root.id); if (sameH(S.dir, n.h)) { S.dir = null; for (const el of document.querySelectorAll('.dirName')) el.textContent = 'Downloads'; } renderTree(); }],
   ].filter(Boolean);
   showCtx(e.clientX, e.clientY, items);
 });
@@ -2749,7 +2888,7 @@ $('#navFilter').onchange = (e) => { NAV.filter = e.target.value; for (const r of
 })();
 try { if (localStorage.getItem('smaBg') === 'l') $('#view').classList.add('light'); } catch (e) {}
 msg('SMA Survey siap. File › Set work directory untuk membuka folder kerja (mis. D:\\yopi).');
-if (!window.showDirectoryPicker) msg('Browser ini belum mendukung Navigator folder. Pakai Chrome atau Edge; untuk sementara pakai Open file.', 'w');
+if (!window.showDirectoryPicker && !window.TAURI_FS) msg('Browser ini belum mendukung Navigator folder. Pakai Chrome atau Edge; untuk sementara pakai Open file.', 'w');
 navRestore();
 
 window.SMA = { S, run, addStr, attachDtm, navAddRoot, NAV, openNodes, msg, loadFiles, zoomAll, setPlan, setTool, nearest, zAt, camera, draw };   // untuk uji otomatis

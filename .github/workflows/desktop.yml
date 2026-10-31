@@ -1,0 +1,67 @@
+# SMA Survey Desktop: uji mesin Rust lalu buat installer Windows (.msi dan setup .exe).
+# Hasil installer: tab Actions → run terakhir → Artifacts → "SMA-Survey-installer".
+# Rilis: buat tag v0.4.0 dst → installer juga dilampirkan di halaman Releases (draft).
+name: desktop
+
+on:
+  push:
+    branches: [desktop-tauri, main]
+    tags: ['v*']
+    paths: ['desktop/**', 'viewer/**', '.github/workflows/desktop.yml']
+  pull_request:
+    paths: ['desktop/**', 'viewer/**']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  core:
+    name: Uji mesin sma-core
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: cargo test
+        run: cargo test --release --manifest-path desktop/core/Cargo.toml
+
+  windows:
+    name: Installer Windows
+    needs: core
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: desktop/app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/app/src-tauri -> target
+      - name: Pasang Tauri CLI
+        run: npm install
+      - name: Build installer
+        run: npx tauri build
+      - name: Uji backend (pelindung folder server, paket data, SQLite)
+        run: cargo test --release --manifest-path src-tauri/Cargo.toml --lib
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SMA-Survey-installer
+          path: |
+            desktop/app/src-tauri/target/release/bundle/msi/*.msi
+            desktop/app/src-tauri/target/release/bundle/nsis/*.exe
+          if-no-files-found: error
+      - name: Lampirkan ke Release (tag v*)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: |
+            desktop/app/src-tauri/target/release/bundle/msi/*.msi
+            desktop/app/src-tauri/target/release/bundle/nsis/*.exe
