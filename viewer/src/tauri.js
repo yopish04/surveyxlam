@@ -101,17 +101,21 @@ if (TA) {
     history: (pit) => inv('vol_history', { pit, limit: 60 }).catch(() => []),
   };
 
-  /* ---- file yang dibuka dari Windows Explorer (klik dua kali .str/.dtm) ---- */
-  inv('startup_files').then(async (paths) => {
+  /* ---- file yang dibuka dari Windows Explorer (klik dua kali .str/.dtm) ----
+     saat aplikasi baru dibuka (startup_files), atau saat aplikasi sudah terbuka (event open-files dari instance kedua) */
+  const openPaths = async (paths) => {
     if (!paths || !paths.length) return;
     const files = [];
     for (const p of paths) {
       const fh = await TAURI_FS.dir(p.replace(/[\\/][^\\/]*$/, '')).getFileHandle(pname(p)).catch(() => null);
       if (fh) files.push({ kind: 'file', name: fh.name, h: fh, parent: { h: TAURI_FS.dir(p.replace(/[\\/][^\\/]*$/, '')), kids: null }, root: { ro: true } });
+      else msg(`Tidak bisa membuka ${p}`, 'e');
     }
     for (const f of files) { const kids = []; for await (const h of f.parent.h.values()) kids.push({ kind: h.kind, name: h.name, h }); f.parent.kids = kids; }
     openNodes(files);
-  }).catch(() => {});
+  };
+  inv('startup_files').then(openPaths).catch(() => {});
+  if (TA.event) TA.event.listen('open-files', (e) => openPaths(e.payload)).catch(() => {});
   document.title = 'SMA Survey Desktop';
   $('#menubar .brand').textContent = 'SMA Survey Desktop';
 }

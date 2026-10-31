@@ -10,7 +10,7 @@
   "app": {
     "withGlobalTauri": true,
     "windows": [
-      { "label": "main", "title": "SMA Survey", "width": 1400, "height": 900, "minWidth": 900, "minHeight": 600, "maximized": true }
+      { "label": "main", "title": "SMA Survey", "width": 1400, "height": 900, "minWidth": 900, "minHeight": 600, "maximized": true, "dragDropEnabled": false }
     ],
     "security": { "csp": null }
   },

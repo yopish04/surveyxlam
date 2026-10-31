@@ -486,9 +486,7 @@ function saveStr(name, rows) {   // rows: [{s,x,y,z,d}] ; s = null -> pemisah se
     '0,           0.000,           0.000,           0.000,           0.000,           0.000,           0.000'];
   for (const r of rows) L.push(r ? `${r.s}, ${r.y.toFixed(3)}, ${r.x.toFixed(3)}, ${(isNaN(r.z) ? 0 : r.z).toFixed(3)}, ${r.d || ''}` : '0, 0.000, 0.000, 0.000,');
   L.push('0, 0.000, 0.000, 0.000, END');
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([L.join('\r\n') + '\r\n'], { type: 'text/plain' }));
-  a.download = name + '.str'; document.body.appendChild(a); a.click(); a.remove();
+  saveFile(name + '.str', new TextEncoder().encode(L.join('\r\n') + '\r\n'));   // ke folder simpan (Downloads kalau belum dipilih)
 }
 $('#identCopy').onclick = (e) => { copyText(['No\tString\tSegmen\tTitik\tY\tX\tZ\tDesc\tLayer', ...S.picks.map((p, k) => [k + 1, p.s, p.seg, p.pt, num(p.y), num(p.x), num(p.z), p.d, p.layer].join('\t'))].join('\r\n')); flash(e.target, 'Tersalin ✓'); };
 $('#identStr').onclick = () => { if (S.picks.length) saveStr('titik_identify', S.picks.flatMap((p) => [{ s: p.s, x: p.x, y: p.y, z: p.z, d: p.d }, null])); };

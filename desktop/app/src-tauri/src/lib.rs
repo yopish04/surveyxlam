@@ -8,7 +8,7 @@ use serde_json::{json, Value};
 use std::path::Path;
 use std::sync::Mutex;
 use tauri::ipc::{InvokeBody, Request, Response};
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 
 mod db;
 mod pack;
@@ -196,10 +196,19 @@ fn vol_last(db: tauri::State<'_, Db>, pit: String, before: String) -> Result<Opt
 #[tauri::command]
 fn vol_history(db: tauri::State<'_, Db>, pit: String, limit: i64) -> Result<Vec<db::VolRec>, String> { db::history(&db.0.lock().unwrap(), &pit, limit).map_err(|e| e.to_string()) }
 
+/// argumen baris perintah yang berupa file (tanpa nama program dan tanpa opsi -x)
+fn file_args(it: impl Iterator<Item = String>) -> Vec<String> { it.skip(1).filter(|a| !a.starts_with('-')).collect() }
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let args: Vec<String> = std::env::args().skip(1).filter(|a| !a.starts_with('-')).collect();
+    let args: Vec<String> = file_args(std::env::args());
     tauri::Builder::default()
+        // satu aplikasi saja: klik dua kali .str/.dtm saat SMA Survey sudah terbuka -> file dibuka di jendela yang ada
+        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            if let Some(w) = app.get_webview_window("main") { let _ = w.unminimize(); let _ = w.set_focus(); }
+            let files = file_args(argv.into_iter());
+            if !files.is_empty() { let _ = app.emit("open-files", files); }
+        }))
         .plugin(tauri_plugin_dialog::init())
         .manage(Startup(args))
         .setup(|app| {

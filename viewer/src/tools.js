@@ -219,7 +219,7 @@ async function doVolume() {
     renderVolume();
     msg(`VOLUME ${volLast.A} → ${volLast.B} (${Bd.name} str ${no}): nett ${fv(volTotals(res).nett)} m³, ${(ms / 1000).toFixed(1)} s`, 'ok');
     if (window.SMA_DB) {          // aplikasi desktop: simpan ke riwayat volume (SQLite)
-      const T = volTotals(res), pi = pitInfo(Bd.name);
+      const T = volTotals(res), pi = pitInfo(Bd.name, volLast.B);
       SMA_DB.save({ tanggal: pi.tgl, pit: pi.pit, first_dtm: volLast.A, second_dtm: volLast.B, bdy: Bd.name, string_no: no, cut: T.cut, fill: T.fill, nett: T.nett, cut_area: T.cutArea, fill_area: T.fillArea, segments: JSON.stringify(res) });
     }
   } catch (e) { $('#volOut').textContent = 'Gagal: ' + e.message.split('\n')[0]; }
@@ -227,14 +227,16 @@ async function doVolume() {
 }
 const fv = (v) => v.toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 /* nama pit & tanggal dari nama boundary: 2026_10_27_update_topo_x_bdy.str -> pit update_topo_x, 2026-10-27 */
-function pitInfo(name) {
-  const b = name.replace(/\.[^.]*$/, ''), m = b.match(/^(\d{4})_(\d{2})_(\d{2})_?(.*)$/);
+function pitInfo(name, dtmName = '') {
+  const re = /^(\d{4})_(\d{2})_(\d{2})_?(.*)$/, b = name.replace(/\.[^.]*$/, ''), m = b.match(re);
   const pit = (m ? m[4] : b).replace(/_bdy$/i, '');
-  return { pit, tgl: m ? `${m[1]}-${m[2]}-${m[3]}` : new Date().toISOString().slice(0, 10) };
+  // tanggal: dari nama boundary, kalau tidak ada dari nama DTM kedua, terakhir tanggal lokal hari ini (bukan UTC)
+  const k = m || dtmName.replace(/\.[^.]*$/, '').match(re), now = new Date(), p2 = (v) => String(v).padStart(2, '0');
+  return { pit, tgl: k ? `${k[1]}-${k[2]}-${k[3]}` : `${now.getFullYear()}-${p2(now.getMonth() + 1)}-${p2(now.getDate())}` };
 }
 function autoKemarin() {
   const Bd = byId($('#volBdy').value); if (!window.SMA_DB || !Bd || $('#volKemarin').dataset.manual) return;
-  const pi = pitInfo(Bd.name);
+  const B = byId($('#volB').value), pi = pitInfo(Bd.name, B ? B.name.replace(' (dibuat)', '') : '');
   SMA_DB.last(pi.pit, pi.tgl).then((r) => { if (r) { $('#volKemarin').value = r.nett.toFixed(3); $('#volKemarin').title = `dari riwayat ${r.tanggal} (${r.second_dtm})`; renderVolume(); } });
 }
 function volTotals(res) { const T = { cut: 0, cutArea: 0, fill: 0, fillArea: 0, nett: 0, common: 0 }; for (const v of res) for (const k in T) T[k] += v[k]; return T; }
@@ -275,9 +277,29 @@ function volReport() {
   <tbody>${rows}<tr class="t"><td>Total</td><td>${fv(T.cut)}</td><td>${fv(T.cutArea)}</td><td>${fv(T.fill)}</td><td>${fv(T.fillArea)}</td><td>${fv(T.nett)}</td><td>${fv(T.nett)}</td><td>${fv(T.common)}</td></tr></tbody></table>
   ${isNaN(kem) ? '' : `<p><b>Volume hari ini</b> = ${fv(T.nett)} − (${fv(kem)}) = <b>${fv(T.nett - kem)}</b> m³</p>`}
   <div class="n">Dihitung dengan SMA Viewer (metode irisan TIN eksak, density 1.000).</div></body></html>`;
-  const w = window.open('', '_blank');
-  if (!w) { saveFile(V.B.replace(/\.dtm$/i, '') + '_vol.html', latin1(unescape(encodeURIComponent(html)))); return; }
-  w.document.write(html); w.document.close();
+  // aplikasi desktop (Tauri) menolak window.open: tampilkan report di jendela dalam aplikasi
+  const w = window.TAURI_FS ? null : window.open('', '_blank');
+  if (w) { w.document.write(html); w.document.close(); return; }
+  showReport(html, V.B.replace(/\.dtm$/i, '') + '_vol.html');
+}
+function showReport(html, name) {
+  let dl = $('#repDlg');
+  if (!dl) {
+    dl = document.createElement('dialog'); dl.id = 'repDlg';
+    dl.innerHTML = `<div class="acts" style="justify-content:flex-end;margin:0 0 8px"><button class="primary" data-r="print">Cetak / Simpan PDF</button><button data-r="save">Simpan HTML</button><button data-r="close">Tutup</button></div>
+      <iframe style="width:100%;height:calc(100% - 44px);border:1px solid var(--line);background:#fff"></iframe>`;
+    dl.style.cssText = 'width:min(1000px,94vw);height:88vh;max-width:none;padding:12px';
+    document.body.appendChild(dl);
+    dl.addEventListener('click', (e) => {
+      const r = e.target.dataset && e.target.dataset.r; if (!r) return;
+      if (r === 'print') dl.querySelector('iframe').contentWindow.print();
+      else if (r === 'save') saveFile(dl.dataset.name, latin1(unescape(encodeURIComponent(dl.dataset.html))));
+      else dl.close();
+    });
+  }
+  dl.dataset.name = name; dl.dataset.html = html;
+  dl.querySelector('iframe').srcdoc = html;
+  dl.showModal();
 }
 
 /* ---------- update progress ---------- */
@@ -370,6 +392,7 @@ $('#sodBtn').onclick = doSod;
 $('#volBtn').onclick = doVolume;
 $('#volKemarin').oninput = (e) => { e.target.dataset.manual = e.target.value ? '1' : ''; renderVolume(); };
 $('#volBdy').addEventListener('change', autoKemarin);
+$('#volB').addEventListener('change', autoKemarin);
 $('#upJenis').onchange = upJenis; upJenis();
 $('#upBtn').onclick = doUpdate;
 $('#secBtn').onclick = doSection;
