@@ -262,7 +262,16 @@ function volTsv(sep) {
   return L.join('\r\n');
 }
 function volReport() {
-  const V = volLast, T = volTotals(V.res), kem = parseFloat(String($('#volKemarin').value).replace(/,/g, ''));
+  const V = volLast, kem = parseFloat(String($('#volKemarin').value).replace(/,/g, ''));
+  const html = volReportHtml(V, kem);
+  // aplikasi desktop (Tauri) menolak window.open: tampilkan report di jendela dalam aplikasi
+  const w = window.TAURI_FS ? null : window.open('', '_blank');
+  if (w) { w.document.write(html); w.document.close(); return; }
+  showReport(html, V.B.replace(/\.dtm$/i, '') + '_vol.html');
+}
+/* report DTM CUT AND FILL (format Surpac) — dipakai tool Volume dan Proses Harian */
+function volReportHtml(V, kem) {
+  const T = volTotals(V.res);
   const d = V.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   const rows = V.res.map((v, i) => `<tr><td>${i + 1}</td><td>${fv(v.cut)}</td><td>${fv(v.cutArea)}</td><td>${fv(v.fill)}</td><td>${fv(v.fillArea)}</td><td>${fv(v.nett)}</td><td>${fv(v.nett)}</td><td>${fv(v.common)}</td></tr>`).join('');
   const html = `<!doctype html><html><head><meta charset="utf-8"><title>${esc(V.B)} - volume</title>
@@ -277,10 +286,7 @@ function volReport() {
   <tbody>${rows}<tr class="t"><td>Total</td><td>${fv(T.cut)}</td><td>${fv(T.cutArea)}</td><td>${fv(T.fill)}</td><td>${fv(T.fillArea)}</td><td>${fv(T.nett)}</td><td>${fv(T.nett)}</td><td>${fv(T.common)}</td></tr></tbody></table>
   ${isNaN(kem) ? '' : `<p><b>Volume hari ini</b> = ${fv(T.nett)} − (${fv(kem)}) = <b>${fv(T.nett - kem)}</b> m³</p>`}
   <div class="n">Dihitung dengan SMA Viewer (metode irisan TIN eksak, density 1.000).</div></body></html>`;
-  // aplikasi desktop (Tauri) menolak window.open: tampilkan report di jendela dalam aplikasi
-  const w = window.TAURI_FS ? null : window.open('', '_blank');
-  if (w) { w.document.write(html); w.document.close(); return; }
-  showReport(html, V.B.replace(/\.dtm$/i, '') + '_vol.html');
+  return html;
 }
 function showReport(html, name) {
   let dl = $('#repDlg');
@@ -416,7 +422,7 @@ function rawSet(files, src) {
   RJ.files = files; RJ.src = src;
   RJ.rows = RAW.prepare(files);
   $('#rawRes').innerHTML = '';
-  renderRaw(); showTab('tRaw');
+  renderRaw(); showTab('tRaw'); harRefresh();
   if (!files.length) msg(`Tidak ada file .txt di ${src}`, 'w');
   else msg(`TXT ke STR: ${files.length} file .txt dari ${src}. Periksa kolom Area dan Profil, lalu Proses.`);
 }
@@ -433,6 +439,7 @@ $('#rawTbl').addEventListener('change', (e) => {
   const r = RJ.rows[+tr.dataset.i];
   r[f] = f === 'use' ? e.target.checked : e.target.value.trim();
   tr.classList.toggle('off', !r.use);
+  harRefresh();
 });
 $('#rawDir').onclick = async () => {
   let h = null;

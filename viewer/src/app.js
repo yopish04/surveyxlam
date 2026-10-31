@@ -963,6 +963,7 @@ view.addEventListener('dragleave', () => $('#drop').classList.remove('on'));
 view.addEventListener('drop', (e) => { e.preventDefault(); $('#drop').classList.remove('on'); loadFiles(e.dataTransfer.files); });
 
 /*TOOLS*/
+/*HARIAN*/
 /*TAURI*/
 /*NAV*/
 window.SMA = { S, cursorAt, ray, setSnap, setPlaneZ, setTarget, run, addStr, attachDtm, navAddRoot, NAV, openNodes, msg, loadFiles, zoomAll, setPlan, setTool, endTool, nearest, hit, zAt, camera, draw, ground };   // untuk uji otomatis
