@@ -194,6 +194,8 @@ fn vol_save(db: tauri::State<'_, Db>, rec: db::VolRec) -> Result<i64, String> { 
 #[tauri::command]
 fn vol_last(db: tauri::State<'_, Db>, pit: String, before: String) -> Result<Option<db::VolRec>, String> { db::last(&db.0.lock().unwrap(), &pit, &before).map_err(|e| e.to_string()) }
 #[tauri::command]
+fn vol_delete(db: tauri::State<'_, Db>, id: i64) -> Result<usize, String> { db::delete(&db.0.lock().unwrap(), id).map_err(|e| e.to_string()) }
+#[tauri::command]
 fn vol_history(db: tauri::State<'_, Db>, pit: String, limit: i64) -> Result<Vec<db::VolRec>, String> { db::history(&db.0.lock().unwrap(), &pit, limit).map_err(|e| e.to_string()) }
 
 /// mode portable: ada file portable.txt di samping exe -> folder data\ di samping exe (kalau bisa ditulisi)
@@ -234,7 +236,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             list_dir, stat_path, read_file, write_file, make_dir, rename_path, remove_path, drives, startup_files,
-            engine_dtm, engine_vol, engine_update, vol_save, vol_last, vol_history
+            engine_dtm, engine_vol, engine_update, vol_save, vol_last, vol_history, vol_delete
         ])
         .run(tauri::generate_context!())
         .expect("SMA Survey gagal dijalankan");

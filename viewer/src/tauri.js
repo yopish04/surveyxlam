@@ -98,7 +98,9 @@ if (TA) {
   window.SMA_DB = {
     save: (rec) => inv('vol_save', { rec }).catch((e) => msg('Gagal menyimpan riwayat volume: ' + e, 'e')),
     last: (pit, before) => inv('vol_last', { pit, before }).catch(() => null),
-    history: (pit) => inv('vol_history', { pit, limit: 60 }).catch(() => []),
+    history: (pit, limit = 60) => inv('vol_history', { pit: pit || '', limit }).catch(() => []),
+    del: (id) => inv('vol_delete', { id }),
+    where: 'SQLite (folder data aplikasi)',
   };
 
   /* ---- file yang dibuka dari Windows Explorer (klik dua kali .str/.dtm) ----

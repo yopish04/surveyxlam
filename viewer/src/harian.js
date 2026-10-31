@@ -145,6 +145,8 @@ async function doHarian() {
       out.push(Object.assign(rec, { T, kem, html, repName, V }));
       HAR.cfg.base[row.area.toLowerCase()] = row.base.rel;
     }
+    const items = out.filter((o) => o.T).map((o) => ({ area: o.area, first_dtm: o.V.A, second_dtm: o.V.B, bdy: o.V.bdy, cut: o.T.cut, fill: o.T.fill, nett: o.T.nett, nett_kemarin: o.kem }));
+    if (items.length) { const xn = await reportExcel(iso, items); if (xn) log.push(`Report Excel: ${xn} → ${S.dirPath || S.dir.name}`); }
     await harSaveCfg(); navRefresh(); renderLayers(); zoomAll();
     const ms = performance.now() - t0;
     HAR.last = out;

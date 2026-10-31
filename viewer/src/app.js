@@ -966,6 +966,7 @@ view.addEventListener('drop', (e) => { e.preventDefault(); $('#drop').classList.
 /*TOOLS*/
 /*HARIAN*/
 /*TAURI*/
+/*RIWAYAT*/
 /*NAV*/
 window.SMA = { S, cursorAt, ray, setSnap, setPlaneZ, setTarget, run, addStr, attachDtm, navAddRoot, NAV, openNodes, msg, loadFiles, zoomAll, setPlan, setTool, endTool, nearest, hit, zAt, camera, draw, ground };   // untuk uji otomatis
 })();

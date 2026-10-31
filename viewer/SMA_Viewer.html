@@ -170,6 +170,8 @@ table.rawtbl tr.off td{opacity:.45}
 #sPlane{cursor:pointer;text-decoration:underline dotted}
 #harRes pre{max-height:22vh;overflow:auto;font-size:11px;white-space:pre-wrap;margin:6px 0;padding:6px;border:1px solid var(--line);border-radius:5px;background:var(--panel)}
 .dtmopt .dsave{margin-left:auto;cursor:pointer;color:#2f81f7;font-size:11px}
+#riwTbl a[data-del]{cursor:pointer;color:#c0392b}
+#riwTbl td:nth-child(n+3):nth-child(-n+7){text-align:right}
 </style>
 </head>
 <body>
@@ -196,7 +198,7 @@ table.rawtbl tr.off td{opacity:.45}
     <a data-cmd="dtm">Create DTM from layer</a><a data-cmd="sod">String over DTM (SOD)</a><a data-cmd="sec">Section DTM</a>
   </div></div>
   <div class="menu"><button>Volumes</button><div class="drop">
-    <a data-cmd="vol">DTM cut and fill volumes</a>
+    <a data-cmd="vol">DTM cut and fill volumes</a><a data-cmd="riw">Riwayat volume</a>
   </div></div>
   <div class="menu"><button>Survey</button><div class="drop">
     <a data-cmd="raw">TXT ke STR (data mentah alat)…</a><hr><a data-cmd="upHarian">Update harian (progress + boundary)</a><a data-cmd="upPotong">String clip (potong progress)</a><a data-cmd="upBdy">Boundary: union / outersect / intersect</a>
@@ -376,6 +378,15 @@ table.rawtbl tr.off td{opacity:.45}
       <div class="muted">Profil: <b>harian</b> (pit, rehandling, quarry: 2→5, 3→6, 500→600), <b>base</b> (base, dumping, waste: 2→2, 3→3, 500→500), <b>tetap</b> (hampar/topo/kuari: nomor string = kode), <b>exca</b> (posisi unit). Aturan dan hasil sama dengan add-in Excel "TXT ke STR".</div>
     </div>
 </div>
+<div id="tRiw" class="win" hidden style="width:780px">
+  <div class="wt"><span>VOLUMES — Riwayat volume</span><button class="wx" title="Tutup">✕</button></div>
+  <div class="wb">
+    <div class="card"><div class="acts" style="margin-top:0;align-items:center"><label class="fld">Pit <select id="riwPit"></select></label><span id="riwWhere" class="muted"></span></div></div>
+    <div class="scroll" style="max-height:48vh"><table id="riwTbl" class="mini"><thead><tr><th>Tanggal</th><th>Pit</th><th>Nett</th><th>Nett sebelumnya</th><th>Hari ini</th><th>Cut</th><th>Fill</th><th>Second DTM</th><th></th></tr></thead><tbody></tbody></table></div>
+    <div class="acts"><button id="riwCopy">Salin ke Excel</button><button id="riwCsv">Simpan CSV</button><span style="flex:1"></span><label class="fld">Tanggal <select id="riwTgl"></select></label><button id="riwXls" class="primary">Report Excel</button></div>
+    <div class="muted">Hari ini = nett − nett catatan sebelumnya untuk pit yang sama. Report Excel memakai <i>template_report_harian.xlsx</i> di folder kerja (dibuat otomatis kalau belum ada; penanda {{tanggal}}, {{1.area}}, {{1.nett}}, {{1.hari_ini}}, {{total.hari_ini}}, {{pit.nett}} …).</div>
+  </div>
+</div>
 <dialog id="help">
   <h3>SMA Survey — cara pakai</h3>
   <ul>
@@ -392,6 +403,7 @@ table.rawtbl tr.off td{opacity:.45}
     <li><b>Volume</b>: DTM cut/fill per segmen boundary, sama dengan report Surpac. Isi nett kemarin untuk volume hari ini.</li>
     <li><b>TXT ke STR</b>: <i>Survey › TXT ke STR</i>, pilih folder data mentah (atau klik dua kali file .txt di Navigator). Periksa tebakan area dan profil di tabel, lalu Proses: crest/toe, spot, boundary, jalan, exca, dan file _CEK.str dibuat otomatis.</li>
     <li><b>Proses Harian</b> (di jendela TXT ke STR): satu klik untuk TXT → STR → update global + boundary → CREATE DTM → volume (base → global baru di dalam boundary baru, dan kemarin: base → global lama di dalam boundary lama) → report + riwayat. Global lama dicari otomatis (<i>YYYY_MM_DD_update_topo_&lt;area&gt;.str</i> terbaru sebelum tanggal proses) di folder kerja; base dipilih sekali per area dan diingat di <i>sma_harian.json</i>.</li>
+    <li><b>Riwayat volume</b> (<i>Volumes › Riwayat volume</i>): semua volume yang pernah dihitung (desktop: SQLite, browser: IndexedDB), volume hari ini per pit, salin ke Excel / CSV, hapus. <b>Report Excel</b> mengisi <i>template_report_harian.xlsx</i> di folder kerja (dibuat otomatis; ganti tata letaknya bebas, penanda {{tanggal}}, {{1.area}}, {{1.nett}}, {{1.nett_kemarin}}, {{1.hari_ini}}, {{total.hari_ini}}, {{pit_tofu3.nett}} … diisi). Proses Harian membuat report Excel ini otomatis.</li>
     <li><b>Update</b>: update harian (potong global + tambah harian + boundary), potong progress, atau boundary tambah/kurangi. Hasil langsung jadi layer; simpan ke folder pilihan.</li>
     <li><b>Kursor 3D & snap (seperti Surpac)</b>: posisi kursor ditentukan mode snap — <b>1 Bidang</b> (perpotongan dengan bidang aktif, default horizontal Z 0; ganti di status bar atau klik kanan › Bidang aktif), <b>2 Titik</b> (titik string terdekat), <b>3 Garis</b> (posisi di garis string terdekat), <b>4 Segitiga DTM</b> (permukaan DTM di bawah kursor). Ganti snap dengan tombol 1–4 atau klik kanan saat fungsi aktif. Di 3D kursor digambar sebagai silang sumbu X/Y/Z. <i>View › Select camera target</i> (atau klik kanan › Pusat putar di sini) memilih titik pusat putar.</li>
     <li>Tombol: F zoom semua, P plan, 3 tampak 3D, I point properties, M bearing and distance, Esc selesai / batal pilih.</li>
@@ -2358,6 +2370,152 @@ return { readRaw, rawFormat, classify, convert, runJob, prepare, jobFromRows, re
 })();
 if (typeof module !== 'undefined') module.exports = RAW;
 </script>
+<script id="xlsxSrc">/* SMA Viewer - isi template Excel (.xlsx) tanpa pustaka luar.
+   Template = file .xlsx biasa; sel berisi penanda {{kunci}} diganti nilainya. Sel yang isinya tepat satu penanda
+   dan nilainya angka menjadi sel angka (format sel tetap), selain itu teks. Gaya, rumus, sheet lain tidak diubah;
+   Excel diminta menghitung ulang rumus saat dibuka (fullCalcOnLoad). ZIP dibaca/ditulis dengan (De)CompressionStream. */
+'use strict';
+const XL = (() => {
+const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+const crc32 = (u) => { let c = 0xffffffff; for (let i = 0; i < u.length; i++) c = CRC[(c ^ u[i]) & 255] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };
+async function pipe(u, s) { const r = new Response(new Blob([u]).stream().pipeThrough(s)); return new Uint8Array(await r.arrayBuffer()); }
+const inflate = (u) => pipe(u, new DecompressionStream('deflate-raw'));
+const deflate = (u) => pipe(u, new CompressionStream('deflate-raw'));
+const te = new TextEncoder(), td = new TextDecoder();
+
+/* ZIP: -> Map nama -> isi (sudah dibuka) */
+async function unzip(buf) {
+  const u = buf instanceof Uint8Array ? buf : new Uint8Array(buf), dv = new DataView(u.buffer, u.byteOffset, u.byteLength);
+  let e = u.length - 22; while (e >= 0 && dv.getUint32(e, true) !== 0x06054b50) e--;
+  if (e < 0) throw new Error('bukan file .xlsx (zip)');
+  const n = dv.getUint16(e + 10, true); let p = dv.getUint32(e + 16, true);
+  const out = new Map();
+  for (let i = 0; i < n; i++) {
+    const meth = dv.getUint16(p + 10, true), csize = dv.getUint32(p + 20, true), nl = dv.getUint16(p + 28, true), xl = dv.getUint16(p + 30, true), cl = dv.getUint16(p + 32, true), off = dv.getUint32(p + 42, true);
+    const name = td.decode(u.subarray(p + 46, p + 46 + nl));
+    const lo = off + 30 + dv.getUint16(off + 26, true) + dv.getUint16(off + 28, true), raw = u.subarray(lo, lo + csize);
+    out.set(name, meth === 0 ? raw.slice() : meth === 8 ? await inflate(raw) : (() => { throw new Error('kompresi zip tidak didukung: ' + meth); })());
+    p += 46 + nl + xl + cl;
+  }
+  return out;
+}
+async function zip(files) {          // files: Map nama -> Uint8Array
+  const parts = [], cen = []; let off = 0;
+  for (const [name, data] of files) {
+    const nm = te.encode(name), comp = await deflate(data), crc = crc32(data);
+    const h = new DataView(new ArrayBuffer(30));
+    h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(8, 8, true); h.setUint32(14, crc, true);
+    h.setUint32(18, comp.length, true); h.setUint32(22, data.length, true); h.setUint16(26, nm.length, true);
+    parts.push(new Uint8Array(h.buffer), nm, comp);
+    const c = new DataView(new ArrayBuffer(46));
+    c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint16(10, 8, true); c.setUint32(16, crc, true);
+    c.setUint32(20, comp.length, true); c.setUint32(24, data.length, true); c.setUint16(28, nm.length, true); c.setUint32(42, off, true);
+    cen.push(new Uint8Array(c.buffer), nm);
+    off += 30 + nm.length + comp.length;
+  }
+  const csz = cen.reduce((s, x) => s + x.length, 0), end = new DataView(new ArrayBuffer(22));
+  end.setUint32(0, 0x06054b50, true); end.setUint16(8, files.size, true); end.setUint16(10, files.size, true); end.setUint32(12, csz, true); end.setUint32(16, off, true);
+  const all = parts.concat(cen, [new Uint8Array(end.buffer)]), r = new Uint8Array(all.reduce((s, x) => s + x.length, 0));
+  let k = 0; for (const x of all) { r.set(x, k); k += x.length; }
+  return r;
+}
+
+const unesc = (s) => s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&#(\d+);/g, (_, d) => String.fromCharCode(+d)).replace(/&amp;/g, '&');
+const escx = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const textOf = (xml) => { let s = ''; for (const m of xml.matchAll(/<t(?:\s[^>]*)?>([\s\S]*?)<\/t>/g)) s += unesc(m[1]); return s; };
+const PH = /\{\{\s*([^{}]+?)\s*\}\}/g;
+
+/* isi template: values = { kunci: angka | teks } ; -> { data: Uint8Array, filled, missing:[kunci tanpa nilai] } */
+async function fill(template, values) {
+  const files = await unzip(template);
+  const sst = files.has('xl/sharedStrings.xml') ? [...td.decode(files.get('xl/sharedStrings.xml')).matchAll(/<si>([\s\S]*?)<\/si>/g)].map((m) => textOf(m[1])) : [];
+  let filled = 0; const missing = new Set();
+  const val = (k) => { if (Object.prototype.hasOwnProperty.call(values, k)) return values[k]; missing.add(k); return ''; };
+  for (const name of [...files.keys()].filter((n) => /^xl\/worksheets\/sheet\d+\.xml$/.test(n))) {
+    const xml = td.decode(files.get(name));
+    const out = xml.replace(/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g, (all, attrs, body) => {
+      const t = (/\st="([^"]*)"/.exec(attrs) || [])[1];
+      let text = null;
+      if (t === 's') { const v = /<v>(\d+)<\/v>/.exec(body || ''); if (v) text = sst[+v[1]]; }
+      else if (t === 'inlineStr') text = textOf(body || '');
+      else if (t === 'str') { const v = /<v>([\s\S]*?)<\/v>/.exec(body || ''); if (v && !/<f[\s>]/.test(body)) text = unesc(v[1]); }
+      if (text == null || !text.includes('{{')) return all;
+      filled++;
+      const a = attrs.replace(/\st="[^"]*"/, '');
+      const one = /^\s*\{\{\s*([^{}]+?)\s*\}\}\s*$/.exec(text);
+      if (one) { const v = val(one[1]); if (typeof v === 'number' && isFinite(v)) return `<c${a}><v>${v}</v></c>`; }
+      const s = text.replace(PH, (_, k) => { const v = val(k); return typeof v === 'number' ? (Number.isInteger(v) ? String(v) : v.toFixed(3)) : String(v ?? ''); });
+      return s === '' ? `<c${a}/>` : `<c${a} t="inlineStr"><is><t xml:space="preserve">${escx(s)}</t></is></c>`;
+    });
+    files.set(name, te.encode(out));
+  }
+  // hitung ulang rumus saat dibuka; calcChain lama bisa tidak cocok lagi
+  if (files.has('xl/workbook.xml')) {
+    let w = td.decode(files.get('xl/workbook.xml'));
+    w = /<calcPr\b/.test(w) ? w.replace(/<calcPr\b([^>]*?)(\/?)>/, (m, a, sl) => `<calcPr${a.replace(/\sfullCalcOnLoad="[^"]*"/, '')} fullCalcOnLoad="1"${sl}>`) : w.replace('</workbook>', '<calcPr fullCalcOnLoad="1"/></workbook>');
+    files.set('xl/workbook.xml', te.encode(w));
+  }
+  if (files.has('xl/calcChain.xml')) {
+    files.delete('xl/calcChain.xml');
+    for (const k of ['[Content_Types].xml', 'xl/_rels/workbook.xml.rels']) if (files.has(k)) files.set(k, te.encode(td.decode(files.get(k)).replace(/<(Override|Relationship)\b[^>]*calcChain[^>]*\/>/g, '')));
+  }
+  return { data: await zip(files), filled, missing: [...missing] };
+}
+
+/* template bawaan: laporan volume harian, 10 baris area + total. Bisa diedit di Excel (tata letak, logo, rumus). */
+const AREA_KEYS = [['no', 'No'], ['area', 'Area'], ['first_dtm', 'First DTM (base)'], ['second_dtm', 'Second DTM'], ['bdy', 'Boundary'],
+  ['cut', 'Cut (m³)'], ['fill', 'Fill (m³)'], ['nett', 'Nett (m³)'], ['nett_kemarin', 'Nett kemarin (m³)'], ['hari_ini', 'Volume hari ini (m³)']];
+async function defaultTemplate(rows = 10) {
+  const col = (i) => String.fromCharCode(65 + i);
+  const cell = (r, c, v, s = 0) => `<c r="${col(c)}${r}"${s ? ` s="${s}"` : ''} t="inlineStr"><is><t>${escx(v)}</t></is></c>`;
+  const R = [];
+  R.push(`<row r="1">${cell(1, 0, 'LAPORAN VOLUME HARIAN — SMA Survey', 1)}</row>`);
+  R.push(`<row r="2">${cell(2, 0, 'Tanggal', 1)}${cell(2, 1, '{{tanggal}}')}${cell(2, 3, 'Tanggal Surpac', 1)}${cell(2, 4, '{{tanggal_surpac}}')}</row>`);
+  R.push(`<row r="4">${AREA_KEYS.map(([, h], i) => cell(4, i, h, 2)).join('')}</row>`);
+  for (let k = 1; k <= rows; k++) R.push(`<row r="${4 + k}">${AREA_KEYS.map(([key], i) => cell(4 + k, i, `{{${k}.${key}}}`, i >= 5 ? 3 : 0)).join('')}</row>`);
+  const t = 5 + rows;
+  R.push(`<row r="${t}">${cell(t, 1, 'Total', 2)}${['cut', 'fill', 'nett', 'nett_kemarin', 'hari_ini'].map((k, i) => cell(t, 5 + i, `{{total.${k}}}`, 4)).join('')}</row>`);
+  R.push(`<row r="${t + 2}">${cell(t + 2, 0, 'Volume dihitung SMA Survey (irisan TIN eksak, sama dengan DTM CUT AND FILL Surpac). Volume hari ini = nett − nett kemarin.')}</row>`);
+  const sheet = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols><col min="1" max="1" width="5" customWidth="1"/><col min="2" max="2" width="22" customWidth="1"/><col min="3" max="5" width="34" customWidth="1"/><col min="6" max="10" width="17" customWidth="1"/></cols><sheetData>${R.join('')}</sheetData></worksheet>`;
+  const styles = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0.000"/></numFmts>
+<fonts count="2"><font><sz val="10"/><name val="Calibri"/></font><font><b/><sz val="10"/><name val="Calibri"/></font></fonts>
+<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFDDEBF7"/></patternFill></fill></fills>
+<borders count="2"><border/><border><bottom style="thin"/></border></borders><cellStyleXfs count="1"><xf/></cellStyleXfs>
+<cellXfs count="5"><xf/><xf fontId="1" applyFont="1"/><xf fontId="1" fillId="2" borderId="1" applyFont="1" applyFill="1" applyBorder="1"/><xf numFmtId="164" applyNumberFormat="1"/><xf numFmtId="164" fontId="1" borderId="1" applyNumberFormat="1" applyFont="1" applyBorder="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
+  const f = new Map([
+    ['[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`],
+    ['_rels/.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`],
+    ['xl/workbook.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Laporan" sheetId="1" r:id="rId1"/></sheets></workbook>`],
+    ['xl/_rels/workbook.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`],
+    ['xl/worksheets/sheet1.xml', sheet], ['xl/styles.xml', styles],
+  ].map(([k, v]) => [k, te.encode(v)]));
+  return zip(f);
+}
+/* nilai penanda dari daftar area: [{area, first_dtm, second_dtm, bdy, cut, fill, nett, nett_kemarin}] */
+const r3 = (x) => Math.round(x * 1000) / 1000;          // 3 desimal seperti report Surpac
+function valuesOf(tgl, items, tglSurpac) {
+  const v = { tanggal: tgl, tanggal_surpac: tglSurpac || '' }, tot = { cut: 0, fill: 0, nett: 0, nett_kemarin: 0, hari_ini: 0 };
+  items.forEach((it, i) => {
+    const nett = r3(it.nett), kem = isFinite(it.nett_kemarin) ? r3(it.nett_kemarin) : '', hari = kem === '' ? '' : r3(nett - kem);
+    const row = { no: i + 1, area: it.area, first_dtm: it.first_dtm, second_dtm: it.second_dtm, bdy: it.bdy, cut: r3(it.cut), fill: r3(it.fill), nett, nett_kemarin: kem, hari_ini: hari };
+    for (const [k, x] of Object.entries(row)) { v[`${i + 1}.${k}`] = x; v[`${String(it.area).toLowerCase()}.${k}`] = x; }
+    for (const k of Object.keys(tot)) if (typeof row[k] === 'number') tot[k] += row[k];
+  });
+  for (const [k, x] of Object.entries(tot)) v[`total.${k}`] = r3(x);
+  return v;
+}
+/* penanda baris area yang tidak terisi (mis. area ke-7 dari 10) dikosongkan tanpa dianggap kurang */
+function blankRest(values, rows = 50) { for (let k = 1; k <= rows; k++) for (const [key] of AREA_KEYS) if (!(`${k}.${key}` in values)) values[`${k}.${key}`] = ''; return values; }
+return { unzip, zip, fill, defaultTemplate, valuesOf, blankRest, crc32 };
+})();
+if (typeof module !== 'undefined') module.exports = XL;
+</script>
 <script id="workerSrc">/* SMA Viewer - pekerja latar (Web Worker): baca file, CREATE DTM, volume, update progress.
    Digabung dengan parser.js, tin.js, vol.js, progres.js saat build. */
 'use strict';
@@ -3638,7 +3796,7 @@ const fv = (v) => v.toLocaleString('en-US', { minimumFractionDigits: 3, maximumF
 /* nama pit & tanggal dari nama boundary: 2026_10_27_update_topo_x_bdy.str -> pit update_topo_x, 2026-10-27 */
 function pitInfo(name, dtmName = '') {
   const re = /^(\d{4})_(\d{2})_(\d{2})_?(.*)$/, b = name.replace(/\.[^.]*$/, ''), m = b.match(re);
-  const pit = (m ? m[4] : b).replace(/_bdy$/i, '');
+  const pit = (m ? m[4] : b).replace(/_bdy$/i, '').replace(/^update_topo_/i, '');   // 2026_10_27_update_topo_pit_tofu3_bdy -> pit_tofu3 (= nama area)
   // tanggal: dari nama boundary, kalau tidak ada dari nama DTM kedua, terakhir tanggal lokal hari ini (bukan UTC)
   const k = m || dtmName.replace(/\.[^.]*$/, '').match(re), now = new Date(), p2 = (v) => String(v).padStart(2, '0');
   return { pit, tgl: k ? `${k[1]}-${k[2]}-${k[3]}` : `${now.getFullYear()}-${p2(now.getMonth() + 1)}-${p2(now.getDate())}` };
@@ -4065,6 +4223,8 @@ async function doHarian() {
       out.push(Object.assign(rec, { T, kem, html, repName, V }));
       HAR.cfg.base[row.area.toLowerCase()] = row.base.rel;
     }
+    const items = out.filter((o) => o.T).map((o) => ({ area: o.area, first_dtm: o.V.A, second_dtm: o.V.B, bdy: o.V.bdy, cut: o.T.cut, fill: o.T.fill, nett: o.T.nett, nett_kemarin: o.kem }));
+    if (items.length) { const xn = await reportExcel(iso, items); if (xn) log.push(`Report Excel: ${xn} → ${S.dirPath || S.dir.name}`); }
     await harSaveCfg(); navRefresh(); renderLayers(); zoomAll();
     const ms = performance.now() - t0;
     HAR.last = out;
@@ -4182,7 +4342,9 @@ if (TA) {
   window.SMA_DB = {
     save: (rec) => inv('vol_save', { rec }).catch((e) => msg('Gagal menyimpan riwayat volume: ' + e, 'e')),
     last: (pit, before) => inv('vol_last', { pit, before }).catch(() => null),
-    history: (pit) => inv('vol_history', { pit, limit: 60 }).catch(() => []),
+    history: (pit, limit = 60) => inv('vol_history', { pit: pit || '', limit }).catch(() => []),
+    del: (id) => inv('vol_delete', { id }),
+    where: 'SQLite (folder data aplikasi)',
   };
 
   /* ---- file yang dibuka dari Windows Explorer (klik dua kali .str/.dtm) ----
@@ -4203,6 +4365,80 @@ if (TA) {
   document.title = 'SMA Survey Desktop';
   $('#menubar .brand').textContent = 'SMA Survey Desktop';
 }
+
+/* ---------- riwayat volume + report harian Excel ----------
+   Desktop: SQLite (tauri.js). Browser: IndexedDB dengan aturan yang sama (hitung ulang pit + tanggal + DTM kedua
+   yang sama menggantikan yang lama; "kemarin" = catatan terakhir pit itu sebelum tanggalnya). */
+if (!window.SMA_DB) {
+  const open = () => new Promise((res, rej) => { const r = indexedDB.open('smaVolume', 1); r.onupgradeneeded = () => r.result.createObjectStore('volumes', { keyPath: 'id', autoIncrement: true }); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+  const all = async () => { const db = await open(); return new Promise((res, rej) => { const q = db.transaction('volumes').objectStore('volumes').getAll(); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); }); };
+  const tx = async (fn) => { const db = await open(); return new Promise((res, rej) => { const t = db.transaction('volumes', 'readwrite'), s = t.objectStore('volumes'); const out = fn(s); t.oncomplete = () => res(out && out.result); t.onerror = () => rej(t.error); }); };
+  const urut = (a, b) => (a.tanggal < b.tanggal ? 1 : a.tanggal > b.tanggal ? -1 : b.id - a.id);
+  window.SMA_DB = {
+    async save(rec) {
+      try {
+        const old = (await all()).filter((v) => v.pit === rec.pit && v.tanggal === rec.tanggal && v.second_dtm === rec.second_dtm);
+        const now = new Date(), p2 = (v) => String(v).padStart(2, '0');
+        return await tx((s) => { for (const v of old) s.delete(v.id); const r = { ...rec }; delete r.id; r.created_at = `${now.getFullYear()}-${p2(now.getMonth() + 1)}-${p2(now.getDate())} ${p2(now.getHours())}:${p2(now.getMinutes())}:${p2(now.getSeconds())}`; return s.add(r); });
+      } catch (e) { msg('Gagal menyimpan riwayat volume: ' + e, 'e'); return null; }
+    },
+    async last(pit, before) { try { return (await all()).filter((v) => v.pit === pit && v.tanggal < before).sort(urut)[0] || null; } catch (e) { return null; } },
+    async history(pit, limit = 60) { try { return (await all()).filter((v) => !pit || v.pit === pit).sort(urut).slice(0, limit); } catch (e) { return []; } },
+    del: (id) => tx((s) => s.delete(id)),
+    where: 'browser ini (IndexedDB)',
+  };
+}
+
+/* report harian ke template Excel: template_report_harian.xlsx di folder kerja (dibuat dari template bawaan kalau belum ada) */
+const TPL_NAME = 'template_report_harian.xlsx';
+async function reportExcel(iso, items) {
+  let tpl = null;
+  if (S.dir) { try { tpl = new Uint8Array(await (await (await S.dir.getFileHandle(TPL_NAME)).getFile()).arrayBuffer()); } catch (e) { /* belum ada */ } }
+  if (!tpl) {
+    tpl = await XL.defaultTemplate();
+    if (S.dir) { await saveFile(TPL_NAME, tpl.slice()); msg(`${TPL_NAME} dibuat di folder kerja — tata letaknya bisa diedit di Excel, penanda {{…}} diisi otomatis.`); }
+  }
+  const t = iso.split('-').map(Number), vals = XL.blankRest(XL.valuesOf(iso, items, PG.tglSurpac(t)));
+  const r = await XL.fill(tpl, vals), name = `${iso.replace(/-/g, '_')}_report_harian.xlsx`;
+  if (r.missing.length) msg(`Template: penanda tanpa nilai: ${r.missing.slice(0, 8).join(', ')}${r.missing.length > 8 ? ' …' : ''}`, 'w');
+  const ok = await saveFile(name, r.data);
+  return ok ? name : null;
+}
+
+/* jendela Volumes > Riwayat volume */
+const RW = { rows: [] };
+async function riwRefresh() {
+  const all = await SMA_DB.history('', 5000), pit = $('#riwPit').value;
+  // hari ini = nett - nett catatan sebelumnya (pit yang sama, tanggal lebih awal)
+  const by = new Map();
+  for (const v of [...all].sort((a, b) => (a.tanggal < b.tanggal ? -1 : a.tanggal > b.tanggal ? 1 : a.id - b.id))) {
+    const prev = by.get(v.pit); v.prev = prev ? prev.nett : NaN; v.hari = prev ? v.nett - prev.nett : NaN; by.set(v.pit, v);
+  }
+  const pits = [...new Set(all.map((v) => v.pit))].sort();
+  $('#riwPit').innerHTML = `<option value="">semua pit (${pits.length})</option>` + pits.map((p) => `<option${p === pit ? ' selected' : ''}>${esc(p)}</option>`).join('');
+  RW.rows = all.filter((v) => !pit || v.pit === pit);
+  const dates = [...new Set(RW.rows.map((v) => v.tanggal))];
+  $('#riwTgl').innerHTML = dates.map((d) => `<option>${esc(d)}</option>`).join('');
+  $('#riwWhere').textContent = `${RW.rows.length} catatan · disimpan di ${SMA_DB.where || 'aplikasi'}`;
+  $('#riwTbl tbody').innerHTML = RW.rows.map((v, i) => `<tr title="${esc(`${v.first_dtm} → ${v.second_dtm} · ${v.bdy} str ${v.string_no} · ${v.created_at || ''}`)}"><td>${esc(v.tanggal)}</td><td>${esc(v.pit)}</td>
+    <td>${fv(v.nett)}</td><td>${isNaN(v.prev) ? '–' : fv(v.prev)}</td><td><b>${isNaN(v.hari) ? '–' : fv(v.hari)}</b></td><td>${fv(v.cut)}</td><td>${fv(v.fill)}</td>
+    <td>${esc(v.second_dtm)}</td><td><a data-del="${i}" title="Hapus catatan ini">✕</a></td></tr>`).join('') || '<tr><td colspan="9" class="muted">Belum ada riwayat. Hitung volume (Volumes › DTM cut and fill) atau jalankan Proses Harian.</td></tr>';
+}
+const riwTsv = (sep) => [['Tanggal', 'Pit', 'Nett', 'Nett sebelumnya', 'Hari ini', 'Cut', 'Fill', 'Cut area', 'Fill area', 'First DTM', 'Second DTM', 'Boundary', 'String'].join(sep),
+  ...RW.rows.map((v) => [v.tanggal, v.pit, v.nett.toFixed(3), isNaN(v.prev) ? '' : v.prev.toFixed(3), isNaN(v.hari) ? '' : v.hari.toFixed(3), v.cut.toFixed(3), v.fill.toFixed(3), (v.cut_area || 0).toFixed(3), (v.fill_area || 0).toFixed(3), v.first_dtm, v.second_dtm, v.bdy, v.string_no].join(sep))].join('\r\n');
+$('#riwPit').onchange = riwRefresh;
+$('#riwCopy').onclick = (e) => { copyText(riwTsv('\t')); flash(e.target, 'Tersalin ✓'); };
+$('#riwCsv').onclick = () => saveFile('riwayat_volume.csv', latin1(riwTsv(';')));
+$('#riwTbl').addEventListener('click', async (e) => {
+  const i = e.target.dataset && e.target.dataset.del; if (i === undefined) return;
+  const v = RW.rows[+i]; if (!confirm(`Hapus catatan ${v.pit} tanggal ${v.tanggal} (nett ${fv(v.nett)})?`)) return;
+  await SMA_DB.del(v.id); msg(`Riwayat dihapus: ${v.pit} ${v.tanggal}`); riwRefresh();
+});
+$('#riwXls').onclick = async () => {
+  const d = $('#riwTgl').value; if (!d) return;
+  const items = RW.rows.filter((v) => v.tanggal === d).map((v) => ({ area: v.pit, first_dtm: v.first_dtm, second_dtm: v.second_dtm, bdy: v.bdy, cut: v.cut, fill: v.fill, nett: v.nett, nett_kemarin: v.prev }));
+  const name = await reportExcel(d, items); if (name) msg(`Report Excel ${d}: ${name}`, 'ok');
+};
 
 /* ---------- kerangka mirip Surpac: menu, Navigator (folder kerja), message window, simpan layer ---------- */
 function msg(t, kind = '') {
@@ -4436,6 +4672,7 @@ const CMD = {
   ident: () => setTool('ident'), meas: () => setTool('meas'), sec: () => showTab('tSec'),
   dtm: () => showTab('tDtm'), sod: () => { showTab('tDtm'); $('#sodSrc').focus(); }, vol: () => showTab('tVol'),
   raw: () => showTab('tRaw'),
+  riw: () => { showTab('tRiw'); riwRefresh(); },
   upHarian: () => { $('#upJenis').value = 'harian'; upJenis(); showTab('tUp'); },
   upPotong: () => { $('#upJenis').value = 'potong'; upJenis(); showTab('tUp'); },
   upBdy: () => { $('#upJenis').value = 'bdy'; upJenis(); showTab('tUp'); },

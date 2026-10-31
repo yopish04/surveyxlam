@@ -270,7 +270,7 @@ const fv = (v) => v.toLocaleString('en-US', { minimumFractionDigits: 3, maximumF
 /* nama pit & tanggal dari nama boundary: 2026_10_27_update_topo_x_bdy.str -> pit update_topo_x, 2026-10-27 */
 function pitInfo(name, dtmName = '') {
   const re = /^(\d{4})_(\d{2})_(\d{2})_?(.*)$/, b = name.replace(/\.[^.]*$/, ''), m = b.match(re);
-  const pit = (m ? m[4] : b).replace(/_bdy$/i, '');
+  const pit = (m ? m[4] : b).replace(/_bdy$/i, '').replace(/^update_topo_/i, '');   // 2026_10_27_update_topo_pit_tofu3_bdy -> pit_tofu3 (= nama area)
   // tanggal: dari nama boundary, kalau tidak ada dari nama DTM kedua, terakhir tanggal lokal hari ini (bukan UTC)
   const k = m || dtmName.replace(/\.[^.]*$/, '').match(re), now = new Date(), p2 = (v) => String(v).padStart(2, '0');
   return { pit, tgl: k ? `${k[1]}-${k[2]}-${k[3]}` : `${now.getFullYear()}-${p2(now.getMonth() + 1)}-${p2(now.getDate())}` };

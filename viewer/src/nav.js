@@ -230,6 +230,7 @@ const CMD = {
   ident: () => setTool('ident'), meas: () => setTool('meas'), sec: () => showTab('tSec'),
   dtm: () => showTab('tDtm'), sod: () => { showTab('tDtm'); $('#sodSrc').focus(); }, vol: () => showTab('tVol'),
   raw: () => showTab('tRaw'),
+  riw: () => { showTab('tRiw'); riwRefresh(); },
   upHarian: () => { $('#upJenis').value = 'harian'; upJenis(); showTab('tUp'); },
   upPotong: () => { $('#upJenis').value = 'potong'; upJenis(); showTab('tUp'); },
   upBdy: () => { $('#upJenis').value = 'bdy'; upJenis(); showTab('tUp'); },

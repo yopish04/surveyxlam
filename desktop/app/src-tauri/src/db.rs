@@ -61,6 +61,9 @@ pub fn history(c: &Connection, pit: &str, limit: i64) -> rusqlite::Result<Vec<Vo
     rows.collect()
 }
 
+/// hapus satu baris riwayat
+pub fn delete(c: &Connection, id: i64) -> rusqlite::Result<usize> { c.execute("DELETE FROM volumes WHERE id = ?1", params![id]) }
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -73,5 +76,9 @@ mod tests {
         save(&c, &v).unwrap();                       // hitung ulang tidak menggandakan
         assert_eq!(history(&c, "tofu", 10).unwrap().len(), 2);
         assert_eq!(last(&c, "tofu", "2026-10-27").unwrap().unwrap().nett, -100.0);
+        assert_eq!(history(&c, "", 10).unwrap().len(), 2);   // pit kosong = semua
+        let id = history(&c, "tofu", 1).unwrap()[0].id;
+        assert_eq!(delete(&c, id).unwrap(), 1);
+        assert_eq!(history(&c, "", 10).unwrap().len(), 1);
     }
 }
