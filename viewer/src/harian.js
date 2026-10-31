@@ -121,6 +121,7 @@ async function doHarian() {
       // 3. CREATE DTM (global baru, global lama) + base
       busy(`Proses harian ${row.area}: CREATE DTM…`);
       const rNew = await parseFile(gNew.name, gNew.data.slice().buffer), Dn = { r: rNew, ...(await harDtm(rNew)), name: gNew.name.replace(/\.str$/i, '.dtm') };
+      await harWrite(row.glob.dir, Dn.name, latin1(dtmText(gNew.name, rNew, Dn.tris)));
       const Db = await harTin(row.base, 'base'), Do = await harTin(row.glob, 'lama');
       const rB = await parseFile(bNew.name, bNew.data.slice().buffer), rings = harRings(rB);
       // 4. volume base -> global baru di dalam boundary baru, dan kemarin: base -> global lama di dalam boundary lama
@@ -140,7 +141,7 @@ async function doHarian() {
       if (Lg) { attachDtm(Dn.name, { tris: Dn.tris.slice(), strName: gNew.name }, Lg); const D = Lg.dtms[Lg.dtms.length - 1]; D.created = true; }
       await addLayerFromBytes(bNew.name, bNew.data.slice());
       if (cek) await addLayerFromBytes(cek.name, cek.data.slice());
-      log.push(`${row.area}: DTM ${Dn.ntri} segitiga; volume ${Db.name} → ${Dn.name}: nett ${fv(T.nett)} m³${isNaN(kem) ? '' : `, kemarin ${fv(kem)}, hari ini ${fv(T.nett - kem)}`} → ${repName}`);
+      log.push(`${row.area}: DTM ${Dn.ntri} segitiga → ${Dn.name}; volume ${Db.name} → ${Dn.name}: nett ${fv(T.nett)} m³${isNaN(kem) ? '' : `, kemarin ${fv(kem)}, hari ini ${fv(T.nett - kem)}`} → ${repName}`);
       out.push(Object.assign(rec, { T, kem, html, repName, V }));
       HAR.cfg.base[row.area.toLowerCase()] = row.base.rel;
     }

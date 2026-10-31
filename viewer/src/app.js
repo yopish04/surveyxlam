@@ -688,7 +688,8 @@ function renderLayers() {
       el.innerHTML = `<div class="lrow"><span class="caret"></span><input type="checkbox" ${L.vis ? 'checked' : ''}>
         <span class="lname" title="${esc(L.name)}">${esc(L.name)}</span><span class="x" title="Tutup layer">✕</span></div>
         <div class="lmeta">DTM · ${L.ntri.toLocaleString('id-ID')} segitiga · Z ${(L.zr[0] + S.origin[2]).toFixed(1)}–${(L.zr[1] + S.origin[2]).toFixed(1)}${L.bad ? ` · ${L.bad} indeks salah` : ''}</div>
-        <div class="dtmopt"><label><input type="radio" name="sh${L.id}" value="0" ${L.shade === 0 ? 'checked' : ''}> warna elevasi</label><label><input type="radio" name="sh${L.id}" value="1" ${L.shade === 1 ? 'checked' : ''}> abu-abu</label><label><input type="checkbox" class="wire" ${L.wire ? 'checked' : ''}> garis segitiga</label></div>`;
+        <div class="dtmopt"><label><input type="radio" name="sh${L.id}" value="0" ${L.shade === 0 ? 'checked' : ''}> warna elevasi</label><label><input type="radio" name="sh${L.id}" value="1" ${L.shade === 1 ? 'checked' : ''}> abu-abu</label><label><input type="checkbox" class="wire" ${L.wire ? 'checked' : ''}> garis segitiga</label><a class="dsave" title="Simpan sebagai .dtm Surpac (teks)">Simpan .dtm</a></div>`;
+      el.querySelector('.dsave').onclick = () => saveDtm(L);
       el.querySelector('.dtmopt').onchange = (e) => { if (e.target.classList.contains('wire')) L.wire = e.target.checked; else L.shade = +e.target.value; S.dirty = true; };
     }
     el.querySelector('.lrow input').onchange = (e) => { L.vis = e.target.checked; S.dirty = true; info(); };

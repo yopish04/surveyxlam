@@ -169,6 +169,7 @@ table.rawtbl tr.off td{opacity:.45}
 #sPrompt.fn::before{content:'▶ ';color:#2f81f7}
 #sPlane{cursor:pointer;text-decoration:underline dotted}
 #harRes pre{max-height:22vh;overflow:auto;font-size:11px;white-space:pre-wrap;margin:6px 0;padding:6px;border:1px solid var(--line);border-radius:5px;background:var(--panel)}
+.dtmopt .dsave{margin-left:auto;cursor:pointer;color:#2f81f7;font-size:11px}
 </style>
 </head>
 <body>
@@ -180,6 +181,7 @@ table.rawtbl tr.off td{opacity:.45}
     <hr><a data-cmd="open">Open file… <i>Ctrl+O</i></a>
     <a data-cmd="save">Save layer <i>Ctrl+S</i></a>
     <a data-cmd="saveAs">Save layer as…</a>
+    <a data-cmd="saveDtm">Save DTM (.dtm Surpac)</a>
     <hr><a data-cmd="closeAll">Close all layers</a>
   </div></div>
   <div class="menu"><button>View</button><div class="drop">
@@ -3089,7 +3091,8 @@ function renderLayers() {
       el.innerHTML = `<div class="lrow"><span class="caret"></span><input type="checkbox" ${L.vis ? 'checked' : ''}>
         <span class="lname" title="${esc(L.name)}">${esc(L.name)}</span><span class="x" title="Tutup layer">✕</span></div>
         <div class="lmeta">DTM · ${L.ntri.toLocaleString('id-ID')} segitiga · Z ${(L.zr[0] + S.origin[2]).toFixed(1)}–${(L.zr[1] + S.origin[2]).toFixed(1)}${L.bad ? ` · ${L.bad} indeks salah` : ''}</div>
-        <div class="dtmopt"><label><input type="radio" name="sh${L.id}" value="0" ${L.shade === 0 ? 'checked' : ''}> warna elevasi</label><label><input type="radio" name="sh${L.id}" value="1" ${L.shade === 1 ? 'checked' : ''}> abu-abu</label><label><input type="checkbox" class="wire" ${L.wire ? 'checked' : ''}> garis segitiga</label></div>`;
+        <div class="dtmopt"><label><input type="radio" name="sh${L.id}" value="0" ${L.shade === 0 ? 'checked' : ''}> warna elevasi</label><label><input type="radio" name="sh${L.id}" value="1" ${L.shade === 1 ? 'checked' : ''}> abu-abu</label><label><input type="checkbox" class="wire" ${L.wire ? 'checked' : ''}> garis segitiga</label><a class="dsave" title="Simpan sebagai .dtm Surpac (teks)">Simpan .dtm</a></div>`;
+      el.querySelector('.dsave').onclick = () => saveDtm(L);
       el.querySelector('.dtmopt').onchange = (e) => { if (e.target.classList.contains('wire')) L.wire = e.target.checked; else L.shade = +e.target.value; S.dirty = true; };
     }
     el.querySelector('.lrow input').onchange = (e) => { L.vis = e.target.checked; S.dirty = true; info(); };
@@ -3449,6 +3452,45 @@ async function addLayerFromBytes(name, bytes) {
   return addStr(name, r, raw);
 }
 
+/* ---------- simpan .dtm (format teks Surpac) ----------
+   Spesifikasi riset/volume/update_harian.py dtm_text(): header '<nama>.str,0;algorithm=standard;fields=x,y', tepi TIN sebagai
+   string 1 (tertutup), OBJECT 1, TRISOLATION 1 (neighbours=yes), lalu tiap segitiga: no, titik1-3, tetangga1-3, END.
+   Nomor titik = nomor baris di .str pasangannya (mulai 1, baris pemisah 0 ikut dihitung), sama dengan cara Surpac. */
+function dtmText(strName, r, tris) {
+  const nt = tris.length / 3, edge = new Map(), key = (a, b) => a * 4294967296 + b;
+  for (let i = 0; i < nt; i++) for (let k = 0; k < 3; k++) edge.set(key(tris[3 * i + k], tris[3 * i + (k + 1) % 3]), i + 1);
+  // tepi TIN: sisi tanpa tetangga, disambung jadi ring
+  const nxt = new Map();
+  for (let i = 0; i < nt; i++) for (let k = 0; k < 3; k++) { const a = tris[3 * i + k], b = tris[3 * i + (k + 1) % 3]; if (!edge.has(key(b, a))) nxt.set(a, b); }
+  const rings = [], used = new Set();
+  for (const s of [...nxt.keys()].sort((a, b) => r.y[a] - r.y[b] || r.x[a] - r.x[b])) {
+    if (used.has(s)) continue;
+    const ring = []; let v = s;
+    while (v !== undefined && !used.has(v)) { used.add(v); ring.push(v); v = nxt.get(v); }
+    if (ring.length >= 3) rings.push(ring);
+  }
+  const f = (v) => v.toFixed(3), L = [`${strName},0;algorithm=standard;fields=x,y`];
+  for (const ring of rings) { for (const v of ring.concat(ring[0])) L.push(`1, ${f(r.y[v])}, ${f(r.x[v])}, ${f(r.z[v])}, `); L.push('0, 0.000, 0.000, 0.000,'); }
+  if (!rings.length) L.push('0, 0.000, 0.000, 0.000,');
+  L.push('0, 0.000, 0.000, 0.000, END', 'OBJECT, 1, ', 'TRISOLATION, 1, neighbours=yes,validated=true,closed=no,algorithm=retriangulation');
+  for (let i = 0; i < nt; i++) {
+    const t = [tris[3 * i], tris[3 * i + 1], tris[3 * i + 2]];
+    const nb = [0, 1, 2].map((k) => edge.get(key(t[(k + 1) % 3], t[k])) || 0);
+    L.push(`${i + 1}, ${t[0] + 1}, ${t[1] + 1}, ${t[2] + 1}, ${nb[0]}, ${nb[1]}, ${nb[2]}, `);
+  }
+  L.push('END');
+  return L.join('\r\n') + '\r\n';
+}
+const dtmFileName = (D) => D.name.replace(/ \(dibuat\)$/, '').replace(/\.dtm$/i, '') + '.dtm';
+async function saveDtm(D) {
+  if (!D || D.kind !== 'dtm') { msg('Pilih layer DTM dulu (klik namanya di panel Layers).', 'w'); return false; }
+  const strName = D.src.name, name = dtmFileName(D);
+  const ok = await saveFile(name, latin1(dtmText(strName, D.src.r, D.tris)));
+  // .dtm merujuk nomor baris .str: pastikan .str pasangannya ada di folder yang sama
+  if (ok && S.dir && D.src.raw) { let ada = true; try { await S.dir.getFileHandle(strName); } catch (e) { ada = false; } if (!ada) await saveFile(strName, new Uint8Array(D.src.raw)); }
+  return ok;
+}
+
 /* ---------- CREATE DTM ---------- */
 async function doCreateDtm() {
   const L = byId($('#dtmSrc').value); if (!L) return;
@@ -3464,7 +3506,9 @@ async function doCreateDtm() {
     const D = L.dtms[L.dtms.length - 1]; D.created = true; D.name = nm + ' (dibuat)';
     out.innerHTML = `<div class="big">DTM jadi: ${r.ntri.toLocaleString('id-ID')} segitiga</div>
       <table><tr><td>Titik dipakai</td><td>${r.npts.toLocaleString('id-ID')}</td></tr><tr><td>Breakline dilewati</td><td>${r.skipped}</td></tr><tr><td>Waktu</td><td>${(ms / 1000).toFixed(1)} detik</td></tr></table>
-      <div class="muted">Aturan sama dengan CREATE DTM Surpac: string ${esc($('#dtmSkip').value)} tidak dipakai, string ${esc($('#dtmSpot').value)} = titik saja, string lain = breakline.</div>`;
+      <div class="muted">Aturan sama dengan CREATE DTM Surpac: string ${esc($('#dtmSkip').value)} tidak dipakai, string ${esc($('#dtmSpot').value)} = titik saja, string lain = breakline.</div>
+      <div class="acts"><button id="dtmSave">Simpan ${esc(nm)}</button></div>`;
+    $('#dtmSave').onclick = (e) => saveDtm(D).then((ok) => ok && flash(e.target, 'Tersimpan ✓'));
     renderLayers(); S.dirty = true;
     msg(`CREATE DTM ${L.name}: ${r.ntri.toLocaleString('id-ID')} segitiga, ${r.skipped} breakline dilewati, ${(ms / 1000).toFixed(1)} s`, 'ok');
   } catch (e) { out.textContent = 'Gagal: ' + e.message.split('\n')[0]; msg('CREATE DTM gagal: ' + e.message.split('\n')[0], 'e'); }
@@ -3997,6 +4041,7 @@ async function doHarian() {
       // 3. CREATE DTM (global baru, global lama) + base
       busy(`Proses harian ${row.area}: CREATE DTM…`);
       const rNew = await parseFile(gNew.name, gNew.data.slice().buffer), Dn = { r: rNew, ...(await harDtm(rNew)), name: gNew.name.replace(/\.str$/i, '.dtm') };
+      await harWrite(row.glob.dir, Dn.name, latin1(dtmText(gNew.name, rNew, Dn.tris)));
       const Db = await harTin(row.base, 'base'), Do = await harTin(row.glob, 'lama');
       const rB = await parseFile(bNew.name, bNew.data.slice().buffer), rings = harRings(rB);
       // 4. volume base -> global baru di dalam boundary baru, dan kemarin: base -> global lama di dalam boundary lama
@@ -4016,7 +4061,7 @@ async function doHarian() {
       if (Lg) { attachDtm(Dn.name, { tris: Dn.tris.slice(), strName: gNew.name }, Lg); const D = Lg.dtms[Lg.dtms.length - 1]; D.created = true; }
       await addLayerFromBytes(bNew.name, bNew.data.slice());
       if (cek) await addLayerFromBytes(cek.name, cek.data.slice());
-      log.push(`${row.area}: DTM ${Dn.ntri} segitiga; volume ${Db.name} → ${Dn.name}: nett ${fv(T.nett)} m³${isNaN(kem) ? '' : `, kemarin ${fv(kem)}, hari ini ${fv(T.nett - kem)}`} → ${repName}`);
+      log.push(`${row.area}: DTM ${Dn.ntri} segitiga → ${Dn.name}; volume ${Db.name} → ${Dn.name}: nett ${fv(T.nett)} m³${isNaN(kem) ? '' : `, kemarin ${fv(kem)}, hari ini ${fv(T.nett - kem)}`} → ${repName}`);
       out.push(Object.assign(rec, { T, kem, html, repName, V }));
       HAR.cfg.base[row.area.toLowerCase()] = row.base.rel;
     }
@@ -4380,6 +4425,7 @@ async function saveLayer(as) {
 /* menu & perintah */
 const CMD = {
   navAdd: () => navAddRoot(false), navAddRo: () => navAddRoot(true), navRefresh,
+  saveDtm: () => saveDtm(S.active && S.active.kind === 'dtm' ? S.active : [...S.layers].reverse().find((L) => L.kind === 'dtm')),
   open: () => $('#fileIn').click(), save: () => saveLayer(false), saveAs: () => saveLayer(true),
   closeAll: () => { for (const L of S.layers.filter((x) => x.kind === 'str')) removeLayer(L); for (const L of [...S.layers]) removeLayer(L); },
   zoom: zoomAll, plan: () => setPlan(true), '3d': () => setPlan(false),

@@ -219,6 +219,7 @@ async function saveLayer(as) {
 /* menu & perintah */
 const CMD = {
   navAdd: () => navAddRoot(false), navAddRo: () => navAddRoot(true), navRefresh,
+  saveDtm: () => saveDtm(S.active && S.active.kind === 'dtm' ? S.active : [...S.layers].reverse().find((L) => L.kind === 'dtm')),
   open: () => $('#fileIn').click(), save: () => saveLayer(false), saveAs: () => saveLayer(true),
   closeAll: () => { for (const L of S.layers.filter((x) => x.kind === 'str')) removeLayer(L); for (const L of [...S.layers]) removeLayer(L); },
   zoom: zoomAll, plan: () => setPlan(true), '3d': () => setPlan(false),

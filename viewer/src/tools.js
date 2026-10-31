@@ -84,6 +84,45 @@ async function addLayerFromBytes(name, bytes) {
   return addStr(name, r, raw);
 }
 
+/* ---------- simpan .dtm (format teks Surpac) ----------
+   Spesifikasi riset/volume/update_harian.py dtm_text(): header '<nama>.str,0;algorithm=standard;fields=x,y', tepi TIN sebagai
+   string 1 (tertutup), OBJECT 1, TRISOLATION 1 (neighbours=yes), lalu tiap segitiga: no, titik1-3, tetangga1-3, END.
+   Nomor titik = nomor baris di .str pasangannya (mulai 1, baris pemisah 0 ikut dihitung), sama dengan cara Surpac. */
+function dtmText(strName, r, tris) {
+  const nt = tris.length / 3, edge = new Map(), key = (a, b) => a * 4294967296 + b;
+  for (let i = 0; i < nt; i++) for (let k = 0; k < 3; k++) edge.set(key(tris[3 * i + k], tris[3 * i + (k + 1) % 3]), i + 1);
+  // tepi TIN: sisi tanpa tetangga, disambung jadi ring
+  const nxt = new Map();
+  for (let i = 0; i < nt; i++) for (let k = 0; k < 3; k++) { const a = tris[3 * i + k], b = tris[3 * i + (k + 1) % 3]; if (!edge.has(key(b, a))) nxt.set(a, b); }
+  const rings = [], used = new Set();
+  for (const s of [...nxt.keys()].sort((a, b) => r.y[a] - r.y[b] || r.x[a] - r.x[b])) {
+    if (used.has(s)) continue;
+    const ring = []; let v = s;
+    while (v !== undefined && !used.has(v)) { used.add(v); ring.push(v); v = nxt.get(v); }
+    if (ring.length >= 3) rings.push(ring);
+  }
+  const f = (v) => v.toFixed(3), L = [`${strName},0;algorithm=standard;fields=x,y`];
+  for (const ring of rings) { for (const v of ring.concat(ring[0])) L.push(`1, ${f(r.y[v])}, ${f(r.x[v])}, ${f(r.z[v])}, `); L.push('0, 0.000, 0.000, 0.000,'); }
+  if (!rings.length) L.push('0, 0.000, 0.000, 0.000,');
+  L.push('0, 0.000, 0.000, 0.000, END', 'OBJECT, 1, ', 'TRISOLATION, 1, neighbours=yes,validated=true,closed=no,algorithm=retriangulation');
+  for (let i = 0; i < nt; i++) {
+    const t = [tris[3 * i], tris[3 * i + 1], tris[3 * i + 2]];
+    const nb = [0, 1, 2].map((k) => edge.get(key(t[(k + 1) % 3], t[k])) || 0);
+    L.push(`${i + 1}, ${t[0] + 1}, ${t[1] + 1}, ${t[2] + 1}, ${nb[0]}, ${nb[1]}, ${nb[2]}, `);
+  }
+  L.push('END');
+  return L.join('\r\n') + '\r\n';
+}
+const dtmFileName = (D) => D.name.replace(/ \(dibuat\)$/, '').replace(/\.dtm$/i, '') + '.dtm';
+async function saveDtm(D) {
+  if (!D || D.kind !== 'dtm') { msg('Pilih layer DTM dulu (klik namanya di panel Layers).', 'w'); return false; }
+  const strName = D.src.name, name = dtmFileName(D);
+  const ok = await saveFile(name, latin1(dtmText(strName, D.src.r, D.tris)));
+  // .dtm merujuk nomor baris .str: pastikan .str pasangannya ada di folder yang sama
+  if (ok && S.dir && D.src.raw) { let ada = true; try { await S.dir.getFileHandle(strName); } catch (e) { ada = false; } if (!ada) await saveFile(strName, new Uint8Array(D.src.raw)); }
+  return ok;
+}
+
 /* ---------- CREATE DTM ---------- */
 async function doCreateDtm() {
   const L = byId($('#dtmSrc').value); if (!L) return;
@@ -99,7 +138,9 @@ async function doCreateDtm() {
     const D = L.dtms[L.dtms.length - 1]; D.created = true; D.name = nm + ' (dibuat)';
     out.innerHTML = `<div class="big">DTM jadi: ${r.ntri.toLocaleString('id-ID')} segitiga</div>
       <table><tr><td>Titik dipakai</td><td>${r.npts.toLocaleString('id-ID')}</td></tr><tr><td>Breakline dilewati</td><td>${r.skipped}</td></tr><tr><td>Waktu</td><td>${(ms / 1000).toFixed(1)} detik</td></tr></table>
-      <div class="muted">Aturan sama dengan CREATE DTM Surpac: string ${esc($('#dtmSkip').value)} tidak dipakai, string ${esc($('#dtmSpot').value)} = titik saja, string lain = breakline.</div>`;
+      <div class="muted">Aturan sama dengan CREATE DTM Surpac: string ${esc($('#dtmSkip').value)} tidak dipakai, string ${esc($('#dtmSpot').value)} = titik saja, string lain = breakline.</div>
+      <div class="acts"><button id="dtmSave">Simpan ${esc(nm)}</button></div>`;
+    $('#dtmSave').onclick = (e) => saveDtm(D).then((ok) => ok && flash(e.target, 'Tersimpan ✓'));
     renderLayers(); S.dirty = true;
     msg(`CREATE DTM ${L.name}: ${r.ntri.toLocaleString('id-ID')} segitiga, ${r.skipped} breakline dilewati, ${(ms / 1000).toFixed(1)} s`, 'ok');
   } catch (e) { out.textContent = 'Gagal: ' + e.message.split('\n')[0]; msg('CREATE DTM gagal: ' + e.message.split('\n')[0], 'e'); }

@@ -11,4 +11,5 @@ python3 -I "$R/viewer/uji/gen_kerja.py" "$W/W/D/kerja"
 python3 "$R/viewer/build.py" >/dev/null && python3 "$R/desktop/app/scripts/prepare.py" >/dev/null
 node "$R/viewer/uji/uji_harian.js" "$W/W" "$R/desktop/app/dist/index.html" "$W"
 python3 "$R/viewer/uji/harian_ref.py" "$R" "$W/W/D/kerja" "$W/ref"
+python3 "$R/viewer/uji/cek_dtm.py" "$R" "$W/W/D/kerja/2026_10_26_update_topo_pit_tofu3.dtm" "$W/W/D/kerja/2026_10_26_update_topo_pit_tofu3.str"
 rm -rf "$W"
