@@ -398,3 +398,106 @@ $('#upBtn').onclick = doUpdate;
 $('#secBtn').onclick = doSection;
 $('#measSod').onclick = measSod;
 refreshTools();
+
+/* ---------- TXT ke STR: data mentah alat -> .str (port raw2str.py / add-in Excel) ---------- */
+const RJ = { files: [], rows: [], src: '' };
+async function rawLoadDir(h, label) {
+  const files = [];
+  busy('Membaca file .txt…');
+  try {
+    for await (const e of h.values()) if (e.kind === 'file' && /\.txt$/i.test(e.name)) {
+      const f = await e.getFile(); files.push({ name: e.name, data: new Uint8Array(await f.arrayBuffer()) });
+    }
+  } catch (err) { msg('Tidak bisa membaca folder: ' + err.message, 'e'); }
+  busy(null);
+  rawSet(files, label || h.path || h.name);
+}
+function rawSet(files, src) {
+  RJ.files = files; RJ.src = src;
+  RJ.rows = RAW.prepare(files);
+  $('#rawRes').innerHTML = '';
+  renderRaw(); showTab('tRaw');
+  if (!files.length) msg(`Tidak ada file .txt di ${src}`, 'w');
+  else msg(`TXT ke STR: ${files.length} file .txt dari ${src}. Periksa kolom Area dan Profil, lalu Proses.`);
+}
+function renderRaw() {
+  $('#rawSrc').textContent = RJ.src ? `${RJ.src} · ${RJ.files.length} file .txt` : 'Belum ada data.';
+  const prof = ['harian', 'base', 'tetap', 'exca'];
+  $('#rawTbl').innerHTML = RJ.rows.map((r, i) => `<tr data-i="${i}" class="${r.use ? '' : 'off'}"><td><input type="checkbox" data-f="use" ${r.use ? 'checked' : ''}></td>
+    <td title="${esc(r.file)}">${esc(r.file)}</td><td>${esc(r.kind)}</td><td><input data-f="area" value="${esc(r.area)}"></td>
+    <td><select data-f="profile"><option value=""></option>${prof.map((p) => `<option${p === r.profile ? ' selected' : ''}>${p}</option>`).join('')}</select></td><td>${esc(r.date)}</td></tr>`).join('')
+    || '<tr><td colspan="6" class="muted">—</td></tr>';
+}
+$('#rawTbl').addEventListener('change', (e) => {
+  const tr = e.target.closest('tr[data-i]'), f = e.target.dataset.f; if (!tr || !f) return;
+  const r = RJ.rows[+tr.dataset.i];
+  r[f] = f === 'use' ? e.target.checked : e.target.value.trim();
+  tr.classList.toggle('off', !r.use);
+});
+$('#rawDir').onclick = async () => {
+  let h = null;
+  if (window.TAURI_FS) h = await TAURI_FS.pickDir(true);
+  else if (window.showDirectoryPicker) { try { h = await window.showDirectoryPicker({ id: 'smaRaw', mode: 'read' }); } catch (e) { return; } }
+  else { $('#rawFileIn').click(); return; }
+  if (h) await rawLoadDir(h);
+};
+$('#rawNav').onclick = () => {
+  let n = NAV.sel; if (n && n.kind !== 'directory') n = n.parent;
+  if (!n) { msg('Pilih folder (atau file .txt) di Navigator dulu.', 'w'); return; }
+  rawLoadDir(n.h, pathOf(n));
+};
+$('#rawFileIn').onchange = async (e) => {
+  const files = [];
+  for (const f of e.target.files) files.push({ name: f.name, data: new Uint8Array(await f.arrayBuffer()) });
+  e.target.value = '';
+  rawSet(files, 'file pilihan');
+};
+/* simpan hasil ke folder simpan/<subfolder> (nama 'gabung/x.str' = subfolder gabung) */
+async function rawDir(parts, create) { let d = S.dir; for (const p of parts) d = await d.getDirectoryHandle(p, { create }); return d; }
+async function rawSave(sub, files) {
+  if (!S.dir) { for (const f of files) await saveFile(f.name.replace(/\//g, '_'), f.data); return 'Downloads'; }
+  const base = sub.split(/[\\/]+/).filter(Boolean);
+  let ada = 0;
+  for (const f of files) {
+    const parts = f.name.split('/');
+    try { await (await rawDir(base.concat(parts.slice(0, -1)), false)).getFileHandle(parts[parts.length - 1]); ada++; } catch (e) { /* belum ada */ }
+  }
+  if (ada && !confirm(`${ada} file hasil sudah ada di ${S.dirPath || S.dir.name}\\${base.join('\\')}. Timpa?`)) return null;
+  for (const f of files) {
+    const parts = f.name.split('/'), d = await rawDir(base.concat(parts.slice(0, -1)), true);
+    const w = await (await d.getFileHandle(parts[parts.length - 1], { create: true })).createWritable();
+    await w.write(f.data); await w.close();
+  }
+  navRefresh();
+  return [S.dirPath || S.dir.name, ...base].join('\\');
+}
+async function doRaw() {
+  if (!RJ.files.length) { alert('Pilih folder data mentah dulu.'); return; }
+  let job;
+  try { job = RAW.jobFromRows(RJ.rows, { date: $('#rawTgl').value.trim() || 'auto', label: $('#rawLabel').value.trim() || 'RTK_SMA', roadCode: $('#rawJalan').value.trim(), dsName: $('#rawDs').value.trim() || 'exa_ds' }); }
+  catch (e) { alert(e.message); return; }
+  const used = new Set(job.rows.flatMap((r) => (Array.isArray(r.files) ? r.files : [])));
+  const files = RJ.files.filter((f) => used.has(f.name)).map((f) => [f.name, f.data.slice()]);
+  busy('TXT ke STR…');
+  const t0 = performance.now();
+  try {
+    const r = await run('raw', { job, files }, files.map(([, d]) => d.buffer));
+    const ms = performance.now() - t0;
+    const where = await rawSave($('#rawOut').value.trim(), r.files);
+    const strs = r.files.filter((f) => /\.str$/i.test(f.name));
+    $('#rawRes').innerHTML = `<div class="big">Selesai (${(ms / 1000).toFixed(1)} detik) · tanggal ${esc(r.date)}</div>
+      <div class="muted">${where ? `${r.files.length} file disimpan ke <b>${esc(where)}</b>` : 'Tidak disimpan (dibatalkan).'}</div>
+      <pre>${esc(r.log.join('\n'))}</pre>
+      <div class="files">${strs.map((f, i) => `<div class="frow"><span>${esc(f.name)}</span><button data-i="${i}">Buka</button></div>`).join('')}</div>`;
+    $('#rawRes .files').onclick = (e) => { const i = e.target.dataset.i; if (i !== undefined) addLayerFromBytes(strs[i].name.split('/').pop(), strs[i].data.slice()).then(() => { renderLayers(); zoomAll(); }); };
+    if ($('#rawOpen').checked) {
+      const areaNames = new Set(job.rows.filter((x) => x.kind === 'AREA').map((x) => x.name));
+      for (const f of strs) if (!f.name.includes('/') && !/_CEK\.str$/i.test(f.name) && [...areaNames].some((a) => f.name.endsWith(a + '.str'))) await addLayerFromBytes(f.name, f.data.slice());
+      renderLayers(); zoomAll();
+    }
+    msg(`TXT ke STR ${r.tag}: ${strs.length} file .str${where ? ' → ' + where : ''}`, 'ok');
+    for (const l of r.log) if (/PERLU|CEK/.test(l)) msg(l.trim(), 'w');
+  } catch (e) { $('#rawRes').textContent = 'Gagal: ' + e.message.split('\n')[0]; msg('TXT ke STR gagal: ' + e.message.split('\n')[0], 'e'); }
+  busy(null);
+}
+$('#rawBtn').onclick = doRaw;

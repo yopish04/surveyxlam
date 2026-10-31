@@ -20,7 +20,7 @@ const IDB = {
 /* handle folder: dari browser (File System Access API) atau dari aplikasi desktop (TAURI_FS, berbasis path) */
 const sameH = (a, b) => !!a && !!b && (a === b || (!!a.path && a.path === b.path));
 const NAV = { roots: [], sel: null, filter: 'surpac', drag: null };
-const EXT_OK = /\.(str|dtm|shp)$/i;
+const EXT_OK = /\.(str|dtm|shp)$/i, EXT_SHOW = /\.(str|dtm|shp|txt)$/i;
 function mkNode(h, parent, root) { return { h, name: h.name, kind: h.kind, parent, root, kids: null, open: false, size: null, mod: null }; }
 async function navAddRoot(ro, handle = null) {
   let h = handle;
@@ -63,7 +63,7 @@ async function loadKids(n) {
   kids.sort((a, b) => (a.kind === b.kind ? 0 : a.kind === 'directory' ? -1 : 1) || a.name.localeCompare(b.name, 'id', { numeric: true, sensitivity: 'base' }));
   n.kids = kids;
   // ukuran & tanggal file diisi belakangan (tidak menghambat tampilan)
-  (async () => { for (const k of kids) if (k.kind === 'file' && (NAV.filter === 'all' || EXT_OK.test(k.name))) { if (k.h.size !== undefined) { k.size = k.h.size; k.mod = k.h.mod; } else try { const f = await k.h.getFile(); k.size = f.size; k.mod = f.lastModified; } catch (e) {} } renderTree(); })();
+  (async () => { for (const k of kids) if (k.kind === 'file' && (NAV.filter === 'all' || EXT_SHOW.test(k.name))) { if (k.h.size !== undefined) { k.size = k.h.size; k.mod = k.h.mod; } else try { const f = await k.h.getFile(); k.size = f.size; k.mod = f.lastModified; } catch (e) {} } renderTree(); })();
 }
 function pathOf(n) { if (n.h && n.h.path) return n.h.path; const p = []; for (let x = n; x; x = x.parent) p.unshift(x.name); return p.join('\\'); }
 function fmtSize(b) { return b == null ? '' : b < 1024 ? b + ' B' : b < 1048576 ? (b / 1024).toFixed(0) + ' KB' : (b / 1048576).toFixed(1) + ' MB'; }
@@ -71,7 +71,7 @@ function iconOf(n) {
   if (!n.parent) return '<span class="ti root">▣</span>';
   if (n.kind === 'directory') return '<span class="ti fold"></span>';
   const e = (n.name.split('.').pop() || '').toLowerCase();
-  return `<span class="ti ${['str', 'dtm', 'shp'].includes(e) ? e : 'oth'}">${['str', 'dtm', 'shp'].includes(e) ? e.toUpperCase() : ''}</span>`;
+  return `<span class="ti ${['str', 'dtm', 'shp', 'txt'].includes(e) ? e : 'oth'}">${['str', 'dtm', 'shp', 'txt'].includes(e) ? e.toUpperCase() : ''}</span>`;
 }
 let rowsMap = [];
 function renderTree() {
@@ -80,7 +80,7 @@ function renderTree() {
   rowsMap = []; const html = [];
   const walk = (n, d) => {
     const i = rowsMap.push(n) - 1, isDir = n.kind === 'directory';
-    if (!isDir && NAV.filter !== 'all' && !EXT_OK.test(n.name)) { rowsMap.pop(); return; }
+    if (!isDir && NAV.filter !== 'all' && !EXT_SHOW.test(n.name)) { rowsMap.pop(); return; }
     const root = !n.parent ? n.root : null;
     const lock = root && !root.ok;
     html.push(`<div class="tn${NAV.sel === n ? ' sel' : ''}${lock ? ' lock' : ''}" data-i="${rowsMap.length - 1}" draggable="${isDir ? 'false' : 'true'}" style="padding-left:${6 + d * 14}px" title="${esc(pathOf(n))}">
@@ -114,6 +114,8 @@ function setSaveDir(n) {
 /* buka file dari Navigator: DTM otomatis membuka .str pasangannya dari folder yang sama */
 async function openNodes(nodes) {
   const files = [];
+  const txt = nodes.find((n) => n.kind === 'file' && /\.txt$/i.test(n.name));
+  if (txt) { await rawLoadDir(txt.parent.h, pathOf(txt.parent)); return; }
   for (const n of nodes) {
     if (n.kind !== 'file') continue;
     if (!EXT_OK.test(n.name)) { msg(`${n.name}: jenis file belum didukung`, 'w'); continue; }
@@ -158,6 +160,7 @@ tree.addEventListener('contextmenu', (e) => {
     !dir && ['Buka', () => openNodes([n])],
     dir && [n.open ? 'Tutup folder' : 'Buka folder', () => toggleDir(n)],
     ['Jadikan folder simpan', () => setSaveDir(n), ro],
+    dir && ['TXT ke STR dari folder ini…', () => rawLoadDir(n.h, pathOf(n))],
     dir && ['Folder baru…', () => newFolder(n), ro],
     !isRoot && ['Ganti nama…', () => renameNode(n), ro],
     !isRoot && ['Hapus…', () => deleteNode(n), ro],
@@ -224,6 +227,7 @@ const CMD = {
   msg: () => $('#msgwin').classList.toggle('min'), msgClear: () => { $('#msgLog').innerHTML = ''; },
   ident: () => setTool('ident'), meas: () => setTool('meas'), sec: () => showTab('tSec'),
   dtm: () => showTab('tDtm'), sod: () => { showTab('tDtm'); $('#sodSrc').focus(); }, vol: () => showTab('tVol'),
+  raw: () => showTab('tRaw'),
   upHarian: () => { $('#upJenis').value = 'harian'; upJenis(); showTab('tUp'); },
   upPotong: () => { $('#upJenis').value = 'potong'; upJenis(); showTab('tUp'); },
   upBdy: () => { $('#upJenis').value = 'bdy'; upJenis(); showTab('tUp'); },

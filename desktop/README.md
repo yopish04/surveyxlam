@@ -27,7 +27,9 @@ Kerangka ini dibangun lewat GitHub Actions (Windows) setelah repo bisa di-push.
   - Navigator memakai path Windows asli lewat Rust;
   - DTM, volume, dan update memakai mesin Rust; kalau gagal, otomatis kembali ke mesin JavaScript;
   - "Nett kemarin" terisi otomatis dari riwayat.
-- Asosiasi file: klik dua kali `.str` / `.dtm` di Explorer membuka SMA Survey.
+- Asosiasi file: klik dua kali `.str` / `.dtm` di Explorer membuka SMA Survey (juga saat aplikasi sudah terbuka: satu instance).
+- TXT ke STR: data mentah .txt langsung jadi .str di aplikasi (mesin JavaScript `viewer/src/raw.js`, sama byte per byte dengan Python/Excel).
+- Versi portable: `SMA Survey.exe` + `portable.txt` di satu folder; data (riwayat volume, Navigator, pengaturan) di `data\` di sampingnya.
 - Build: `.github/workflows/desktop.yml` (uji `sma-core` di Ubuntu → installer `.msi` + setup `.exe` di Windows).
 
 Sudah diuji di cloud dengan backend tiruan:

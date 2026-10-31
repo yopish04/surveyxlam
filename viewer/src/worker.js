@@ -28,6 +28,7 @@ function smaJob(cmd, a, progress) {
     }
     return [r, r.files.map((f) => f.data.buffer)];
   }
+  if (cmd === 'raw') { const r = RAW.runJob(a.job, new Map(a.files)); return [r, r.files.map((f) => f.data.buffer)]; }
   throw new Error('perintah tidak dikenal: ' + cmd);
 }
 if (typeof window === 'undefined' && typeof self !== 'undefined' && typeof module === 'undefined') {

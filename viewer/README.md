@@ -30,5 +30,11 @@ Aplikasi survey ringan yang kompatibel dengan file Surpac.
 - Port dari `progres.py`.
 - Uji: hasil byte-identik dengan Python dan Excel (LD03, Tofu 9).
 
-Kode sumber ada di `src/`: `parser.js`, `tin.js`, `vol.js`, `progres.js`, `worker.js`, `app.js`, `tools.js`, `index.html`, `style.css`.
+**TXT ke STR** (*Survey › TXT ke STR*)
+- Data mentah alat (.txt, format tab maupun `kode N E Z nama`) menjadi .str: crest/toe, spot, titik 23, boundary per area, jalan, posisi exca DS/NS, dan `_CEK.str` untuk titik yang perlu dicek.
+- Port dari `riset/prototipe/raw2str.py` + `proses_job.py`; tebakan area dan profil dari nama file seperti *Siapkan Job* di Excel (`SurveyPanel.bas`).
+- Hasil disimpan ke `<folder simpan>\STR` (bisa diganti), gabungan semua area di `STR\gabung\<tag>.str`, log di `<tag>_LOG.txt`.
+- Uji: `uji/run_raw_parity.sh` membuat data mentah sintetis lalu membandingkan semua .str dengan Python, byte per byte (8 set data: sama semua).
+
+Kode sumber ada di `src/`: `parser.js`, `tin.js`, `vol.js`, `progres.js`, `raw.js`, `worker.js`, `app.js`, `tools.js`, `index.html`, `style.css`.
 Jalankan `python3 build.py` untuk membuat `SMA_Viewer.html`.

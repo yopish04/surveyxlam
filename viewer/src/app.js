@@ -76,7 +76,7 @@ function parseRange(s) {
 /* ---------- pekerja latar: baca file, DTM, volume, update ---------- */
 let worker = null, wid = 0; const wcb = new Map();
 try {
-  const src = ['parserSrc', 'tinSrc', 'volSrc', 'progresSrc', 'workerSrc'].map((id) => $('#' + id).textContent).join('\n;\n');
+  const src = ['parserSrc', 'tinSrc', 'volSrc', 'progresSrc', 'rawSrc', 'workerSrc'].map((id) => $('#' + id).textContent).join('\n;\n');
   worker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
   worker.onmessage = (ev) => {
     const d = ev.data, f = wcb.get(d.id); if (!f) return;
