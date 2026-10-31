@@ -161,3 +161,4 @@ table.rawtbl tr.off td{opacity:.45}
 #sPrompt{flex:1 1 auto;min-width:0;color:var(--muted)}
 #sPrompt.fn{color:var(--text);font-weight:600}
 #sPrompt.fn::before{content:'▶ ';color:#2f81f7}
+#sPlane{cursor:pointer;text-decoration:underline dotted}

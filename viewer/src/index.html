@@ -19,6 +19,7 @@
   </div></div>
   <div class="menu"><button>View</button><div class="drop">
     <a data-cmd="zoom">Zoom all <i>F</i></a><a data-cmd="plan">Plan view <i>P</i></a><a data-cmd="3d">3D view <i>3</i></a>
+    <a data-cmd="target">Select camera target <i>pusat putar</i></a>
     <hr><a data-cmd="bg">Latar grafis hitam / putih</a><a data-cmd="theme">Tema panel terang / gelap</a><a data-cmd="msg">Message window</a>
   </div></div>
   <div class="menu"><button>Inquire</button><div class="drop">
@@ -82,7 +83,7 @@
     <section id="msgwin"><div class="ptitle"><span>Message window</span><span class="pact"><button data-cmd="msgClear" title="Bersihkan">⌫</button><button data-cmd="msg" title="Sembunyikan">▾</button></span></div><div id="msgLog"></div></section>
   </section>
 </main>
-<footer id="status"><span id="sPrompt"></span><span id="sXY">Y –  X –  Z –</span><span id="sDir">Folder simpan: <b class="dirName">Downloads</b></span><span id="sInfo"></span></footer>
+<footer id="status"><span id="sPrompt"></span><span id="sXY">Y –  X –  Z –</span><span id="sPlane" title="Bidang aktif (snap Bidang). Klik untuk ganti elevasi."></span><span id="sDir">Folder simpan: <b class="dirName">Downloads</b></span><span id="sInfo"></span></footer>
 <div id="ctx" hidden></div>
 <div id="tIdent" class="win" hidden>
   <div class="wt"><span>POINT PROPERTIES — Identify</span><button class="wx" title="Tutup">✕</button></div>
@@ -216,6 +217,7 @@
     <li><b>Volume</b>: DTM cut/fill per segmen boundary, sama dengan report Surpac. Isi nett kemarin untuk volume hari ini.</li>
     <li><b>TXT ke STR</b>: <i>Survey › TXT ke STR</i>, pilih folder data mentah (atau klik dua kali file .txt di Navigator). Periksa tebakan area dan profil di tabel, lalu Proses: crest/toe, spot, boundary, jalan, exca, dan file _CEK.str dibuat otomatis.</li>
     <li><b>Update</b>: update harian (potong global + tambah harian + boundary), potong progress, atau boundary tambah/kurangi. Hasil langsung jadi layer; simpan ke folder pilihan.</li>
+    <li><b>Kursor 3D & snap (seperti Surpac)</b>: posisi kursor ditentukan mode snap — <b>1 Bidang</b> (perpotongan dengan bidang aktif, default horizontal Z 0; ganti di status bar atau klik kanan › Bidang aktif), <b>2 Titik</b> (titik string terdekat), <b>3 Garis</b> (posisi di garis string terdekat), <b>4 Segitiga DTM</b> (permukaan DTM di bawah kursor). Ganti snap dengan tombol 1–4 atau klik kanan saat fungsi aktif. Di 3D kursor digambar sebagai silang sumbu X/Y/Z. <i>View › Select camera target</i> (atau klik kanan › Pusat putar di sini) memilih titik pusat putar.</li>
     <li>Tombol: F zoom semua, P plan, 3 tampak 3D, I point properties, M bearing and distance, Esc selesai / batal pilih.</li>
   </ul>
   <form method="dialog"><button>Tutup</button></form>

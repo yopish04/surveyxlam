@@ -359,9 +359,23 @@ function draw() {
   // garis karet: titik ukur terakhir -> kursor
   if (S.tool === 'meas' && S.measOpen && S.meas.length && hoverXY && !drag) {
     let q = null;
-    if (S.hover) { const r = S.hover.L.r, i = S.hover.i; q = { x: r.x[i], y: r.y[i], z: r.z[i] }; }
-    else if (S.plan) { const gr = ground(hoverXY[0], hoverXY[1]); q = { x: gr.x, y: gr.y, z: S.meas[S.meas.length - 1].z }; }
+    q = S.cur;
     if (q) { put(S.meas[S.meas.length - 1]); put(q); call(gl.LINES, 2, [1, 0.6, 0.95]); }
+  }
+  // kursor 3D: silang sumbu X (merah) Y (hijau) Z (biru) di posisi snap, ukuran tetap ±18 px di layar
+  if (S.cur && !S.plan && !drag) {
+    const v = toView(S.cur), dd = Math.hypot(v[0] - cam.e[0], v[1] - cam.e[1], v[2] - cam.e[2]);
+    const len = 18 * (2 * dd * Math.tan(S.cam.fov / 2) / cam.H), c0 = S.cur;
+    for (const [a, rgb] of [[0, [1, 0.3, 0.3]], [1, [0.3, 1, 0.4]], [2, [0.4, 0.6, 1]]]) {
+      const d = [0, 0, 0]; d[a] = a === 2 ? len / S.ex : len;
+      put({ x: c0.x - d[0], y: c0.y - d[1], z: c0.z - d[2] }); put({ x: c0.x + d[0], y: c0.y + d[1], z: c0.z + d[2] }); call(gl.LINES, 2, rgb);
+    }
+  }
+  if (S.cur && S.cur.m !== 'point') { put(S.cur); call(gl.POINTS, 1, [1, 1, 1], 7); put(S.cur); call(gl.POINTS, 1, bg(), 3); }
+  // pusat putar saat memutar dengan tombol kanan
+  if (drag && drag.moved && (drag.b === 2 || (drag.b === 0 && drag.ctrl))) {
+    const t = S.cam.t, w = toWorld(t), L2 = 12 * (2 * S.cam.dist * Math.tan(S.cam.fov / 2) / cam.H);
+    put({ x: w.x - L2, y: w.y, z: w.z }); put({ x: w.x + L2, y: w.y, z: w.z }); put({ x: w.x, y: w.y - L2, z: w.z }); put({ x: w.x, y: w.y + L2, z: w.z }); call(gl.LINES, 4, [1, 0.85, 0.2]);
   }
   // kotak snap di titik terdekat (fungsi aktif)
   if (S.hover) { putI(S.hover.L, S.hover.i); call(gl.POINTS, 1, [1, 1, 1], 14); putI(S.hover.L, S.hover.i); call(gl.POINTS, 1, bg(), 9); putI(S.hover.L, S.hover.i); call(gl.POINTS, 1, [1, 1, 1], 3); }
@@ -486,6 +500,61 @@ function segOf(L, i) {
   while (b + 1 < L.r.rows && sn[b + 1] === s) b++;
   return { L, a, b, s };
 }
+/* ---------- kursor 3D seperti Surpac: sinar dari mata melewati kursor + mode snap ----------
+   Plane = perpotongan dengan bidang aktif (default horizontal Z 0, seperti Surpac) · Point = titik terdekat
+   Line = posisi di garis string terdekat · Triangle = permukaan DTM di bawah kursor */
+const SNAP = { plane: ['Bidang', '1'], point: ['Titik', '2'], line: ['Garis', '3'], tri: ['Segitiga DTM', '4'] };
+S.snap = 'point'; S.plane = { z: 0 };
+function ray(px, py) {               // ruang tampilan (relatif origin, z dikali Z×)
+  const c = camera(), nx = px / c.W * 2 - 1, ny = 1 - py / c.H * 2, t = S.cam.t;
+  const q = [0, 1, 2].map((a) => t[a] + c.R[a] * nx * c.halfW + c.U[a] * ny * c.halfH);
+  if (S.plan) { const big = c.halfH * 1e4 + 1e6; return { o: q.map((v, a) => v - c.F[a] * big), d: c.F.slice() }; }
+  return { o: c.e.slice(), d: norm(q.map((v, a) => v - c.e[a])) };
+}
+const toWorld = (v) => { const O = S.origin || [0, 0, 0]; return { x: v[0] + O[0], y: v[1] + O[1], z: v[2] / S.ex + O[2] }; };
+const toView = (p) => { const O = S.origin || [0, 0, 0]; return [p.x - O[0], p.y - O[1], (p.z - O[2]) * S.ex]; };
+function planeAt(px, py) {
+  const r = ray(px, py), O = S.origin || [0, 0, 0], zp = (S.plane.z - O[2]) * S.ex;
+  if (Math.abs(r.d[2]) < 1e-9) return null;
+  const t = (zp - r.o[2]) / r.d[2]; if (t < 0) return null;
+  const w = toWorld([r.o[0] + r.d[0] * t, r.o[1] + r.d[1] * t, zp]); w.z = S.plane.z; return w;
+}
+function triAt(px, py) {
+  if (S.plan) { const g = ground(px, py), z = zAt(g.x, g.y); return isNaN(z) ? null : { x: g.x, y: g.y, z }; }
+  const r = ray(px, py), b = sceneBox(); if (!b) return null;
+  const O = S.origin || [0, 0, 0], f = (t) => { const w = toWorld([r.o[0] + r.d[0] * t, r.o[1] + r.d[1] * t, r.o[2] + r.d[2] * t]); const z = zAt(w.x, w.y); return isNaN(z) ? NaN : w.z - z; };
+  const far = Math.hypot(r.o[0] - (b[0] + b[3]) / 2, r.o[1] - (b[1] + b[4]) / 2, r.o[2] - (b[2] + b[5]) / 2 * S.ex) + sceneSize() * 1.5, N = 400;
+  let t0 = 0, f0 = f(0);
+  for (let k = 1; k <= N; k++) {           // berjalan di sepanjang sinar sampai menembus permukaan, lalu bagi dua
+    const t1 = far * k / N, f1 = f(t1);
+    if (!isNaN(f0) && !isNaN(f1) && f0 > 0 && f1 <= 0) {
+      let a = t0, c = t1; for (let it = 0; it < 40; it++) { const m = (a + c) / 2; if (f(m) > 0) a = m; else c = m; }
+      const w = toWorld([r.o[0] + r.d[0] * c, r.o[1] + r.d[1] * c, r.o[2] + r.d[2] * c]); w.z = zAt(w.x, w.y); return w;
+    }
+    t0 = t1; f0 = f1;
+  }
+  return null;
+}
+function lineAt(px, py, h) {          // posisi di garis string terdekat dengan sinar kursor
+  h = h || hit(px, py, 14);
+  if (!h.e || h.e.d > 14) return null;
+  const { L, i } = h.e, P = L.pos, A = [P[3 * i], P[3 * i + 1], P[3 * i + 2] * S.ex];
+  if (!isEdge(L, i)) { const q = pointInfo(L, i); return { x: q.x, y: q.y, z: q.z, L, i }; }
+  const B = [P[3 * i + 3], P[3 * i + 4], P[3 * i + 5] * S.ex], r = ray(px, py);
+  const u = B.map((v, a) => v - A[a]), w0 = A.map((v, a) => v - r.o[a]);
+  const a = u[0] * u[0] + u[1] * u[1] + u[2] * u[2], bb = u[0] * r.d[0] + u[1] * r.d[1] + u[2] * r.d[2], c = 1;
+  const d = u[0] * w0[0] + u[1] * w0[1] + u[2] * w0[2], e = r.d[0] * w0[0] + r.d[1] * w0[1] + r.d[2] * w0[2], den = a * c - bb * bb;
+  const s = Math.max(0, Math.min(1, den > 1e-12 ? (bb * e - c * d) / den : 0));
+  const wv = toWorld(A.map((v, k) => v + u[k] * s)), r0 = L.r;
+  wv.z = r0.z[i] + (r0.z[i + 1] - r0.z[i]) * s;            // z tepat di garis (tanpa pembulatan Z×)
+  return Object.assign(wv, { L, i, s });
+}
+/* posisi kursor menurut mode snap -> {x, y, z, m: mode, L?, i?} atau null */
+function cursorAt(px, py, mode = S.snap, h = null) {
+  if (mode === 'point') { h = h || hit(px, py, 30); if (!h.v || h.v.d > 30) return null; const q = pointInfo(h.v.L, h.v.i); return { x: q.x, y: q.y, z: q.z, m: mode, L: h.v.L, i: h.v.i }; }
+  const p = mode === 'line' ? lineAt(px, py, h) : mode === 'tri' ? triAt(px, py) : planeAt(px, py);
+  return p ? Object.assign(p, { m: mode }) : null;
+}
 function ground(px, py) {      // titik di bidang tampak (plan: koordinat sebenarnya)
   const c = camera(), nx = px / c.W * 2 - 1, ny = 1 - py / c.H * 2, t = S.cam.t, O = S.origin || [0, 0, 0];
   const q = [0, 1, 2].map((a) => t[a] + c.R[a] * nx * c.halfW + c.U[a] * ny * c.halfH);
@@ -524,12 +593,9 @@ function renderPicks() {
 /* ---------- ukur ---------- */
 function doMeasure(px, py) {
   if (!S.measOpen) { S.meas = []; S.measOpen = true; }
-  const h = nearest(px, py);
-  let p;
-  if (h) { const q = pointInfo(h.L, h.i); p = { x: q.x, y: q.y, z: q.z, snap: true }; }
-  else if (S.plan) { const g = ground(px, py); p = { x: g.x, y: g.y, z: zAt(g.x, g.y), snap: false }; }
-  else return;
-  S.meas.push(p); S.dirty = true; renderMeasure();
+  const c = cursorAt(px, py);
+  if (!c) { if (!S.meas.length) S.measOpen = false; msg(`Snap ${SNAP[S.snap][0]}: tidak ada ${{ point: 'titik', line: 'garis', tri: 'permukaan DTM', plane: 'bidang aktif' }[S.snap]} di bawah kursor. Ganti snap: klik kanan atau tombol 1–4.`, 'w'); return; }
+  S.meas.push({ x: c.x, y: c.y, z: c.z, snap: c.m === 'point', m: c.m }); S.dirty = true; renderMeasure();
 }
 function surfLen(a, b) {      // panjang mengikuti permukaan DTM (sampel tiap 1 m)
   const L = Math.hypot(b.x - a.x, b.y - a.y), n = Math.max(1, Math.ceil(L));
@@ -564,7 +630,7 @@ function renderMeasure() {
     <table><tr><td>Miring (lurus antar titik)</td><td>${f3(SL)} m</td></tr>
     <tr><td>Mengikuti permukaan DTM</td><td>${isNaN(SF) ? '<span class="muted">di luar DTM</span>' : f3(SF) + ' m'}</td></tr>
     <tr><td>Bearing ruas terakhir</td><td>${dms(last.br)}</td></tr><tr><td>ΔZ total</td><td>${f3(m[m.length - 1].z - m[0].z)} m</td></tr></table>
-    <div class="muted" style="margin-top:4px">${S.measOpen ? 'Esc = selesai.' : 'Selesai. Klik lagi untuk ukuran baru.'} * = titik bebas (tidak menempel ke titik string).</div>`;
+    <div class="muted" style="margin-top:4px">${S.measOpen ? 'Esc = selesai.' : 'Selesai. Klik lagi untuk ukuran baru.'} * = bukan titik string (snap Bidang/Garis/Segitiga).</div>`;
 }
 
 /* ---------- ekspor ---------- */
@@ -656,28 +722,31 @@ function info() {
    roda = zoom di kursor · tombol tengah seret = geser · tombol kanan seret = putar (dari Plan langsung ke 3D)
    kiri seret = geser (cadangan untuk touchpad) · klik kiri = pilih / titik fungsi · klik kanan = menu
    Fungsi (Point properties, Bearing & distance): pilih fungsi dulu, ikuti petunjuk di status bar, Esc = selesai. */
-const TOOL_NAME = { ident: 'Point properties', meas: 'Bearing and distance' };
+const TOOL_NAME = { ident: 'Point properties', meas: 'Bearing and distance', target: 'Select camera target' };
 function prompt_() {
   let t;
   if (S.tool === 'ident') t = 'Point properties: klik titik (menempel ke titik terdekat). Esc / klik kanan = selesai.';
   else if (S.tool === 'meas') t = !S.measOpen || !S.meas.length ? 'Bearing and distance: klik titik pertama. Esc = selesai.'
     : `Bearing and distance: klik titik berikutnya (${S.meas.length} titik). Backspace = batal titik terakhir, Esc = akhiri garis.`;
+  else if (S.tool === 'target') t = 'Select camera target: klik titik/permukaan yang menjadi pusat putar. Esc = batal.';
   else t = S.sel.length ? `${selText()} — klik kanan = menu, Esc = batal pilih.` : 'Klik garis/titik untuk memilih · klik kanan = menu · roda = zoom · tengah seret = geser · kanan seret = putar';
+  if (S.tool && S.tool !== 'ident') t += `  [Snap: ${SNAP[S.snap][0]} — tombol 1–4 / klik kanan]`;
   $('#sPrompt').textContent = t;
+  $('#sPlane').textContent = `Bidang: Horizontal Z ${f3(S.plane.z)}`;
   $('#sPrompt').classList.toggle('fn', !!S.tool);
 }
 function setTool(t) {
   if (S.tool === t && t) { endTool(); return; }
   S.tool = t || null; S.measOpen = false;
   $('#bIdent').classList.toggle('on', t === 'ident'); $('#bMeasure').classList.toggle('on', t === 'meas');
-  if (t) showTab(t === 'ident' ? 'tIdent' : 'tMeasure');
+  if (t === 'ident' || t === 'meas') showTab(t === 'ident' ? 'tIdent' : 'tMeasure');
   if (t) msg(`Fungsi ${TOOL_NAME[t]} dimulai.`);
   prompt_(); S.dirty = true;
 }
 function endTool() {
   if (!S.tool) return;
   msg(`Fungsi ${TOOL_NAME[S.tool]} selesai.`);
-  S.tool = null; S.measOpen = false; S.hover = null;
+  S.tool = null; S.measOpen = false; S.hover = null; S.cur = null;
   $('#bIdent').classList.remove('on'); $('#bMeasure').classList.remove('on');
   renderMeasure(); prompt_(); S.dirty = true;
 }
@@ -737,6 +806,7 @@ function ctxMenu(x, y, h) {
   if (S.tool) {
     items.push([`Selesai: ${TOOL_NAME[S.tool]} (Esc)`, endTool]);
     if (S.tool === 'meas') { items.push(['Akhiri garis ukur', escKey, !S.measOpen || !S.meas.length], ['Batal titik terakhir (Backspace)', undoMeas, !S.meas.length]); }
+    if (S.tool !== 'ident') { items.push('-'); for (const [m, [nm, k]] of Object.entries(SNAP)) items.push([`${S.snap === m ? '● ' : '○ '}Snap ${nm} (${k})`, () => setSnap(m)]); }
     items.push('-');
   }
   const g = h && h.e && h.e.d <= 8 ? segOf(h.e.L, h.e.i) : null;
@@ -748,22 +818,40 @@ function ctxMenu(x, y, h) {
       ['Simpan pilihan sebagai .str…', () => { const nm = window.prompt('Nama file:', `pilihan_str${f.s}`); if (nm) saveStr(nm.replace(/\.str$/i, ''), selRows()); }],
       [`Sembunyikan string ${f.s}`, () => hideString(f.L, f.s)], ['Batal pilih (Esc)', () => { S.sel = []; S.dirty = true; prompt_(); }], '-');
   }
+  const here = h && hoverXY ? (h.v && h.v.d <= 10 ? cursorAt(hoverXY[0], hoverXY[1], 'point', h) : null) || cursorAt(hoverXY[0], hoverXY[1], 'tri') : null;
+  items.push(['Pusat putar di sini (camera target)', () => setTarget(here), !here], ['Bidang aktif ke Z di sini', () => setPlaneZ(here.z), !here],
+    [`Bidang aktif Z… (sekarang ${f3(S.plane.z)})`, () => { const v = window.prompt('Elevasi bidang aktif (horizontal):', String(S.plane.z)); if (v !== null) setPlaneZ(parseFloat(v.replace(',', '.'))); }], '-');
   items.push(['Zoom all (F)', zoomAll], [S.plan ? '3D view (3)' : 'Plan view (P)', () => setPlan(!S.plan)],
     ['Point properties (I)', () => setTool('ident')], ['Bearing and distance (M)', () => setTool('meas')]);
   showCtx(x, y, items.map((it) => (it === '-' ? it : [it[0], it[1], !!it[2]])));
 }
+function setTarget(c) {         // Select camera target: pusat putar di titik ini (layar ikut berpusat ke titik itu)
+  if (!c) { msg('Tidak ada titik/permukaan di bawah kursor.', 'w'); return; }
+  S.cam.t = toView(c); S.dirty = true;
+  msg(`Pusat putar (camera target): Y ${f3(c.y)}  X ${f3(c.x)}  Z ${f3(c.z)}`, 'ok');
+  if (S.tool === 'target') endTool();
+}
+function setSnap(m) { S.snap = m; msg(`Snap: ${SNAP[m][0]}`); prompt_(); if (hoverXY) { hoverQueued = true; requestAnimationFrame(updateHover); } }
+function setPlaneZ(z) { if (!isFinite(z)) return; S.plane.z = z; msg(`Bidang aktif: Horizontal Z ${f3(z)}`); prompt_(); S.dirty = true; }
 function undoMeas() { if (!S.meas.length) return; S.meas.pop(); S.measOpen = S.meas.length > 0; renderMeasure(); prompt_(); S.dirty = true; }
 /* hover: snap ke titik (fungsi aktif) atau sorot garis (tanpa fungsi), sekali per frame */
 function updateHover() {
   hoverQueued = false;
   if (!hoverXY || drag) return;
-  const [px, py] = hoverXY, h = hit(px, py, 12, true);
-  const v = h.v && h.v.d <= 10 ? h.v : null, e = !S.tool && h.e && h.e.d <= 8 ? segOf(h.e.L, h.e.i) : null;
-  const changed = (S.hover && S.hover.L) !== (v && v.L) || (S.hover && S.hover.i) !== (v && v.i) || (S.hoverSeg && S.hoverSeg.a) !== (e && e.a) || (S.hoverSeg && S.hoverSeg.L) !== (e && e.L);
-  S.hover = S.tool || !e ? v : null; S.hoverSeg = e;
-  if (S.hover) { const q = pointInfo(S.hover.L, S.hover.i); $('#sXY').textContent = `◻ str ${q.s} · seg ${q.seg} · titik ${q.pt}   Y ${f3(q.y)}   X ${f3(q.x)}   Z ${f3(q.z)}`; }
-  else if (S.plan && S.origin) { const gr = ground(px, py); $('#sXY').textContent = `Y ${f3(gr.y)}   X ${f3(gr.x)}   Z ${f3(zAt(gr.x, gr.y))}`; }
-  else $('#sXY').textContent = 'Tampak 3D — dekatkan kursor ke titik untuk koordinat';
+  const [px, py] = hoverXY, h = hit(px, py, 30, true);
+  const e = !S.tool && h.e && h.e.d <= 8 ? segOf(h.e.L, h.e.i) : null;
+  // fungsi aktif: posisi menurut mode snap (Point properties selalu snap titik); tanpa fungsi: titik dekat, DTM, lalu bidang
+  let c = null;
+  if (S.tool) c = cursorAt(px, py, S.tool === 'ident' ? 'point' : S.snap, h);
+  else if (S.origin) c = (h.v && h.v.d <= 10 ? cursorAt(px, py, 'point', h) : null) || cursorAt(px, py, 'tri') || cursorAt(px, py, 'plane');
+  const v = c && c.m === 'point' && (S.tool || !e) ? { L: c.L, i: c.i } : null;
+  const key = (o) => o ? [o.L && o.L.id, o.i, o.a, o.x, o.y].join() : '';
+  const changed = key(S.hover) !== key(v) || key(S.hoverSeg) !== key(e) || (S.tool && key(S.cur) !== key(c));
+  S.hover = v; S.hoverSeg = e; S.cur = S.tool ? c : null;
+  const lbl = { point: 'Titik', line: 'Garis', tri: 'DTM', plane: 'Bidang' };
+  if (c && c.m === 'point') { const q = pointInfo(c.L, c.i); $('#sXY').textContent = `◻ str ${q.s} · seg ${q.seg} · titik ${q.pt}   Y ${f3(q.y)}   X ${f3(q.x)}   Z ${f3(q.z)}`; }
+  else if (c) $('#sXY').textContent = `${lbl[c.m]}:   Y ${f3(c.y)}   X ${f3(c.x)}   Z ${f3(c.z)}`;
+  else $('#sXY').textContent = S.tool ? `Snap ${SNAP[S.snap][0]}: tidak ada di bawah kursor` : 'Y –  X –  Z –';
   if (changed) S.dirty = true;
 }
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -801,6 +889,7 @@ canvas.addEventListener('pointerup', (e) => {
   if (d.b !== 0) return;
   if (S.tool === 'ident') doIdent(px, py);
   else if (S.tool === 'meas') { doMeasure(px, py); prompt_(); }
+  else if (S.tool === 'target') setTarget(cursorAt(px, py) || cursorAt(px, py, 'tri') || cursorAt(px, py, 'plane'));
   else {
     const h = hit(px, py, 12), g = h.e && h.e.d <= 8 ? segOf(h.e.L, h.e.i) : null;
     if (g) selectSeg(g, e.shiftKey || e.ctrlKey);
@@ -821,6 +910,7 @@ canvas.addEventListener('wheel', (e) => {
   c.dist *= k; S.dirty = true;
   if (!hoverQueued) { hoverQueued = true; requestAnimationFrame(updateHover); }
 }, { passive: false });
+$('#sPlane').onclick = () => { const v = window.prompt('Elevasi bidang aktif (horizontal):', String(S.plane.z)); if (v !== null) setPlaneZ(parseFloat(v.replace(',', '.'))); };
 prompt_();
 /* jendela form mengambang (seperti form fungsi Surpac) */
 let winZ = 20;
@@ -851,6 +941,7 @@ window.addEventListener('keydown', (e) => {
   const k = e.key.toLowerCase();
   if (k === 'escape') escKey();
   else if (k === 'backspace' && S.tool === 'meas') { e.preventDefault(); undoMeas(); }
+  else if (S.tool && S.tool !== 'ident' && '1234'.includes(k)) setSnap(Object.keys(SNAP).find((m) => SNAP[m][1] === k));
   else if (k === 'f') zoomAll(); else if (k === 'p') setPlan(true); else if (k === '3') setPlan(false);
   else if (k === 'i') setTool('ident'); else if (k === 'm') setTool('meas');
 });
@@ -874,5 +965,5 @@ view.addEventListener('drop', (e) => { e.preventDefault(); $('#drop').classList.
 /*TOOLS*/
 /*TAURI*/
 /*NAV*/
-window.SMA = { S, run, addStr, attachDtm, navAddRoot, NAV, openNodes, msg, loadFiles, zoomAll, setPlan, setTool, endTool, nearest, hit, zAt, camera, draw, ground };   // untuk uji otomatis
+window.SMA = { S, cursorAt, ray, setSnap, setPlaneZ, setTarget, run, addStr, attachDtm, navAddRoot, NAV, openNodes, msg, loadFiles, zoomAll, setPlan, setTool, endTool, nearest, hit, zAt, camera, draw, ground };   // untuk uji otomatis
 })();

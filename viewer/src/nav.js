@@ -225,6 +225,7 @@ const CMD = {
   bg: () => { $('#view').classList.toggle('light'); S.dirty = true; try { localStorage.setItem('smaBg', $('#view').classList.contains('light') ? 'l' : 'd'); } catch (e) {} },
   theme: () => $('#bTheme').click(),
   msg: () => $('#msgwin').classList.toggle('min'), msgClear: () => { $('#msgLog').innerHTML = ''; },
+  target: () => setTool('target'),
   ident: () => setTool('ident'), meas: () => setTool('meas'), sec: () => showTab('tSec'),
   dtm: () => showTab('tDtm'), sod: () => { showTab('tDtm'); $('#sodSrc').focus(); }, vol: () => showTab('tVol'),
   raw: () => showTab('tRaw'),
