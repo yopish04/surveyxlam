@@ -64,11 +64,12 @@ async function saveFile(name, bytes) {
       try { await S.dir.getFileHandle(name); } catch (e) { exists = false; }
       if (exists && !confirm(`${name} sudah ada di folder ${S.dir.name}. Timpa?`)) return false;
       const fh = await S.dir.getFileHandle(name, { create: true }), w = await fh.createWritable();
-      await w.write(bytes); await w.close(); return true;
+      await w.write(bytes); await w.close(); msg(`Disimpan: ${name} → ${S.dirPath || S.dir.name}`, 'ok'); navRefreshDir(S.dir); return true;
     } catch (e) { alert('Gagal menulis ke folder: ' + e.message + '\nFile diunduh saja.'); }
   }
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([bytes])); a.download = name;
+  msg(`Diunduh: ${name} (folder Downloads). Pilih folder kerja di Navigator supaya tersimpan langsung.`, 'w');
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 10000);
   return true;
@@ -99,7 +100,8 @@ async function doCreateDtm() {
       <table><tr><td>Titik dipakai</td><td>${r.npts.toLocaleString('id-ID')}</td></tr><tr><td>Breakline dilewati</td><td>${r.skipped}</td></tr><tr><td>Waktu</td><td>${(ms / 1000).toFixed(1)} detik</td></tr></table>
       <div class="muted">Aturan sama dengan CREATE DTM Surpac: string ${esc($('#dtmSkip').value)} tidak dipakai, string ${esc($('#dtmSpot').value)} = titik saja, string lain = breakline.</div>`;
     renderLayers(); S.dirty = true;
-  } catch (e) { out.textContent = 'Gagal: ' + e.message.split('\n')[0]; }
+    msg(`CREATE DTM ${L.name}: ${r.ntri.toLocaleString('id-ID')} segitiga, ${r.skipped} breakline dilewati, ${(ms / 1000).toFixed(1)} s`, 'ok');
+  } catch (e) { out.textContent = 'Gagal: ' + e.message.split('\n')[0]; msg('CREATE DTM gagal: ' + e.message.split('\n')[0], 'e'); }
   busy(null);
 }
 
@@ -214,6 +216,7 @@ async function doVolume() {
     const ms = performance.now() - t0;
     volLast = { A: A.name.replace(' (dibuat)', ''), B: B.name.replace(' (dibuat)', ''), bdy: Bd.name, no, res, ms, date: new Date() };
     renderVolume();
+    msg(`VOLUME ${volLast.A} → ${volLast.B} (${Bd.name} str ${no}): nett ${fv(volTotals(res).nett)} m³, ${(ms / 1000).toFixed(1)} s`, 'ok');
   } catch (e) { $('#volOut').textContent = 'Gagal: ' + e.message.split('\n')[0]; }
   busy(null);
 }
@@ -297,7 +300,9 @@ async function doUpdate() {
     $('#upOut .files').onclick = (e) => { const i = e.target.dataset.i; if (i !== undefined) saveFile(r.files[i].name, r.files[i].data).then((ok) => ok && flash(e.target, 'Tersimpan ✓')); };
     $('#upAll').onclick = async (e) => { for (const f of r.files) await saveFile(f.name, f.data); flash(e.target, 'Tersimpan ✓'); };
     renderLayers(); zoomAll();
-  } catch (e) { $('#upOut').textContent = 'Gagal: ' + e.message.split('\n')[0]; }
+    msg(`UPDATE (${j}): ${r.files.map((f) => f.name).join(', ')}${r.cek ? ` · ${r.cek} titik _CEK` : ''}`, 'ok');
+    if (S.dir && $('#upAuto').checked) { for (const f of r.files) await saveFile(f.name, f.data); }
+  } catch (e) { $('#upOut').textContent = 'Gagal: ' + e.message.split('\n')[0]; msg('UPDATE gagal: ' + e.message.split('\n')[0], 'e'); }
   busy(null);
 }
 
@@ -352,5 +357,4 @@ $('#upJenis').onchange = upJenis; upJenis();
 $('#upBtn').onclick = doUpdate;
 $('#secBtn').onclick = doSection;
 $('#measSod').onclick = measSod;
-for (const b of document.querySelectorAll('.pickDir')) b.onclick = pickDir;
 refreshTools();

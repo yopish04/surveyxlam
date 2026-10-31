@@ -3,14 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SMA Viewer</title>
+<title>SMA Survey</title>
 <style>:root{
   --bg:#f4f5f7; --panel:#ffffff; --line:#d9dce2; --text:#1d2330; --muted:#677084; --accent:#1f6feb; --accent-ink:#fff;
-  --view:#e9ecf1; --hover:#eef2f8; --chip:#f0f2f5;
+  --view:#000000; --hover:#e6ecf5; --chip:#f0f2f5; --chrome:#e9ebef;
 }
+#view.light{--view:#ffffff}
 :root[data-theme="dark"]{
   --bg:#15181e; --panel:#1c2028; --line:#2e3440; --text:#e3e7ee; --muted:#8a93a6; --accent:#4c8dff; --accent-ink:#fff;
-  --view:#0f1115; --hover:#262c37; --chip:#252a33;
+  --view:#000000; --hover:#262c37; --chip:#252a33; --chrome:#181b21;
 }
 *{box-sizing:border-box}
 html,body{height:100%;margin:0}
@@ -20,16 +21,9 @@ button:hover,.btn:hover{background:var(--hover)}
 .btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 .tog.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 input{font:inherit;color:var(--text);background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:3px 6px}
-#bar{display:flex;align-items:center;gap:6px;padding:6px 10px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
-#bar .brand{font-weight:700;margin-right:6px;letter-spacing:.2px}
-#bar .sep{width:1px;height:22px;background:var(--line);margin:0 4px}
-#bar .grow{flex:1}
 .fld{display:flex;align-items:center;gap:4px;color:var(--muted)}
 #zEx{width:56px} #spotIn{width:80px}
 main{flex:1;display:flex;min-height:0}
-#left{width:260px;background:var(--panel);border-right:1px solid var(--line);overflow:auto;flex-shrink:0}
-#right{width:440px;background:var(--panel);border-left:1px solid var(--line);display:flex;flex-direction:column;flex-shrink:0;min-height:0}
-.ptitle{font-weight:600;padding:8px 10px;border-bottom:1px solid var(--line)}
 .empty{padding:14px 12px;color:var(--muted)}
 #view{flex:1;position:relative;background:var(--view);min-width:0}
 #gl{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:crosshair}
@@ -69,7 +63,6 @@ td{padding:2px 4px;border-bottom:1px solid var(--line);white-space:nowrap}
 #status{display:flex;justify-content:space-between;gap:12px;padding:4px 10px;background:var(--panel);border-top:1px solid var(--line);color:var(--muted);font-variant-numeric:tabular-nums;font-size:12px}
 dialog{border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--text);max-width:620px}
 dialog li{margin:4px 0}
-@media (max-width:900px){#right{width:280px}#left{width:200px}}
 
 .tabs{flex-wrap:wrap}
 .tabs button{padding:3px 8px}
@@ -98,57 +91,175 @@ svg.sec text{font-size:10px;fill:var(--muted)}
 svg.sec .gr{stroke:var(--line);stroke-width:.6}
 .legend{display:flex;flex-wrap:wrap;gap:10px;font-size:11px}
 .legend i{display:inline-block;width:12px;height:3px;margin-right:4px;vertical-align:middle}
+
+/* ---- kerangka mirip Surpac ---- */
+#menubar{display:flex;align-items:center;gap:2px;padding:2px 8px;background:var(--chrome);border-bottom:1px solid var(--line);user-select:none}
+#menubar .brand{font-weight:700;margin-right:10px;letter-spacing:.2px}
+.menu{position:relative}
+.menu>button{border:0;background:transparent;border-radius:4px;padding:3px 9px}
+.menu>button:hover,.menu.open>button{background:var(--hover)}
+.drop{display:none;position:absolute;left:0;top:100%;min-width:260px;background:var(--panel);border:1px solid var(--line);border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:4px;z-index:50}
+.menu.open .drop{display:block}
+.drop a,#ctx a{display:flex;justify-content:space-between;gap:16px;padding:5px 10px;border-radius:4px;cursor:pointer;white-space:nowrap}
+.drop a:hover,#ctx a:hover{background:var(--accent);color:var(--accent-ink)}
+.drop a i,#ctx a i{font-style:normal;color:var(--muted)}
+.drop a:hover i{color:inherit}
+.drop hr,#ctx hr{border:0;border-top:1px solid var(--line);margin:4px 2px}
+#toolbar{display:flex;align-items:center;gap:4px;padding:4px 8px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
+#toolbar button,#toolbar .tb{height:28px;min-width:30px;padding:0 7px;display:inline-flex;align-items:center;justify-content:center;border-radius:5px;background:var(--chip);border:1px solid var(--line);cursor:pointer}
+#toolbar svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linejoin:round;stroke-linecap:round}
+#toolbar .tog.on svg{stroke:var(--accent-ink)}
+#toolbar .sep{width:1px;height:22px;background:var(--line);margin:0 4px}
+#toolbar .grow{flex:1}
+#left{width:290px;background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;flex-shrink:0;min-height:0}
+#navPane{flex:0 0 55%;display:flex;flex-direction:column;min-height:80px;overflow:hidden}
+#layPane{flex:1;display:flex;flex-direction:column;min-height:80px;overflow:hidden}
+#layers{overflow:auto;flex:1}
+#splitter{height:5px;cursor:row-resize;background:var(--line)}
+.ptitle{display:flex;align-items:center;justify-content:space-between;gap:6px;font-weight:600;padding:4px 8px;background:var(--chrome);border-bottom:1px solid var(--line)}
+.pact{display:flex;gap:3px;align-items:center;font-weight:400}
+.pact button{padding:0 6px;height:22px;border-radius:4px}
+.pact select{font-size:11px;padding:1px 2px}
+#tree{overflow:auto;flex:1;padding:2px 0;font-size:12px}
+#tree .empty a,.empty a{color:var(--accent);cursor:pointer;text-decoration:underline}
+.tn{display:flex;align-items:center;gap:4px;padding:2px 6px;cursor:default;white-space:nowrap;user-select:none}
+.tn:hover{background:var(--hover)}
+.tn.sel{background:var(--accent);color:var(--accent-ink)}
+.tn.sel .tsz{color:inherit}
+.tn .tc{width:12px;color:var(--muted);flex-shrink:0;text-align:center;cursor:pointer}
+.tn .ti{width:16px;height:14px;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;border-radius:2px}
+.ti.fold{background:#e3b341}.ti.str{background:#2f81f7;color:#fff}.ti.dtm{background:#2e9d5b;color:#fff}.ti.shp{background:#9a6324;color:#fff}.ti.oth{background:var(--line)}
+.ti.root{background:#6e7781;color:#fff}
+.tn .tnm{overflow:hidden;text-overflow:ellipsis}
+.tn .tsz{margin-left:auto;color:var(--muted);font-size:10px;padding-left:6px}
+.tn.lock{color:var(--muted);font-style:italic}
+.tn .ro{font-size:9px;color:#c47f00;border:1px solid #c47f00;border-radius:3px;padding:0 3px}
+.lrow.act{background:var(--hover);box-shadow:inset 3px 0 var(--accent)}
+#center{flex:1;display:flex;flex-direction:column;min-width:0}
+#view{flex:1;position:relative;background:var(--view);min-height:0}
+#north{color:#9aa3b2}
+#msgwin{height:120px;display:flex;flex-direction:column;border-top:1px solid var(--line);background:var(--panel)}
+#msgwin.min{height:auto}
+#msgwin.min #msgLog{display:none}
+#msgLog{flex:1;overflow:auto;font:12px/1.4 Consolas,"Cascadia Mono",monospace;padding:4px 8px;white-space:pre-wrap}
+#msgLog .w{color:#c47f00}#msgLog .e{color:#d64545}#msgLog .ok{color:#2e9d5b}
+#msgLog time{color:var(--muted);margin-right:8px}
+#status span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.win{position:fixed;top:96px;right:16px;width:450px;max-width:calc(100vw - 24px);max-height:calc(100vh - 150px);display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,.28);z-index:20}
+.win .wt{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 6px 6px 12px;background:var(--chrome);border-bottom:1px solid var(--line);border-radius:8px 8px 0 0;font-weight:600;cursor:move;user-select:none}
+.win .wx{border:0;background:transparent;padding:2px 8px}
+.win .wb{overflow:auto;padding:10px;display:flex;flex-direction:column;gap:8px;min-height:0}
+#ctx{position:fixed;z-index:60;background:var(--panel);border:1px solid var(--line);border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,.2);padding:4px;min-width:200px}
+#ctx a.dis{opacity:.45;pointer-events:none}
+#toolbar .tog.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 </style>
 </head>
 <body>
-<header id="bar">
-  <span class="brand">SMA Viewer</span>
-  <label class="btn primary" title="Buka .str, .dtm, .shp (boleh banyak sekaligus, atau seret file ke layar)">Buka file<input id="fileIn" type="file" multiple accept=".str,.dtm,.shp" hidden></label>
+<nav id="menubar">
+  <span class="brand">SMA Survey</span>
+  <div class="menu"><button>File</button><div class="drop">
+    <a data-cmd="navAdd">Set work directory… <i>folder kerja</i></a>
+    <a data-cmd="navAddRo">Tambah folder server (baca saja)…</a>
+    <hr><a data-cmd="open">Open file… <i>Ctrl+O</i></a>
+    <a data-cmd="save">Save layer <i>Ctrl+S</i></a>
+    <a data-cmd="saveAs">Save layer as…</a>
+    <hr><a data-cmd="closeAll">Close all layers</a>
+  </div></div>
+  <div class="menu"><button>View</button><div class="drop">
+    <a data-cmd="zoom">Zoom all <i>F</i></a><a data-cmd="plan">Plan view <i>P</i></a><a data-cmd="3d">3D view <i>3</i></a>
+    <hr><a data-cmd="bg">Latar grafis hitam / putih</a><a data-cmd="theme">Tema panel terang / gelap</a><a data-cmd="msg">Message window</a>
+  </div></div>
+  <div class="menu"><button>Inquire</button><div class="drop">
+    <a data-cmd="ident">Point properties <i>I</i></a><a data-cmd="meas">Bearing and distance <i>M</i></a><a data-cmd="sec">Section DTM</a>
+  </div></div>
+  <div class="menu"><button>Surfaces</button><div class="drop">
+    <a data-cmd="dtm">Create DTM from layer</a><a data-cmd="sod">String over DTM (SOD)</a><a data-cmd="sec">Section DTM</a>
+  </div></div>
+  <div class="menu"><button>Volumes</button><div class="drop">
+    <a data-cmd="vol">DTM cut and fill volumes</a>
+  </div></div>
+  <div class="menu"><button>Survey</button><div class="drop">
+    <a data-cmd="upHarian">Update harian (progress + boundary)</a><a data-cmd="upPotong">String clip (potong progress)</a><a data-cmd="upBdy">Boundary: union / outersect / intersect</a>
+  </div></div>
+  <div class="menu"><button>Help</button><div class="drop"><a data-cmd="help">Cara pakai</a></div></div>
+</nav>
+<div id="toolbar">
+  <button data-cmd="navAdd" title="Set work directory"><svg viewBox="0 0 20 20"><path d="M2 5h6l2 2h8v9H2z"/></svg></button>
+  <label class="tb" title="Open file"><svg viewBox="0 0 20 20"><path d="M5 2h7l4 4v12H5z M12 2v4h4"/></svg><input id="fileIn" type="file" multiple accept=".str,.dtm,.shp" hidden></label>
+  <button data-cmd="save" title="Save layer (Ctrl+S)"><svg viewBox="0 0 20 20"><path d="M3 3h11l3 3v11H3z M6 3v5h7V3 M6 17v-6h8v6"/></svg></button>
   <span class="sep"></span>
-  <button id="bZoom" title="Zoom semua (F)">Zoom semua</button>
-  <button id="bPlan" class="tog on" title="Tampak atas (P)">Plan</button>
-  <button id="b3d" class="tog" title="Tampak 3D (3)">3D</button>
+  <button id="bZoom" title="Zoom all (F)"><svg viewBox="0 0 20 20"><path d="M3 7V3h4 M13 3h4v4 M17 13v4h-4 M7 17H3v-4"/></svg></button>
+  <button id="bPlan" class="tog on" title="Plan (P)">Plan</button>
+  <button id="b3d" class="tog" title="3D (3)">3D</button>
   <label class="fld" title="Pembesaran vertikal">Z×<input id="zEx" type="number" value="1" min="0.1" max="20" step="0.5"></label>
   <span class="sep"></span>
-  <button id="bIdent" class="tog on" title="Klik titik untuk info (I)">Identify</button>
-  <button id="bMeasure" class="tog" title="Ukur jarak/bearing; Esc = selesai (M)">Ukur</button>
+  <button id="bIdent" class="tog on" title="Point properties (I)"><svg viewBox="0 0 20 20"><circle cx="9" cy="9" r="5"/><path d="M13 13l5 5"/></svg></button>
+  <button id="bMeasure" class="tog" title="Bearing and distance (M)"><svg viewBox="0 0 20 20"><path d="M2 15L15 2l3 3L5 18z M6 11l2 2 M9 8l2 2 M12 5l2 2"/></svg></button>
+  <button data-cmd="sec" title="Section DTM"><svg viewBox="0 0 20 20"><path d="M2 15l4-6 4 3 4-8 4 5"/><path d="M2 18h16"/></svg></button>
+  <span class="sep"></span>
+  <button data-cmd="dtm" title="Create DTM">DTM</button>
+  <button data-cmd="vol" title="DTM cut and fill volumes">Vol</button>
+  <button data-cmd="upHarian" title="Update harian">Update</button>
   <span class="sep"></span>
   <label class="fld" title="Nomor string yang digambar sebagai titik (spot), mis. 500-999">Spot<input id="spotIn" value="500-999"></label>
   <label class="fld"><input id="showPts" type="checkbox"> Titik</label>
   <span class="grow"></span>
-  <button id="bTheme" title="Ganti latar">Latar</button>
-  <button id="bHelp">Bantuan</button>
-</header>
+  <button id="bTheme" title="Tema panel" hidden>Tema</button>
+  <button id="bHelp" title="Cara pakai">?</button>
+</div>
 <main>
   <aside id="left">
-    <div class="ptitle">Layer</div>
-    <div id="layers"><div class="empty">Belum ada file.<br>Klik <b>Buka file</b> atau seret file .str / .dtm / .shp ke sini.<br><br>Untuk DTM, pilih file .dtm bersama .str-nya.</div></div>
+    <section id="navPane">
+      <div class="ptitle"><span>Navigator</span><span class="pact"><button data-cmd="navAdd" title="Tambah folder kerja">+</button><button data-cmd="navRefresh" title="Segarkan">⟳</button>
+        <select id="navFilter" title="Saring file"><option value="surpac">.str .dtm .shp</option><option value="all">Semua file</option></select></span></div>
+      <div id="tree"><div class="empty">Belum ada folder kerja.<br><a data-cmd="navAdd">Set work directory…</a> (mis. D:\yopi)<br><a data-cmd="navAddRo">Tambah folder server (baca saja)…</a> (mis. Z:\)</div></div>
+    </section>
+    <div id="splitter" title="Seret untuk ubah ukuran"></div>
+    <section id="layPane">
+      <div class="ptitle"><span>Layers</span></div>
+      <div id="layers"><div class="empty">Belum ada layer. Klik dua kali file di Navigator, atau seret ke layar grafis.</div></div>
+    </section>
   </aside>
-  <section id="view">
-    <canvas id="gl"></canvas>
-    <div id="drop">Lepaskan file di sini</div>
-    <div id="busy" hidden><div class="spin"></div><span id="busyTxt">Membaca…</span></div>
-    <div id="north" title="Arah utara">N<div class="arrow"></div></div>
+  <section id="center">
+    <section id="view">
+      <canvas id="gl"></canvas>
+      <div id="drop">Lepaskan file di sini</div>
+      <div id="busy" hidden><div class="spin"></div><span id="busyTxt">Membaca…</span></div>
+      <div id="north" title="Arah utara">N<div class="arrow"></div></div>
+    </section>
+    <section id="msgwin"><div class="ptitle"><span>Message window</span><span class="pact"><button data-cmd="msgClear" title="Bersihkan">⌫</button><button data-cmd="msg" title="Sembunyikan">▾</button></span></div><div id="msgLog"></div></section>
   </section>
-  <aside id="right">
-    <div class="tabs"><button data-t="tIdent" class="on">Identify</button><button data-t="tMeasure">Ukur</button><button data-t="tSec">Section</button><button data-t="tDtm">DTM</button><button data-t="tVol">Volume</button><button data-t="tUp">Update</button></div>
-    <div id="tIdent" class="tab">
+</main>
+<footer id="status"><span id="sXY">Y –  X –  Z –</span><span id="sDir">Folder simpan: <b class="dirName">Downloads</b></span><span id="sInfo"></span></footer>
+<div id="ctx" hidden></div>
+<div id="tIdent" class="win" hidden>
+  <div class="wt"><span>POINT PROPERTIES — Identify</span><button class="wx" title="Tutup">✕</button></div>
+  <div class="wb">
       <div id="identCur" class="card muted">Klik titik di layar.</div>
       <table id="identTbl"><thead><tr><th>#</th><th>Str</th><th>Y</th><th>X</th><th>Z</th><th>Desc</th></tr></thead><tbody></tbody></table>
       <div class="acts"><button id="identCopy">Salin ke Excel</button><button id="identStr">Simpan .str</button><button id="identClr">Hapus</button></div>
     </div>
-    <div id="tMeasure" class="tab" hidden>
+</div>
+<div id="tMeasure" class="win" hidden>
+  <div class="wt"><span>BEARING AND DISTANCE — Ukur</span><button class="wx" title="Tutup">✕</button></div>
+  <div class="wb">
       <div id="measSum" class="card muted">Mode Ukur: klik titik-titik (menempel ke titik terdekat). Esc = selesai, klik lagi = ukuran baru.</div>
       <table id="measTbl"><thead><tr><th>#</th><th>Y</th><th>X</th><th>Z</th><th>Datar</th><th>Miring</th><th>Bearing</th><th>Grade</th></tr></thead><tbody></tbody></table>
       <div class="acts"><button id="measCopy">Salin ke Excel</button><button id="measStr">Simpan .str</button><button id="measClr">Hapus</button></div>
       <div class="acts"><label class="fld">String<input id="measNo" type="number" value="1" min="1" style="width:64px"></label><button id="measSod" title="Garis ukur ditempel ke DTM teratas (titik di tiap sisi segitiga), lalu disimpan">Tempel ke DTM &amp; simpan .str</button></div>
     </div>
-    <div id="tSec" class="tab" hidden>
+</div>
+<div id="tSec" class="win" hidden>
+  <div class="wt"><span>SECTION DTM</span><button class="wx" title="Tutup">✕</button></div>
+  <div class="wb">
       <div class="card"><div class="big">Section DTM</div><div id="secInfo" class="muted"></div></div>
       <div class="acts"><button id="secBtn" class="primary">Buat section</button></div>
       <div id="secOut"></div>
     </div>
-    <div id="tDtm" class="tab" hidden>
+</div>
+<div id="tDtm" class="win" hidden>
+  <div class="wt"><span>SURFACES — Create DTM / String over DTM</span><button class="wx" title="Tutup">✕</button></div>
+  <div class="wb">
       <div class="card"><div class="big">CREATE DTM</div>
         <div class="form">
           <label>String file<select id="dtmSrc"></select></label>
@@ -169,7 +280,10 @@ svg.sec .gr{stroke:var(--line);stroke-width:.6}
         <div id="sodOut"></div>
       </div>
     </div>
-    <div id="tVol" class="tab" hidden>
+</div>
+<div id="tVol" class="win" hidden>
+  <div class="wt"><span>DTM CUT AND FILL VOLUMES</span><button class="wx" title="Tutup">✕</button></div>
+  <div class="wb">
       <div class="card"><div class="big">DTM CUT AND FILL VOLUMES</div>
         <div class="form">
           <label>DTM pertama (base)<select id="volA"></select></label>
@@ -182,7 +296,10 @@ svg.sec .gr{stroke:var(--line);stroke-width:.6}
       </div>
       <div id="volOut"></div>
     </div>
-    <div id="tUp" class="tab" hidden>
+</div>
+<div id="tUp" class="win" hidden>
+  <div class="wt"><span>SURVEY — Update progress</span><button class="wx" title="Tutup">✕</button></div>
+  <div class="wb">
       <div class="card">
         <div class="form">
           <label>Pekerjaan<select id="upJenis"><option value="harian">Update harian</option><option value="potong">Potong progress</option><option value="bdy">Boundary (tambah/kurangi)</option></select></label>
@@ -200,17 +317,17 @@ svg.sec .gr{stroke:var(--line);stroke-width:.6}
           <label>Tanggal<input id="upTgl" value="auto" title="auto (dari nama file harian), 27/10/2026, 2026-10-27"></label>
           <label data-up="potong bdy">Nama hasil<input id="upNama" placeholder="kosong = otomatis"></label>
         </div>
-        <div class="acts"><button id="upBtn" class="primary">Jalankan</button><button class="pickDir" title="Pilih folder tempat menyimpan hasil (mis. D:\yopi\...)">Folder simpan: <b class="dirName">Downloads</b></button></div>
+        <div class="acts"><button id="upBtn" class="primary">Jalankan</button></div>
+        <label class="chk"><input id="upAuto" type="checkbox" checked> langsung simpan hasil ke folder simpan: <b class="dirName">Downloads</b></label>
       </div>
       <div id="upOut"></div>
       <div class="muted">Hasilnya sama byte per byte dengan add-in Excel "Update Progress". File asal tidak diubah.</div>
     </div>
-  </aside>
-</main>
-<footer id="status"><span id="sXY">Y –  X –  Z –</span><span id="sInfo"></span></footer>
+</div>
 <dialog id="help">
-  <h3>SMA Viewer — cara pakai</h3>
+  <h3>SMA Survey — cara pakai</h3>
   <ul>
+    <li><b>Navigator</b>: <i>File › Set work directory</i> untuk folder kerja (mis. D:\yopi), <i>Tambah folder server (baca saja)</i> untuk Z:\. Klik dua kali file untuk membuka (DTM otomatis membuka .str-nya), seret file ke layar grafis, klik kanan untuk menu (folder simpan, folder baru, ganti nama, hapus). Folder yang dipilih di Navigator menjadi folder simpan hasil. Folder server tidak pernah ditulisi.</li>
     <li><b>Buka file</b>: pilih .str (teks/biner), .dtm (pilih bersama .str-nya) dan .shp. Bisa juga seret file ke layar. File hanya dibaca di komputer ini, tidak dikirim ke mana pun.</li>
     <li><b>Plan</b>: seret kiri = geser, roda = zoom di kursor. <b>3D</b>: seret kiri = putar, seret kanan / Shift+seret = geser.</li>
     <li><b>Identify</b>: klik titik → nomor string, Y, X, Z, deskripsi. <b>Ukur</b>: klik beberapa titik → jarak datar, miring, bearing, grade; di atas DTM juga jarak mengikuti permukaan DTM.</li>
@@ -1483,12 +1600,14 @@ async function loadFiles(files) {
       const r = await parseFile(f.name, buf);
       r.ms = performance.now() - t0;
       if (r.kind === 'dtm') addDtm(f.name, r, msgs); else addStr(f.name, r, raw);
+      msg(`Buka ${f.name}: ${r.kind === 'dtm' ? (r.tris.length / 3).toLocaleString('id-ID') + ' segitiga' : (r.rows).toLocaleString('id-ID') + ' baris'}${r.binary ? ' (biner)' : ''}, ${Math.round(r.ms)} ms`);
     } catch (e) { msgs.push(`${f.name}: gagal dibaca (${e.message.split('\n')[0]})`); }
   }
   busy(null);
   if (S.pending.length) msgs.push(...S.pending.map((d) => `${d.name} butuh file ${d.r.strName}. Buka juga file .str itu.`));
   renderLayers(); zoomAll();
-  if (msgs.length) alert(msgs.join('\n'));
+  for (const m of msgs) msg(m, 'w');
+  if (msgs.length) $('#msgwin').classList.remove('min');
 }
 
 function addStr(name, r, raw = null) {
@@ -1519,7 +1638,7 @@ function addStr(name, r, raw = null) {
   L.vbo = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, L.vbo); gl.bufferData(gl.ARRAY_BUFFER, pos, gl.STATIC_DRAW);
   L.cbo = gl.createBuffer(); L.lineIbo = gl.createBuffer(); L.ptIbo = gl.createBuffer();
   buildColors(L); buildIndex(L);
-  S.layers.push(L);
+  S.layers.push(L); S.active = L;
   // DTM yang menunggu .str ini
   for (const d of [...S.pending]) if (d.r.strName.toLowerCase() === name.toLowerCase()) { S.pending.splice(S.pending.indexOf(d), 1); attachDtm(d.name, d.r, L); }
   return L;
@@ -1903,6 +2022,8 @@ function renderLayers() {
       el.querySelector('.dtmopt').onchange = (e) => { if (e.target.classList.contains('wire')) L.wire = e.target.checked; else L.shade = +e.target.value; S.dirty = true; };
     }
     el.querySelector('.lrow input').onchange = (e) => { L.vis = e.target.checked; S.dirty = true; info(); };
+    if (S.active === L) el.querySelector('.lrow').classList.add('act');
+    el.querySelector('.lname').onclick = () => { S.active = L; renderLayers(); };
     el.querySelector('.x').onclick = () => removeLayer(L);
     box.appendChild(el);
   }
@@ -1914,6 +2035,7 @@ function removeLayer(L) {
   for (const k of kill) {
     for (const b of ['vbo', 'cbo', 'lineIbo', 'ptIbo', 'ibo', 'wireIbo']) if (k[b]) gl.deleteBuffer(k[b]);
     S.layers.splice(S.layers.indexOf(k), 1);
+    if (S.active === k) S.active = null;
     if (k.kind === 'dtm' && L.kind === 'dtm') k.src.dtms.splice(k.src.dtms.indexOf(k), 1);
   }
   if (!S.layers.length) S.origin = null;
@@ -1963,8 +2085,30 @@ function setTool(t) {
   S.tool = t; $('#bIdent').classList.toggle('on', t === 'ident'); $('#bMeasure').classList.toggle('on', t === 'meas');
   showTab(t === 'ident' ? 'tIdent' : 'tMeasure');
 }
-function showTab(id) { for (const b of document.querySelectorAll('.tabs button')) b.classList.toggle('on', b.dataset.t === id); for (const t of document.querySelectorAll('.tab')) t.hidden = t.id !== id; }
-document.querySelector('.tabs').onclick = (e) => { const t = e.target.dataset.t; if (!t) return; if (t === 'tIdent') setTool('ident'); else if (t === 'tMeasure') setTool('meas'); else showTab(t); };
+/* jendela form mengambang (seperti form fungsi Surpac) */
+let winZ = 20;
+function showTab(id) {
+  const w = document.getElementById(id); if (!w) return;
+  if (w.hidden) {
+    w.hidden = false;
+    const open = [...document.querySelectorAll('.win:not([hidden])')].filter((x) => x !== w).length;
+    if (!w.dataset.moved) { w.style.top = (96 + open * 26) + 'px'; w.style.right = (16 + open * 26) + 'px'; w.style.left = 'auto'; }
+  }
+  w.style.zIndex = ++winZ;
+}
+for (const w of document.querySelectorAll('.win')) {
+  w.addEventListener('pointerdown', () => { w.style.zIndex = ++winZ; });
+  w.querySelector('.wx').onclick = () => { w.hidden = true; };
+  const t = w.querySelector('.wt');
+  t.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('button')) return;
+    const r = w.getBoundingClientRect(), dx = e.clientX - r.left, dy = e.clientY - r.top;
+    t.setPointerCapture(e.pointerId);
+    const mv = (ev) => { w.style.left = Math.max(0, Math.min(innerWidth - 80, ev.clientX - dx)) + 'px'; w.style.top = Math.max(0, Math.min(innerHeight - 40, ev.clientY - dy)) + 'px'; w.style.right = 'auto'; w.dataset.moved = 1; };
+    const up = () => { t.removeEventListener('pointermove', mv); t.removeEventListener('pointerup', up); };
+    t.addEventListener('pointermove', mv); t.addEventListener('pointerup', up);
+  });
+}
 window.addEventListener('keydown', (e) => {
   if (e.target.tagName === 'INPUT') return;
   const k = e.key.toLowerCase();
@@ -2055,11 +2199,12 @@ async function saveFile(name, bytes) {
       try { await S.dir.getFileHandle(name); } catch (e) { exists = false; }
       if (exists && !confirm(`${name} sudah ada di folder ${S.dir.name}. Timpa?`)) return false;
       const fh = await S.dir.getFileHandle(name, { create: true }), w = await fh.createWritable();
-      await w.write(bytes); await w.close(); return true;
+      await w.write(bytes); await w.close(); msg(`Disimpan: ${name} → ${S.dirPath || S.dir.name}`, 'ok'); navRefreshDir(S.dir); return true;
     } catch (e) { alert('Gagal menulis ke folder: ' + e.message + '\nFile diunduh saja.'); }
   }
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([bytes])); a.download = name;
+  msg(`Diunduh: ${name} (folder Downloads). Pilih folder kerja di Navigator supaya tersimpan langsung.`, 'w');
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 10000);
   return true;
@@ -2090,7 +2235,8 @@ async function doCreateDtm() {
       <table><tr><td>Titik dipakai</td><td>${r.npts.toLocaleString('id-ID')}</td></tr><tr><td>Breakline dilewati</td><td>${r.skipped}</td></tr><tr><td>Waktu</td><td>${(ms / 1000).toFixed(1)} detik</td></tr></table>
       <div class="muted">Aturan sama dengan CREATE DTM Surpac: string ${esc($('#dtmSkip').value)} tidak dipakai, string ${esc($('#dtmSpot').value)} = titik saja, string lain = breakline.</div>`;
     renderLayers(); S.dirty = true;
-  } catch (e) { out.textContent = 'Gagal: ' + e.message.split('\n')[0]; }
+    msg(`CREATE DTM ${L.name}: ${r.ntri.toLocaleString('id-ID')} segitiga, ${r.skipped} breakline dilewati, ${(ms / 1000).toFixed(1)} s`, 'ok');
+  } catch (e) { out.textContent = 'Gagal: ' + e.message.split('\n')[0]; msg('CREATE DTM gagal: ' + e.message.split('\n')[0], 'e'); }
   busy(null);
 }
 
@@ -2205,6 +2351,7 @@ async function doVolume() {
     const ms = performance.now() - t0;
     volLast = { A: A.name.replace(' (dibuat)', ''), B: B.name.replace(' (dibuat)', ''), bdy: Bd.name, no, res, ms, date: new Date() };
     renderVolume();
+    msg(`VOLUME ${volLast.A} → ${volLast.B} (${Bd.name} str ${no}): nett ${fv(volTotals(res).nett)} m³, ${(ms / 1000).toFixed(1)} s`, 'ok');
   } catch (e) { $('#volOut').textContent = 'Gagal: ' + e.message.split('\n')[0]; }
   busy(null);
 }
@@ -2288,7 +2435,9 @@ async function doUpdate() {
     $('#upOut .files').onclick = (e) => { const i = e.target.dataset.i; if (i !== undefined) saveFile(r.files[i].name, r.files[i].data).then((ok) => ok && flash(e.target, 'Tersimpan ✓')); };
     $('#upAll').onclick = async (e) => { for (const f of r.files) await saveFile(f.name, f.data); flash(e.target, 'Tersimpan ✓'); };
     renderLayers(); zoomAll();
-  } catch (e) { $('#upOut').textContent = 'Gagal: ' + e.message.split('\n')[0]; }
+    msg(`UPDATE (${j}): ${r.files.map((f) => f.name).join(', ')}${r.cek ? ` · ${r.cek} titik _CEK` : ''}`, 'ok');
+    if (S.dir && $('#upAuto').checked) { for (const f of r.files) await saveFile(f.name, f.data); }
+  } catch (e) { $('#upOut').textContent = 'Gagal: ' + e.message.split('\n')[0]; msg('UPDATE gagal: ' + e.message.split('\n')[0], 'e'); }
   busy(null);
 }
 
@@ -2343,10 +2492,267 @@ $('#upJenis').onchange = upJenis; upJenis();
 $('#upBtn').onclick = doUpdate;
 $('#secBtn').onclick = doSection;
 $('#measSod').onclick = measSod;
-for (const b of document.querySelectorAll('.pickDir')) b.onclick = pickDir;
 refreshTools();
 
-window.SMA = { S, run, addStr, attachDtm, loadFiles, zoomAll, setPlan, setTool, nearest, zAt, camera, draw };   // untuk uji otomatis
+/* ---------- kerangka mirip Surpac: menu, Navigator (folder kerja), message window, simpan layer ---------- */
+function msg(t, kind = '') {
+  const box = $('#msgLog'); if (!box) return;
+  const d = new Date(), tm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
+  const el = document.createElement('div'); if (kind) el.className = kind;
+  el.innerHTML = `<time>${tm}</time>${esc(t)}`;
+  box.appendChild(el); box.scrollTop = box.scrollHeight;
+  if (kind === 'e' || kind === 'w') $('#msgwin').classList.remove('min');
+}
+
+/* ---- penyimpanan daftar folder (IndexedDB menyimpan izin folder antar sesi) ---- */
+const IDB = {
+  db() { return new Promise((res, rej) => { const r = indexedDB.open('smaSurvey', 1); r.onupgradeneeded = () => r.result.createObjectStore('roots', { keyPath: 'id' }); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); },
+  async all() { try { const db = await this.db(); return await new Promise((res) => { const q = db.transaction('roots').objectStore('roots').getAll(); q.onsuccess = () => res(q.result || []); q.onerror = () => res([]); }); } catch (e) { return []; } },
+  async put(v) { try { const db = await this.db(); db.transaction('roots', 'readwrite').objectStore('roots').put(v); } catch (e) {} },
+  async del(id) { try { const db = await this.db(); db.transaction('roots', 'readwrite').objectStore('roots').delete(id); } catch (e) {} },
+};
+
+/* ---- Navigator ---- */
+const NAV = { roots: [], sel: null, filter: 'surpac', drag: null };
+const EXT_OK = /\.(str|dtm|shp)$/i;
+function mkNode(h, parent, root) { return { h, name: h.name, kind: h.kind, parent, root, kids: null, open: false, size: null, mod: null }; }
+async function navAddRoot(ro, handle = null) {
+  let h = handle;
+  if (!h) {
+    if (!window.showDirectoryPicker) { alert('Browser ini belum bisa membuka folder. Pakai Google Chrome atau Microsoft Edge versi baru.'); return; }
+    try { h = await window.showDirectoryPicker({ id: ro ? 'smaServer' : 'smaKerja', mode: ro ? 'read' : 'readwrite' }); } catch (e) { return; }
+  }
+  for (const r of NAV.roots) if (await r.node.h.isSameEntry(h)) { msg(`${h.name} sudah ada di Navigator.`); return; }
+  const id = Date.now() + Math.random();
+  const root = { id, ro, ok: true, node: null };
+  root.node = mkNode(h, null, root); root.node.open = true;
+  NAV.roots.push(root);
+  if (!handle || handle._persist !== false) IDB.put({ id, h, ro });
+  await loadKids(root.node);
+  if (!ro && !S.dir) setSaveDir(root.node);
+  msg(`Folder ${ro ? 'server (baca saja)' : 'kerja'}: ${h.name}`);
+  renderTree();
+}
+async function navRestore() {
+  for (const v of await IDB.all()) {
+    const root = { id: v.id, ro: v.ro, ok: false, node: null };
+    root.node = mkNode(v.h, null, root);
+    try { root.ok = (await v.h.queryPermission({ mode: v.ro ? 'read' : 'readwrite' })) === 'granted'; } catch (e) { root.ok = false; }
+    NAV.roots.push(root);
+    if (root.ok) { root.node.open = true; await loadKids(root.node); if (!v.ro && !S.dir) setSaveDir(root.node); }
+  }
+  renderTree();
+}
+async function grant(root) {
+  try { root.ok = (await root.node.h.requestPermission({ mode: root.ro ? 'read' : 'readwrite' })) === 'granted'; } catch (e) { root.ok = false; }
+  if (root.ok) { root.node.open = true; await loadKids(root.node); if (!root.ro && !S.dir) setSaveDir(root.node); }
+  renderTree();
+}
+async function loadKids(n) {
+  const kids = [];
+  try { for await (const h of n.h.values()) kids.push(mkNode(h, n, n.root)); }
+  catch (e) { msg(`Tidak bisa membaca folder ${n.name}: ${e.message}`, 'e'); }
+  kids.sort((a, b) => (a.kind === b.kind ? 0 : a.kind === 'directory' ? -1 : 1) || a.name.localeCompare(b.name, 'id', { numeric: true, sensitivity: 'base' }));
+  n.kids = kids;
+  // ukuran & tanggal file diisi belakangan (tidak menghambat tampilan)
+  (async () => { for (const k of kids) if (k.kind === 'file' && (NAV.filter === 'all' || EXT_OK.test(k.name))) { try { const f = await k.h.getFile(); k.size = f.size; k.mod = f.lastModified; } catch (e) {} } renderTree(); })();
+}
+function pathOf(n) { const p = []; for (let x = n; x; x = x.parent) p.unshift(x.name); return p.join('\\'); }
+function fmtSize(b) { return b == null ? '' : b < 1024 ? b + ' B' : b < 1048576 ? (b / 1024).toFixed(0) + ' KB' : (b / 1048576).toFixed(1) + ' MB'; }
+function iconOf(n) {
+  if (!n.parent) return '<span class="ti root">▣</span>';
+  if (n.kind === 'directory') return '<span class="ti fold"></span>';
+  const e = (n.name.split('.').pop() || '').toLowerCase();
+  return `<span class="ti ${['str', 'dtm', 'shp'].includes(e) ? e : 'oth'}">${['str', 'dtm', 'shp'].includes(e) ? e.toUpperCase() : ''}</span>`;
+}
+let rowsMap = [];
+function renderTree() {
+  const box = $('#tree');
+  if (!NAV.roots.length) { box.innerHTML = '<div class="empty">Belum ada folder kerja.<br><a data-cmd="navAdd">Set work directory…</a> (mis. D:\\yopi)<br><a data-cmd="navAddRo">Tambah folder server (baca saja)…</a> (mis. Z:\\)</div>'; return; }
+  rowsMap = []; const html = [];
+  const walk = (n, d) => {
+    const i = rowsMap.push(n) - 1, isDir = n.kind === 'directory';
+    if (!isDir && NAV.filter !== 'all' && !EXT_OK.test(n.name)) { rowsMap.pop(); return; }
+    const root = !n.parent ? n.root : null;
+    const lock = root && !root.ok;
+    html.push(`<div class="tn${NAV.sel === n ? ' sel' : ''}${lock ? ' lock' : ''}" data-i="${rowsMap.length - 1}" draggable="${isDir ? 'false' : 'true'}" style="padding-left:${6 + d * 14}px" title="${esc(pathOf(n))}">
+      <span class="tc">${isDir ? (n.open ? '▾' : '▸') : ''}</span>${iconOf(n)}<span class="tnm">${esc(n.name)}${lock ? ' — klik untuk izinkan akses' : ''}</span>
+      ${root && root.ro ? '<span class="ro">baca saja</span>' : ''}${S.dir && n.h === S.dir ? '<span class="ro" style="color:#2e9d5b;border-color:#2e9d5b">simpan</span>' : ''}<span class="tsz">${isDir ? '' : fmtSize(n.size)}</span></div>`);
+    if (isDir && n.open && n.kids) for (const k of n.kids) walk(k, d + 1);
+  };
+  for (const r of NAV.roots) walk(r.node, 0);
+  box.innerHTML = html.join('');
+}
+async function toggleDir(n) {
+  if (!n.parent && !n.root.ok) { await grant(n.root); return; }
+  n.open = !n.open;
+  if (n.open && !n.kids) await loadKids(n);
+  renderTree();
+}
+async function navRefreshDir(h) {
+  const find = (n) => { if (n.h === h) return n; if (n.kids) for (const k of n.kids) { const r = find(k); if (r) return r; } return null; };
+  for (const r of NAV.roots) { const n = find(r.node); if (n && n.kids) { await loadKids(n); renderTree(); } }
+}
+async function navRefresh() { for (const r of NAV.roots) if (r.ok) { const re = async (n) => { if (n.kids) { const open = new Set(n.kids.filter((k) => k.open).map((k) => k.name)); await loadKids(n); for (const k of n.kids) if (open.has(k.name)) { k.open = true; await re(k); } } }; await re(r.node); } renderTree(); }
+function setSaveDir(n) {
+  if (n.kind !== 'directory') n = n.parent;
+  if (!n) return;
+  if (n.root.ro) { msg(`${pathOf(n)} adalah folder server (baca saja); tidak dipakai untuk menyimpan.`, 'w'); return; }
+  S.dir = n.h; S.dirPath = pathOf(n);
+  for (const el of document.querySelectorAll('.dirName')) el.textContent = S.dirPath;
+  renderTree();
+}
+
+/* buka file dari Navigator: DTM otomatis membuka .str pasangannya dari folder yang sama */
+async function openNodes(nodes) {
+  const files = [];
+  for (const n of nodes) {
+    if (n.kind !== 'file') continue;
+    if (!EXT_OK.test(n.name)) { msg(`${n.name}: jenis file belum didukung`, 'w'); continue; }
+    const f = await n.h.getFile(); files.push(f);
+    if (/\.dtm$/i.test(n.name)) {
+      const head = new TextDecoder('latin1').decode(await f.slice(0, 400).arrayBuffer()).split(/\r?\n/)[0];
+      const sn = head.split(',')[0].trim().toLowerCase();
+      if (S.layers.some((L) => L.kind === 'str' && L.name.toLowerCase() === sn) || files.some((x) => x.name.toLowerCase() === sn)) continue;
+      if (!n.parent.kids) await loadKids(n.parent);
+      const sib = n.parent.kids.find((k) => k.kind === 'file' && k.name.toLowerCase() === sn);
+      if (sib) files.push(await sib.h.getFile()); else msg(`${n.name} butuh ${sn}, tetapi file itu tidak ada di folder yang sama.`, 'w');
+    }
+  }
+  if (files.length) await loadFiles(files);
+}
+
+/* klik, klik dua kali, seret, klik kanan di Navigator */
+const tree = $('#tree');
+tree.addEventListener('click', async (e) => {
+  const a = e.target.closest('a[data-cmd]'); if (a) return;
+  const row = e.target.closest('.tn'); if (!row) return;
+  const n = rowsMap[+row.dataset.i]; NAV.sel = n;
+  if (n.kind === 'directory' && (e.target.classList.contains('tc') || (!n.parent && !n.root.ok))) { await toggleDir(n); return; }
+  for (const r of tree.querySelectorAll('.tn.sel')) r.classList.remove('sel');      // pilih tanpa menggambar ulang (supaya klik dua kali tetap jalan)
+  row.classList.add('sel');
+});
+tree.addEventListener('dblclick', async (e) => {
+  const row = e.target.closest('.tn'); if (!row) return;
+  const n = rowsMap[+row.dataset.i];
+  if (n.kind === 'directory') await toggleDir(n); else await openNodes([n]);
+});
+tree.addEventListener('dragstart', (e) => { const row = e.target.closest('.tn'); if (!row) return; NAV.drag = rowsMap[+row.dataset.i]; e.dataTransfer.setData('text/plain', NAV.drag.name); e.dataTransfer.effectAllowed = 'copy'; });
+tree.addEventListener('dragend', () => { setTimeout(() => { NAV.drag = null; }, 100); });
+$('#view').addEventListener('drop', (e) => { if (NAV.drag) { e.preventDefault(); e.stopImmediatePropagation(); $('#drop').classList.remove('on'); const n = NAV.drag; NAV.drag = null; openNodes([n]); } }, true);
+tree.addEventListener('contextmenu', (e) => {
+  const row = e.target.closest('.tn'); if (!row) return;
+  e.preventDefault();
+  const n = rowsMap[+row.dataset.i]; NAV.sel = n;
+  for (const r of tree.querySelectorAll('.tn.sel')) r.classList.remove('sel'); row.classList.add('sel');
+  const dir = n.kind === 'directory', ro = n.root.ro, isRoot = !n.parent;
+  const items = [
+    !dir && ['Buka', () => openNodes([n])],
+    dir && [n.open ? 'Tutup folder' : 'Buka folder', () => toggleDir(n)],
+    ['Jadikan folder simpan', () => setSaveDir(n), ro],
+    dir && ['Folder baru…', () => newFolder(n), ro],
+    !isRoot && ['Ganti nama…', () => renameNode(n), ro],
+    !isRoot && ['Hapus…', () => deleteNode(n), ro],
+    '-',
+    ['Salin path', () => copyText(pathOf(n))],
+    ['Segarkan', () => (dir ? navRefreshDir(n.h) : navRefreshDir(n.parent.h))],
+    isRoot && ['Hapus dari Navigator', () => { NAV.roots = NAV.roots.filter((r) => r !== n.root); IDB.del(n.root.id); if (S.dir === n.h) { S.dir = null; for (const el of document.querySelectorAll('.dirName')) el.textContent = 'Downloads'; } renderTree(); }],
+  ].filter(Boolean);
+  showCtx(e.clientX, e.clientY, items);
+});
+function showCtx(x, y, items) {
+  const c = $('#ctx');
+  c.innerHTML = items.map((it, i) => it === '-' ? '<hr>' : `<a data-i="${i}" class="${it[2] ? 'dis' : ''}">${esc(it[0])}${it[2] ? '<i>baca saja</i>' : ''}</a>`).join('');
+  c.hidden = false;
+  c.style.left = Math.min(x, innerWidth - 220) + 'px'; c.style.top = Math.min(y, innerHeight - c.offsetHeight - 8) + 'px';
+  c.onclick = (e) => { const a = e.target.closest('a'); if (!a) return; c.hidden = true; items[+a.dataset.i][1](); };
+}
+document.addEventListener('pointerdown', (e) => {
+  if (!e.target.closest('#ctx')) $('#ctx').hidden = true;
+  if (!e.target.closest('.menu')) for (const m of document.querySelectorAll('.menu.open')) m.classList.remove('open');
+});
+async function newFolder(n) {
+  const nm = prompt('Nama folder baru di ' + pathOf(n) + ':'); if (!nm) return;
+  try { await n.h.getDirectoryHandle(nm, { create: true }); msg(`Folder baru: ${pathOf(n)}\\${nm}`, 'ok'); n.open = true; await loadKids(n); renderTree(); }
+  catch (e) { msg('Gagal membuat folder: ' + e.message, 'e'); }
+}
+async function renameNode(n) {
+  const nm = prompt('Nama baru:', n.name); if (!nm || nm === n.name) return;
+  try {
+    if (n.h.move) await n.h.move(nm);
+    else if (n.kind === 'file') {
+      const f = await n.h.getFile(), nh = await n.parent.h.getFileHandle(nm, { create: true }), w = await nh.createWritable();
+      await w.write(await f.arrayBuffer()); await w.close(); await n.parent.h.removeEntry(n.name);
+    } else throw new Error('ganti nama folder belum didukung browser ini');
+    msg(`Ganti nama: ${n.name} → ${nm}`, 'ok'); await loadKids(n.parent); renderTree();
+  } catch (e) { msg('Gagal ganti nama: ' + e.message, 'e'); }
+}
+async function deleteNode(n) {
+  const dir = n.kind === 'directory';
+  if (!confirm(`Hapus ${dir ? 'folder (beserta isinya)' : 'file'}:\n${pathOf(n)}\n\nFile yang dihapus tidak masuk Recycle Bin.`)) return;
+  try { await n.parent.h.removeEntry(n.name, { recursive: dir }); msg(`Dihapus: ${pathOf(n)}`, 'w'); if (NAV.sel === n) NAV.sel = null; await loadKids(n.parent); renderTree(); }
+  catch (e) { msg('Gagal menghapus: ' + e.message, 'e'); }
+}
+
+/* simpan layer aktif (Save / Save as) */
+async function saveLayer(as) {
+  const L = S.active && S.active.kind === 'str' ? S.active : null;
+  if (!L) { msg('Pilih layer string dulu (klik namanya di panel Layers).', 'w'); return; }
+  let name = L.name;
+  if (as) { name = prompt('Simpan layer sebagai:', L.name); if (!name) return; if (!/\.str$/i.test(name)) name += '.str'; }
+  const bytes = L.raw ? new Uint8Array(L.raw) : null;
+  if (!bytes) { msg('Layer ini tidak bisa disimpan.', 'e'); return; }
+  await saveFile(name, bytes);
+}
+
+/* menu & perintah */
+const CMD = {
+  navAdd: () => navAddRoot(false), navAddRo: () => navAddRoot(true), navRefresh,
+  open: () => $('#fileIn').click(), save: () => saveLayer(false), saveAs: () => saveLayer(true),
+  closeAll: () => { for (const L of S.layers.filter((x) => x.kind === 'str')) removeLayer(L); for (const L of [...S.layers]) removeLayer(L); },
+  zoom: zoomAll, plan: () => setPlan(true), '3d': () => setPlan(false),
+  bg: () => { $('#view').classList.toggle('light'); S.dirty = true; try { localStorage.setItem('smaBg', $('#view').classList.contains('light') ? 'l' : 'd'); } catch (e) {} },
+  theme: () => $('#bTheme').click(),
+  msg: () => $('#msgwin').classList.toggle('min'), msgClear: () => { $('#msgLog').innerHTML = ''; },
+  ident: () => setTool('ident'), meas: () => setTool('meas'), sec: () => showTab('tSec'),
+  dtm: () => showTab('tDtm'), sod: () => { showTab('tDtm'); $('#sodSrc').focus(); }, vol: () => showTab('tVol'),
+  upHarian: () => { $('#upJenis').value = 'harian'; upJenis(); showTab('tUp'); },
+  upPotong: () => { $('#upJenis').value = 'potong'; upJenis(); showTab('tUp'); },
+  upBdy: () => { $('#upJenis').value = 'bdy'; upJenis(); showTab('tUp'); },
+  help: () => $('#help').showModal(),
+};
+document.addEventListener('click', (e) => {
+  const a = e.target.closest('[data-cmd]');
+  if (a && CMD[a.dataset.cmd]) { for (const m of document.querySelectorAll('.menu.open')) m.classList.remove('open'); CMD[a.dataset.cmd](); return; }
+  const mb = e.target.closest('.menu>button');
+  if (mb) { const m = mb.parentElement, was = m.classList.contains('open'); for (const x of document.querySelectorAll('.menu.open')) x.classList.remove('open'); if (!was) m.classList.add('open'); }
+});
+document.addEventListener('pointerover', (e) => {      // menu terbuka: pindah menu dengan hover, seperti aplikasi desktop
+  const mb = e.target.closest('.menu>button'); if (!mb || !document.querySelector('.menu.open')) return;
+  for (const x of document.querySelectorAll('.menu.open')) x.classList.remove('open'); mb.parentElement.classList.add('open');
+});
+window.addEventListener('keydown', (e) => {
+  if (!(e.ctrlKey || e.metaKey)) return;
+  const k = e.key.toLowerCase();
+  if (k === 's') { e.preventDefault(); saveLayer(e.shiftKey); } else if (k === 'o') { e.preventDefault(); $('#fileIn').click(); }
+});
+$('#navFilter').onchange = (e) => { NAV.filter = e.target.value; for (const r of NAV.roots) if (r.ok) { const re = async (n) => { if (n.kids) { for (const k of n.kids) if (k.kind === 'file' && k.size == null) { try { const f = await k.h.getFile(); k.size = f.size; } catch (er) {} } for (const k of n.kids) if (k.open) await re(k); } }; re(r.node).then(renderTree); } renderTree(); };
+/* pembagi Navigator / Layers */
+(() => {
+  const sp = $('#splitter'), nav = $('#navPane'), left = $('#left');
+  sp.addEventListener('pointerdown', (e) => {
+    sp.setPointerCapture(e.pointerId);
+    const mv = (ev) => { const r = left.getBoundingClientRect(); const f = Math.max(0.15, Math.min(0.85, (ev.clientY - r.top) / r.height)); nav.style.flex = `0 0 ${f * 100}%`; };
+    const up = () => { sp.removeEventListener('pointermove', mv); sp.removeEventListener('pointerup', up); };
+    sp.addEventListener('pointermove', mv); sp.addEventListener('pointerup', up);
+  });
+})();
+try { if (localStorage.getItem('smaBg') === 'l') $('#view').classList.add('light'); } catch (e) {}
+msg('SMA Survey siap. File › Set work directory untuk membuka folder kerja (mis. D:\\yopi).');
+if (!window.showDirectoryPicker) msg('Browser ini belum mendukung Navigator folder. Pakai Chrome atau Edge; untuk sementara pakai Open file.', 'w');
+navRestore();
+
+window.SMA = { S, run, addStr, attachDtm, navAddRoot, NAV, openNodes, msg, loadFiles, zoomAll, setPlan, setTool, nearest, zAt, camera, draw };   // untuk uji otomatis
 })();
 </script>
 </body>

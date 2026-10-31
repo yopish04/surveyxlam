@@ -112,12 +112,14 @@ async function loadFiles(files) {
       const r = await parseFile(f.name, buf);
       r.ms = performance.now() - t0;
       if (r.kind === 'dtm') addDtm(f.name, r, msgs); else addStr(f.name, r, raw);
+      msg(`Buka ${f.name}: ${r.kind === 'dtm' ? (r.tris.length / 3).toLocaleString('id-ID') + ' segitiga' : (r.rows).toLocaleString('id-ID') + ' baris'}${r.binary ? ' (biner)' : ''}, ${Math.round(r.ms)} ms`);
     } catch (e) { msgs.push(`${f.name}: gagal dibaca (${e.message.split('\n')[0]})`); }
   }
   busy(null);
   if (S.pending.length) msgs.push(...S.pending.map((d) => `${d.name} butuh file ${d.r.strName}. Buka juga file .str itu.`));
   renderLayers(); zoomAll();
-  if (msgs.length) alert(msgs.join('\n'));
+  for (const m of msgs) msg(m, 'w');
+  if (msgs.length) $('#msgwin').classList.remove('min');
 }
 
 function addStr(name, r, raw = null) {
@@ -148,7 +150,7 @@ function addStr(name, r, raw = null) {
   L.vbo = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, L.vbo); gl.bufferData(gl.ARRAY_BUFFER, pos, gl.STATIC_DRAW);
   L.cbo = gl.createBuffer(); L.lineIbo = gl.createBuffer(); L.ptIbo = gl.createBuffer();
   buildColors(L); buildIndex(L);
-  S.layers.push(L);
+  S.layers.push(L); S.active = L;
   // DTM yang menunggu .str ini
   for (const d of [...S.pending]) if (d.r.strName.toLowerCase() === name.toLowerCase()) { S.pending.splice(S.pending.indexOf(d), 1); attachDtm(d.name, d.r, L); }
   return L;
@@ -532,6 +534,8 @@ function renderLayers() {
       el.querySelector('.dtmopt').onchange = (e) => { if (e.target.classList.contains('wire')) L.wire = e.target.checked; else L.shade = +e.target.value; S.dirty = true; };
     }
     el.querySelector('.lrow input').onchange = (e) => { L.vis = e.target.checked; S.dirty = true; info(); };
+    if (S.active === L) el.querySelector('.lrow').classList.add('act');
+    el.querySelector('.lname').onclick = () => { S.active = L; renderLayers(); };
     el.querySelector('.x').onclick = () => removeLayer(L);
     box.appendChild(el);
   }
@@ -543,6 +547,7 @@ function removeLayer(L) {
   for (const k of kill) {
     for (const b of ['vbo', 'cbo', 'lineIbo', 'ptIbo', 'ibo', 'wireIbo']) if (k[b]) gl.deleteBuffer(k[b]);
     S.layers.splice(S.layers.indexOf(k), 1);
+    if (S.active === k) S.active = null;
     if (k.kind === 'dtm' && L.kind === 'dtm') k.src.dtms.splice(k.src.dtms.indexOf(k), 1);
   }
   if (!S.layers.length) S.origin = null;
@@ -592,8 +597,30 @@ function setTool(t) {
   S.tool = t; $('#bIdent').classList.toggle('on', t === 'ident'); $('#bMeasure').classList.toggle('on', t === 'meas');
   showTab(t === 'ident' ? 'tIdent' : 'tMeasure');
 }
-function showTab(id) { for (const b of document.querySelectorAll('.tabs button')) b.classList.toggle('on', b.dataset.t === id); for (const t of document.querySelectorAll('.tab')) t.hidden = t.id !== id; }
-document.querySelector('.tabs').onclick = (e) => { const t = e.target.dataset.t; if (!t) return; if (t === 'tIdent') setTool('ident'); else if (t === 'tMeasure') setTool('meas'); else showTab(t); };
+/* jendela form mengambang (seperti form fungsi Surpac) */
+let winZ = 20;
+function showTab(id) {
+  const w = document.getElementById(id); if (!w) return;
+  if (w.hidden) {
+    w.hidden = false;
+    const open = [...document.querySelectorAll('.win:not([hidden])')].filter((x) => x !== w).length;
+    if (!w.dataset.moved) { w.style.top = (96 + open * 26) + 'px'; w.style.right = (16 + open * 26) + 'px'; w.style.left = 'auto'; }
+  }
+  w.style.zIndex = ++winZ;
+}
+for (const w of document.querySelectorAll('.win')) {
+  w.addEventListener('pointerdown', () => { w.style.zIndex = ++winZ; });
+  w.querySelector('.wx').onclick = () => { w.hidden = true; };
+  const t = w.querySelector('.wt');
+  t.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('button')) return;
+    const r = w.getBoundingClientRect(), dx = e.clientX - r.left, dy = e.clientY - r.top;
+    t.setPointerCapture(e.pointerId);
+    const mv = (ev) => { w.style.left = Math.max(0, Math.min(innerWidth - 80, ev.clientX - dx)) + 'px'; w.style.top = Math.max(0, Math.min(innerHeight - 40, ev.clientY - dy)) + 'px'; w.style.right = 'auto'; w.dataset.moved = 1; };
+    const up = () => { t.removeEventListener('pointermove', mv); t.removeEventListener('pointerup', up); };
+    t.addEventListener('pointermove', mv); t.addEventListener('pointerup', up);
+  });
+}
 window.addEventListener('keydown', (e) => {
   if (e.target.tagName === 'INPUT') return;
   const k = e.key.toLowerCase();
@@ -619,5 +646,6 @@ view.addEventListener('dragleave', () => $('#drop').classList.remove('on'));
 view.addEventListener('drop', (e) => { e.preventDefault(); $('#drop').classList.remove('on'); loadFiles(e.dataTransfer.files); });
 
 /*TOOLS*/
-window.SMA = { S, run, addStr, attachDtm, loadFiles, zoomAll, setPlan, setTool, nearest, zAt, camera, draw };   // untuk uji otomatis
+/*NAV*/
+window.SMA = { S, run, addStr, attachDtm, navAddRoot, NAV, openNodes, msg, loadFiles, zoomAll, setPlan, setTool, nearest, zAt, camera, draw };   // untuk uji otomatis
 })();
