@@ -194,6 +194,11 @@ table.rawtbl tr.off td{opacity:.45}
   <div class="menu"><button>Inquire</button><div class="drop">
     <a data-cmd="ident">Point properties <i>I</i></a><a data-cmd="meas">Bearing and distance <i>M</i></a><a data-cmd="sec">Section DTM</a>
   </div></div>
+  <div class="menu"><button>Edit</button><div class="drop">
+    <a data-cmd="undo">Undo <i>Ctrl+Z</i></a><a data-cmd="redo">Redo <i>Ctrl+Y</i></a><hr>
+    <a data-cmd="ptMove">Point › Move</a><a data-cmd="ptIns">Point › Insert</a><a data-cmd="ptDel">Point › Delete</a><a data-cmd="ptEdit">Point › Properties</a><hr>
+    <a data-cmd="segDel">Segment › Delete</a><a data-cmd="segRev">Segment › Reverse</a><a data-cmd="segRenum">Segment › Renumber</a><a data-cmd="segBreak">Segment › Break</a><a data-cmd="segJoin">Segment › Join</a>
+  </div></div>
   <div class="menu"><button>Surfaces</button><div class="drop">
     <a data-cmd="dtm">Create DTM from layer</a><a data-cmd="sod">String over DTM (SOD)</a><a data-cmd="sec">Section DTM</a>
   </div></div>
@@ -406,6 +411,7 @@ table.rawtbl tr.off td{opacity:.45}
     <li><b>Riwayat volume</b> (<i>Volumes › Riwayat volume</i>): semua volume yang pernah dihitung (desktop: SQLite, browser: IndexedDB), volume hari ini per pit, salin ke Excel / CSV, hapus. <b>Report Excel</b> mengisi <i>template_report_harian.xlsx</i> di folder kerja (dibuat otomatis; ganti tata letaknya bebas, penanda {{tanggal}}, {{1.area}}, {{1.nett}}, {{1.nett_kemarin}}, {{1.hari_ini}}, {{total.hari_ini}}, {{pit_tofu3.nett}} … diisi). Proses Harian membuat report Excel ini otomatis.</li>
     <li><b>Update</b>: update harian (potong global + tambah harian + boundary), potong progress, atau boundary tambah/kurangi. Hasil langsung jadi layer; simpan ke folder pilihan.</li>
     <li><b>Kursor 3D & snap (seperti Surpac)</b>: posisi kursor ditentukan mode snap — <b>1 Bidang</b> (perpotongan dengan bidang aktif, default horizontal Z 0; ganti di status bar atau klik kanan › Bidang aktif), <b>2 Titik</b> (titik string terdekat), <b>3 Garis</b> (posisi di garis string terdekat), <b>4 Segitiga DTM</b> (permukaan DTM di bawah kursor). Ganti snap dengan tombol 1–4 atau klik kanan saat fungsi aktif. Di 3D kursor digambar sebagai silang sumbu X/Y/Z. <i>View › Select camera target</i> (atau klik kanan › Pusat putar di sini) memilih titik pusat putar.</li>
+    <li><b>Edit</b> (menu Edit, seperti Surpac): Point move/insert/delete/properties, Segment delete/reverse/renumber/break/join. Pilih fungsi, klik sesuai petunjuk di status bar, Esc = selesai. Ctrl+Z / Ctrl+Y = undo / redo. Layer yang diedit bertanda * — simpan dengan File › Save layer (format teks/biner sama dengan file asli). DTM dari string yang diedit dilepas; buat ulang.</li>
     <li>Tombol: F zoom semua, P plan, 3 tampak 3D, I point properties, M bearing and distance, Esc selesai / batal pilih.</li>
   </ul>
   <form method="dialog"><button>Tutup</button></form>
@@ -3231,7 +3237,7 @@ function renderLayers() {
       const nums = [...L.strs.keys()].sort((a, b) => a - b);
       const pts = [...L.strs.values()].reduce((s, v) => s + v.count, 0);
       el.innerHTML = `<div class="lrow"><span class="caret">${L.open ? '▾' : '▸'}</span><input type="checkbox" ${L.vis ? 'checked' : ''}>
-        <span class="lname" title="${esc(L.name)}">${esc(L.name)}</span><span class="x" title="Tutup layer">✕</span></div>
+        <span class="lname" title="${esc(L.name)}${L.edited ? ' (diedit, belum disimpan)' : ''}">${L.edited ? '* ' : ''}${esc(L.name)}</span><span class="x" title="Tutup layer">✕</span></div>
         <div class="lmeta">${pts.toLocaleString('id-ID')} titik · ${L.segs.toLocaleString('id-ID')} segmen · ${nums.length} string${L.r.binary ? ' · biner' : ''} · ${Math.round(L.r.ms || 0)} ms</div>`;
       if (L.open) {
         const sb = document.createElement('div'); sb.className = 'strs';
@@ -3287,19 +3293,20 @@ function info() {
 const TOOL_NAME = { ident: 'Point properties', meas: 'Bearing and distance', target: 'Select camera target' };
 function prompt_() {
   let t;
-  if (S.tool === 'ident') t = 'Point properties: klik titik (menempel ke titik terdekat). Esc / klik kanan = selesai.';
+  if (EDIT[S.tool]) t = EDIT[S.tool].prompt() + ' Esc = selesai, Ctrl+Z = undo.';
+  else if (S.tool === 'ident') t = 'Point properties: klik titik (menempel ke titik terdekat). Esc / klik kanan = selesai.';
   else if (S.tool === 'meas') t = !S.measOpen || !S.meas.length ? 'Bearing and distance: klik titik pertama. Esc = selesai.'
     : `Bearing and distance: klik titik berikutnya (${S.meas.length} titik). Backspace = batal titik terakhir, Esc = akhiri garis.`;
   else if (S.tool === 'target') t = 'Select camera target: klik titik/permukaan yang menjadi pusat putar. Esc = batal.';
   else t = S.sel.length ? `${selText()} — klik kanan = menu, Esc = batal pilih.` : 'Klik garis/titik untuk memilih · klik kanan = menu · roda = zoom · tengah seret = geser · kanan seret = putar';
-  if (S.tool && S.tool !== 'ident') t += `  [Snap: ${SNAP[S.snap][0]} — tombol 1–4 / klik kanan]`;
+  if (S.tool && S.tool !== 'ident' && (!EDIT[S.tool] || EDIT[S.tool].snap() !== 'point' || S.tool === 'ptMove')) t += `  [Snap: ${SNAP[S.snap][0]} — tombol 1–4 / klik kanan]`;
   $('#sPrompt').textContent = t;
   $('#sPlane').textContent = `Bidang: Horizontal Z ${f3(S.plane.z)}`;
   $('#sPrompt').classList.toggle('fn', !!S.tool);
 }
 function setTool(t) {
   if (S.tool === t && t) { endTool(); return; }
-  S.tool = t || null; S.measOpen = false;
+  S.tool = t || null; S.measOpen = false; ED.st = {};
   $('#bIdent').classList.toggle('on', t === 'ident'); $('#bMeasure').classList.toggle('on', t === 'meas');
   if (t === 'ident' || t === 'meas') showTab(t === 'ident' ? 'tIdent' : 'tMeasure');
   if (t) msg(`Fungsi ${TOOL_NAME[t]} dimulai.`);
@@ -3308,7 +3315,7 @@ function setTool(t) {
 function endTool() {
   if (!S.tool) return;
   msg(`Fungsi ${TOOL_NAME[S.tool]} selesai.`);
-  S.tool = null; S.measOpen = false; S.hover = null; S.cur = null;
+  S.tool = null; S.measOpen = false; S.hover = null; S.cur = null; ED.st = {}; S.sel = [];
   $('#bIdent').classList.remove('on'); $('#bMeasure').classList.remove('on');
   renderMeasure(); prompt_(); S.dirty = true;
 }
@@ -3401,10 +3408,10 @@ function updateHover() {
   hoverQueued = false;
   if (!hoverXY || drag) return;
   const [px, py] = hoverXY, h = hit(px, py, 30, true);
-  const e = !S.tool && h.e && h.e.d <= 8 ? segOf(h.e.L, h.e.i) : null;
+  const e = (!S.tool || (EDIT[S.tool] && EDIT[S.tool].seg)) && h.e && h.e.d <= 8 ? segOf(h.e.L, h.e.i) : null;
   // fungsi aktif: posisi menurut mode snap (Point properties selalu snap titik); tanpa fungsi: titik dekat, DTM, lalu bidang
   let c = null;
-  if (S.tool) c = cursorAt(px, py, S.tool === 'ident' ? 'point' : S.snap, h);
+  if (S.tool) c = cursorAt(px, py, S.tool === 'ident' ? 'point' : EDIT[S.tool] ? EDIT[S.tool].snap() : S.snap, h);
   else if (S.origin) c = (h.v && h.v.d <= 10 ? cursorAt(px, py, 'point', h) : null) || cursorAt(px, py, 'tri') || cursorAt(px, py, 'plane');
   const v = c && c.m === 'point' && (S.tool || !e) ? { L: c.L, i: c.i } : null;
   const key = (o) => o ? [o.L && o.L.id, o.i, o.a, o.x, o.y].join() : '';
@@ -3451,6 +3458,7 @@ canvas.addEventListener('pointerup', (e) => {
   if (d.b !== 0) return;
   if (S.tool === 'ident') doIdent(px, py);
   else if (S.tool === 'meas') { doMeasure(px, py); prompt_(); }
+  else if (EDIT[S.tool]) EDIT[S.tool].click(px, py).then(() => { prompt_(); hoverQueued = true; requestAnimationFrame(updateHover); });
   else if (S.tool === 'target') setTarget(cursorAt(px, py) || cursorAt(px, py, 'tri') || cursorAt(px, py, 'plane'));
   else {
     const h = hit(px, py, 12), g = h.e && h.e.d <= 8 ? segOf(h.e.L, h.e.i) : null;
@@ -3473,7 +3481,6 @@ canvas.addEventListener('wheel', (e) => {
   if (!hoverQueued) { hoverQueued = true; requestAnimationFrame(updateHover); }
 }, { passive: false });
 $('#sPlane').onclick = () => { const v = window.prompt('Elevasi bidang aktif (horizontal):', String(S.plane.z)); if (v !== null) setPlaneZ(parseFloat(v.replace(',', '.'))); };
-prompt_();
 /* jendela form mengambang (seperti form fungsi Surpac) */
 let winZ = 20;
 function showTab(id) {
@@ -4242,6 +4249,179 @@ async function doHarian() {
 $('#harBtn').onclick = doHarian;
 $('#harScan').onclick = harRefresh;
 
+/* ---------- EDIT Tahap 1 (seperti menu Edit Surpac): POINT move/insert/delete/properties, SEGMENT delete/reverse/
+   renumber/break/join, UNDO/REDO. Alur Surpac: pilih fungsi, ikuti petunjuk di status bar, Esc = selesai.
+   Hasil edit ditulis ulang dengan PG.tulis (sama byte per byte dengan Python/Excel; teks atau biner sesuai file asli),
+   lalu layer dibangun ulang. Undo menyimpan isi file sebelum setiap edit. */
+const ED = { undo: [], redo: [], st: {} };
+/* model edit dari layer: segmen = titik berurutan dengan nomor string sama (dipisah baris 0) */
+function edSegs(L) {
+  const r = L.r, out = []; let cur = null;
+  for (let i = 0; i < r.rows; i++) {
+    const s = r.sn[i];
+    if (!s) { cur = null; continue; }
+    if (!cur || cur.s !== s) { cur = { s, pts: [], rows: [] }; out.push(cur); }
+    cur.pts.push([r.y[i], r.x[i], r.z[i], pointInfo(L, i).d]); cur.rows.push(i);
+  }
+  return out;
+}
+const edWhere = (segs, row) => { for (let k = 0; k < segs.length; k++) { const j = segs[k].rows.indexOf(row); if (j >= 0) return [k, j]; } return [-1, -1]; };
+async function edRebuild(L, bytes, edited = true) {
+  const r = await parseFile(L.name, bytes.slice().buffer);
+  for (const D of [...L.dtms]) { removeLayer(D); msg(`${D.name} dilepas: nomor baris ${L.name} berubah. Buat DTM lagi.`, 'w'); }
+  const keep = { id: L.id, vis: L.vis, open: L.open, strs: L.strs, active: S.active === L };
+  const N = addStr(L.name, r, bytes.slice().buffer);
+  for (const [s, st] of N.strs) { const o = keep.strs.get(s); if (o) { st.vis = o.vis; st.color = o.color; st.auto = o.auto; } }
+  buildColors(N); buildIndex(N);
+  N.id = keep.id; N.vis = keep.vis; N.open = keep.open; N.edited = edited;
+  S.layers.splice(S.layers.indexOf(N), 1); S.layers[S.layers.indexOf(L)] = N;
+  for (const b of ['vbo', 'cbo', 'lineIbo', 'ptIbo']) if (L[b]) gl.deleteBuffer(L[b]);
+  S.active = keep.active ? N : S.active === N ? L : S.active;
+  S.sel = S.sel.filter((g) => g.L !== L); S.hover = null; S.hoverSeg = null; S.dirty = true;
+  renderLayers();
+  return N;
+}
+async function edApply(L, segs, label) {
+  if (!L.raw) { msg(`${L.name} tidak bisa diedit (bukan file .str).`, 'w'); return null; }
+  const H = PG.baca(L.raw), before = new Uint8Array(L.raw).slice();
+  const bytes = PG.tulis(H.head, segs.filter((g) => g.pts.length).map((g) => g.pts.map((p) => [g.s, p[0], p[1], p[2], p[3]])), H.binary, H.axis);
+  ED.undo.push({ id: L.id, bytes: before, label, edited: !!L.edited }); if (ED.undo.length > 100) ED.undo.shift();
+  ED.redo = [];
+  const N = await edRebuild(L, bytes);
+  msg(`EDIT ${label} — ${L.name} (Ctrl+Z = undo)`, 'ok');
+  return N;
+}
+async function edUndo(redo = false) {
+  const A = redo ? ED.redo : ED.undo, B = redo ? ED.undo : ED.redo, e = A.pop();
+  if (!e) { msg(redo ? 'Tidak ada yang bisa di-redo.' : 'Tidak ada yang bisa di-undo.', 'w'); return; }
+  const L = S.layers.find((x) => x.id === e.id && x.kind === 'str');
+  if (!L) { msg('Layer untuk undo sudah ditutup.', 'w'); return; }
+  B.push({ id: L.id, bytes: new Uint8Array(L.raw).slice(), label: e.label, edited: !!L.edited });
+  await edRebuild(L, e.bytes, e.edited);
+  msg(`${redo ? 'REDO' : 'UNDO'} ${e.label} — ${L.name}`, 'ok');
+}
+/* fungsi edit: snap() = mode snap kursor, seg = sorot segmen, prompt(), click(px, py) */
+const pickPoint = (px, py) => { const c = cursorAt(px, py, 'point'); return c && c.L.raw ? c : null; };
+const pickSeg = (px, py) => { const h = hit(px, py, 12); return h.e && h.e.d <= 10 && h.e.L.raw ? segOf(h.e.L, h.e.i) : null; };
+const EDIT = {
+  ptMove: {
+    name: 'Point move', snap: () => (ED.st.p ? S.snap : 'point'),
+    prompt: () => (ED.st.p ? `Point move: klik lokasi baru (snap ${SNAP[S.snap][0]}${S.snap === 'plane' ? ', Z titik tetap' : ''}). Esc = batal.` : 'Point move: klik titik yang dipindah.'),
+    async click(px, py) {
+      if (!ED.st.p) { ED.st.p = pickPoint(px, py); if (!ED.st.p) msg('Tidak ada titik string di bawah kursor.', 'w'); prompt_(); return; }
+      const c = cursorAt(px, py); if (!c) { msg(`Snap ${SNAP[S.snap][0]}: tidak ada posisi di bawah kursor.`, 'w'); return; }
+      const p = ED.st.p, segs = edSegs(p.L), [k, j] = edWhere(segs, p.i), q = segs[k].pts[j];
+      segs[k].pts[j] = [c.y, c.x, S.snap === 'plane' ? q[2] : c.z, q[3]];
+      ED.st = {}; await edApply(p.L, segs, `point move str ${segs[k].s}`);
+    },
+  },
+  ptIns: {
+    name: 'Point insert', snap: () => 'line',
+    prompt: () => 'Point insert: klik di garis segmen; titik baru disisipkan di posisi itu (Z mengikuti garis).',
+    async click(px, py) {
+      const c = cursorAt(px, py, 'line'); if (!c || !c.L.raw || c.s === undefined) { msg('Klik tepat di garis segmen (bukan string spot).', 'w'); return; }
+      const segs = edSegs(c.L), [k, j] = edWhere(segs, c.i), d = segs[k].pts[j][3];
+      segs[k].pts.splice(j + 1, 0, [c.y, c.x, c.z, d]);
+      await edApply(c.L, segs, `point insert str ${segs[k].s}`);
+    },
+  },
+  ptDel: {
+    name: 'Point delete', snap: () => 'point', prompt: () => 'Point delete: klik titik yang dihapus (berulang). Esc = selesai.',
+    async click(px, py) {
+      const p = pickPoint(px, py); if (!p) { msg('Tidak ada titik string di bawah kursor.', 'w'); return; }
+      const segs = edSegs(p.L), [k, j] = edWhere(segs, p.i); segs[k].pts.splice(j, 1);
+      await edApply(p.L, segs, `point delete str ${segs[k].s}`);
+    },
+  },
+  ptEdit: {
+    name: 'Point properties edit', snap: () => 'point', prompt: () => 'Point properties: klik titik untuk mengubah Y, X, Z, deskripsi.',
+    async click(px, py) {
+      const p = pickPoint(px, py); if (!p) { msg('Tidak ada titik string di bawah kursor.', 'w'); return; }
+      const segs = edSegs(p.L), [k, j] = edWhere(segs, p.i), q = segs[k].pts[j];
+      const v = await edForm(`String ${segs[k].s} · titik ${j + 1}`, [['Y', q[0].toFixed(3)], ['X', q[1].toFixed(3)], ['Z', q[2].toFixed(3)], ['Deskripsi', q[3]]]);
+      if (!v) return;
+      const num = (t, o) => { const x = parseFloat(String(t).replace(',', '.')); return isFinite(x) ? x : o; };
+      segs[k].pts[j] = [num(v[0], q[0]), num(v[1], q[1]), num(v[2], q[2]), v[3]];
+      await edApply(p.L, segs, `point properties str ${segs[k].s}`);
+    },
+  },
+  segDel: {
+    name: 'Segment delete', snap: () => 'point', seg: true, prompt: () => 'Segment delete: klik segmen yang dihapus (berulang). Esc = selesai.',
+    async click(px, py) {
+      const g = pickSeg(px, py); if (!g) { msg('Klik di garis segmen.', 'w'); return; }
+      const segs = edSegs(g.L), [k] = edWhere(segs, g.a); segs.splice(k, 1);
+      await edApply(g.L, segs, `segment delete str ${g.s}`);
+    },
+  },
+  segRev: {
+    name: 'Segment reverse', snap: () => 'point', seg: true, prompt: () => 'Segment reverse: klik segmen untuk membalik arahnya.',
+    async click(px, py) {
+      const g = pickSeg(px, py); if (!g) { msg('Klik di garis segmen.', 'w'); return; }
+      const segs = edSegs(g.L), [k] = edWhere(segs, g.a); segs[k].pts.reverse();
+      await edApply(g.L, segs, `segment reverse str ${g.s}`);
+    },
+  },
+  segRenum: {
+    name: 'Segment renumber', snap: () => 'point', seg: true, prompt: () => 'Segment renumber: klik segmen lalu isi nomor string baru.',
+    async click(px, py) {
+      const g = pickSeg(px, py); if (!g) { msg('Klik di garis segmen.', 'w'); return; }
+      const v = await edForm(`Segmen string ${g.s}`, [['Nomor string baru', String(g.s)]]); if (!v) return;
+      const n = parseInt(v[0], 10); if (!(n > 0 && n < 2147483647)) { msg('Nomor string harus bilangan bulat > 0.', 'w'); return; }
+      const segs = edSegs(g.L), [k] = edWhere(segs, g.a); segs[k].s = n;
+      await edApply(g.L, segs, `segment renumber ${g.s} → ${n}`);
+    },
+  },
+  segBreak: {
+    name: 'Segment break', snap: () => 'point', prompt: () => 'Segment break: klik titik tempat segmen diputus (titik itu jadi ujung kedua bagian).',
+    async click(px, py) {
+      const p = pickPoint(px, py); if (!p) { msg('Tidak ada titik string di bawah kursor.', 'w'); return; }
+      const segs = edSegs(p.L), [k, j] = edWhere(segs, p.i), g = segs[k], P = g.pts, n = P.length;
+      const closed = n > 2 && P[0][0] === P[n - 1][0] && P[0][1] === P[n - 1][1];
+      if (closed) {                                       // segmen tertutup: dibuka di titik ini
+        const ring = P.slice(0, n - 1), jj = j % (n - 1);
+        g.pts = ring.slice(jj).concat(ring.slice(0, jj + 1));
+      } else {
+        if (j === 0 || j === n - 1) { msg('Titik itu sudah ujung segmen; pilih titik di tengah.', 'w'); return; }
+        segs.splice(k, 1, { s: g.s, pts: P.slice(0, j + 1) }, { s: g.s, pts: P.slice(j) });
+      }
+      await edApply(p.L, segs, `segment break str ${g.s}${closed ? ' (dibuka)' : ''}`);
+    },
+  },
+  segJoin: {
+    name: 'Segment join', snap: () => 'point', seg: true,
+    prompt: () => (ED.st.a ? `Segment join: klik segmen kedua di dekat ujung yang disambung (segmen pertama: string ${ED.st.a.s}).` : 'Segment join: klik segmen pertama di dekat ujung yang disambung.'),
+    async click(px, py) {
+      const h = hit(px, py, 12); if (!h.e || h.e.d > 10 || !h.e.L.raw) { msg('Klik di garis segmen.', 'w'); return; }
+      const g = segOf(h.e.L, h.e.i), c = ground(px, py), r = g.L.r;
+      const nearEnd = (q) => { if (!S.plan && h.v) return h.v.i - g.a < g.b - h.v.i ? 0 : 1; const d0 = Math.hypot(r.x[g.a] - q.x, r.y[g.a] - q.y), d1 = Math.hypot(r.x[g.b] - q.x, r.y[g.b] - q.y); return d0 < d1 ? 0 : 1; };
+      if (!ED.st.a) { ED.st.a = Object.assign(g, { end: nearEnd(c) }); S.sel = [g]; S.dirty = true; prompt_(); return; }
+      const A = ED.st.a; ED.st = {}; S.sel = [];
+      if (A.L !== g.L) { msg('Kedua segmen harus di layer yang sama.', 'w'); prompt_(); return; }
+      if (A.a === g.a) { msg('Pilih segmen lain.', 'w'); prompt_(); return; }
+      const segs = edSegs(g.L), [ka] = edWhere(segs, A.a), [kb] = edWhere(segs, g.a);
+      let pa = segs[ka].pts.slice(), pb = segs[kb].pts.slice();
+      if (A.end === 0) pa.reverse();                       // ujung yang disambung di akhir A
+      if (nearEnd(c) === 1) pb.reverse();                  // ujung yang disambung di awal B
+      const last = pa[pa.length - 1], first = pb[0];
+      if (last[0] === first[0] && last[1] === first[1] && last[2] === first[2]) pb.shift();   // titik sama tidak digandakan
+      segs[ka] = { s: segs[ka].s, pts: pa.concat(pb) }; segs.splice(kb, 1);
+      await edApply(g.L, segs, `segment join str ${A.s} + ${g.s}`);
+    },
+  },
+};
+Object.assign(TOOL_NAME, Object.fromEntries(Object.entries(EDIT).map(([k, v]) => [k, v.name])));
+/* form kecil (pengganti beberapa prompt) */
+function edForm(title, fields) {
+  return new Promise((res) => {
+    let dl = $('#edDlg');
+    if (!dl) { dl = document.createElement('dialog'); dl.id = 'edDlg'; document.body.appendChild(dl); }
+    dl.innerHTML = `<form method="dialog" class="form" style="min-width:320px"><div class="big">${esc(title)}</div>${fields.map(([l, v], i) => `<label>${esc(l)}<input name="f${i}" value="${esc(v)}"></label>`).join('')}
+      <div class="acts"><button value="ok" class="primary">OK</button><button value="batal" formnovalidate>Batal</button></div></form>`;
+    dl.onclose = () => res(dl.returnValue === 'ok' ? fields.map((_, i) => dl.querySelector(`[name=f${i}]`).value) : null);
+    dl.returnValue = ''; dl.showModal(); dl.querySelector('input').select();
+  });
+}
+
 /* ---------- jembatan ke aplikasi desktop (Tauri + Rust) ----------
    Hanya aktif kalau halaman berjalan di dalam SMA Survey Desktop (window.__TAURI__ ada).
    - TAURI_FS: folder/file lewat Rust (path Windows asli, Z:\ baca saja ditolak di Rust juga)
@@ -4672,6 +4852,8 @@ const CMD = {
   ident: () => setTool('ident'), meas: () => setTool('meas'), sec: () => showTab('tSec'),
   dtm: () => showTab('tDtm'), sod: () => { showTab('tDtm'); $('#sodSrc').focus(); }, vol: () => showTab('tVol'),
   raw: () => showTab('tRaw'),
+  undo: () => edUndo(false), redo: () => edUndo(true),
+  ...Object.fromEntries(Object.keys(EDIT).map((k) => [k, () => setTool(k)])),
   riw: () => { showTab('tRiw'); riwRefresh(); },
   upHarian: () => { $('#upJenis').value = 'harian'; upJenis(); showTab('tUp'); },
   upPotong: () => { $('#upJenis').value = 'potong'; upJenis(); showTab('tUp'); },
@@ -4692,6 +4874,7 @@ window.addEventListener('keydown', (e) => {
   if (!(e.ctrlKey || e.metaKey)) return;
   const k = e.key.toLowerCase();
   if (k === 's') { e.preventDefault(); saveLayer(e.shiftKey); } else if (k === 'o') { e.preventDefault(); $('#fileIn').click(); }
+  else if ((k === 'z' || k === 'y') && !/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) { e.preventDefault(); edUndo(k === 'y' || e.shiftKey); }
 });
 $('#navFilter').onchange = (e) => { NAV.filter = e.target.value; for (const r of NAV.roots) if (r.ok) { const re = async (n) => { if (n.kids) { for (const k of n.kids) if (k.kind === 'file' && k.size == null) { try { const f = await k.h.getFile(); k.size = f.size; } catch (er) {} } for (const k of n.kids) if (k.open) await re(k); } }; re(r.node).then(renderTree); } renderTree(); };
 /* pembagi Navigator / Layers */
@@ -4708,6 +4891,7 @@ try { if (localStorage.getItem('smaBg') === 'l') $('#view').classList.add('light
 msg('SMA Survey siap. File › Set work directory untuk membuka folder kerja (mis. D:\\yopi).');
 if (!window.showDirectoryPicker && !window.TAURI_FS) msg('Browser ini belum mendukung Navigator folder. Pakai Chrome atau Edge; untuk sementara pakai Open file.', 'w');
 navRestore();
+prompt_();
 
 window.SMA = { S, cursorAt, ray, setSnap, setPlaneZ, setTarget, run, addStr, attachDtm, navAddRoot, NAV, openNodes, msg, loadFiles, zoomAll, setPlan, setTool, endTool, nearest, hit, zAt, camera, draw, ground };   // untuk uji otomatis
 })();

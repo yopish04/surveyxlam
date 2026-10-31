@@ -26,6 +26,11 @@
   <div class="menu"><button>Inquire</button><div class="drop">
     <a data-cmd="ident">Point properties <i>I</i></a><a data-cmd="meas">Bearing and distance <i>M</i></a><a data-cmd="sec">Section DTM</a>
   </div></div>
+  <div class="menu"><button>Edit</button><div class="drop">
+    <a data-cmd="undo">Undo <i>Ctrl+Z</i></a><a data-cmd="redo">Redo <i>Ctrl+Y</i></a><hr>
+    <a data-cmd="ptMove">Point › Move</a><a data-cmd="ptIns">Point › Insert</a><a data-cmd="ptDel">Point › Delete</a><a data-cmd="ptEdit">Point › Properties</a><hr>
+    <a data-cmd="segDel">Segment › Delete</a><a data-cmd="segRev">Segment › Reverse</a><a data-cmd="segRenum">Segment › Renumber</a><a data-cmd="segBreak">Segment › Break</a><a data-cmd="segJoin">Segment › Join</a>
+  </div></div>
   <div class="menu"><button>Surfaces</button><div class="drop">
     <a data-cmd="dtm">Create DTM from layer</a><a data-cmd="sod">String over DTM (SOD)</a><a data-cmd="sec">Section DTM</a>
   </div></div>
@@ -238,6 +243,7 @@
     <li><b>Riwayat volume</b> (<i>Volumes › Riwayat volume</i>): semua volume yang pernah dihitung (desktop: SQLite, browser: IndexedDB), volume hari ini per pit, salin ke Excel / CSV, hapus. <b>Report Excel</b> mengisi <i>template_report_harian.xlsx</i> di folder kerja (dibuat otomatis; ganti tata letaknya bebas, penanda {{tanggal}}, {{1.area}}, {{1.nett}}, {{1.nett_kemarin}}, {{1.hari_ini}}, {{total.hari_ini}}, {{pit_tofu3.nett}} … diisi). Proses Harian membuat report Excel ini otomatis.</li>
     <li><b>Update</b>: update harian (potong global + tambah harian + boundary), potong progress, atau boundary tambah/kurangi. Hasil langsung jadi layer; simpan ke folder pilihan.</li>
     <li><b>Kursor 3D & snap (seperti Surpac)</b>: posisi kursor ditentukan mode snap — <b>1 Bidang</b> (perpotongan dengan bidang aktif, default horizontal Z 0; ganti di status bar atau klik kanan › Bidang aktif), <b>2 Titik</b> (titik string terdekat), <b>3 Garis</b> (posisi di garis string terdekat), <b>4 Segitiga DTM</b> (permukaan DTM di bawah kursor). Ganti snap dengan tombol 1–4 atau klik kanan saat fungsi aktif. Di 3D kursor digambar sebagai silang sumbu X/Y/Z. <i>View › Select camera target</i> (atau klik kanan › Pusat putar di sini) memilih titik pusat putar.</li>
+    <li><b>Edit</b> (menu Edit, seperti Surpac): Point move/insert/delete/properties, Segment delete/reverse/renumber/break/join. Pilih fungsi, klik sesuai petunjuk di status bar, Esc = selesai. Ctrl+Z / Ctrl+Y = undo / redo. Layer yang diedit bertanda * — simpan dengan File › Save layer (format teks/biner sama dengan file asli). DTM dari string yang diedit dilepas; buat ulang.</li>
     <li>Tombol: F zoom semua, P plan, 3 tampak 3D, I point properties, M bearing and distance, Esc selesai / batal pilih.</li>
   </ul>
   <form method="dialog"><button>Tutup</button></form>

@@ -670,7 +670,7 @@ function renderLayers() {
       const nums = [...L.strs.keys()].sort((a, b) => a - b);
       const pts = [...L.strs.values()].reduce((s, v) => s + v.count, 0);
       el.innerHTML = `<div class="lrow"><span class="caret">${L.open ? '▾' : '▸'}</span><input type="checkbox" ${L.vis ? 'checked' : ''}>
-        <span class="lname" title="${esc(L.name)}">${esc(L.name)}</span><span class="x" title="Tutup layer">✕</span></div>
+        <span class="lname" title="${esc(L.name)}${L.edited ? ' (diedit, belum disimpan)' : ''}">${L.edited ? '* ' : ''}${esc(L.name)}</span><span class="x" title="Tutup layer">✕</span></div>
         <div class="lmeta">${pts.toLocaleString('id-ID')} titik · ${L.segs.toLocaleString('id-ID')} segmen · ${nums.length} string${L.r.binary ? ' · biner' : ''} · ${Math.round(L.r.ms || 0)} ms</div>`;
       if (L.open) {
         const sb = document.createElement('div'); sb.className = 'strs';
@@ -726,19 +726,20 @@ function info() {
 const TOOL_NAME = { ident: 'Point properties', meas: 'Bearing and distance', target: 'Select camera target' };
 function prompt_() {
   let t;
-  if (S.tool === 'ident') t = 'Point properties: klik titik (menempel ke titik terdekat). Esc / klik kanan = selesai.';
+  if (EDIT[S.tool]) t = EDIT[S.tool].prompt() + ' Esc = selesai, Ctrl+Z = undo.';
+  else if (S.tool === 'ident') t = 'Point properties: klik titik (menempel ke titik terdekat). Esc / klik kanan = selesai.';
   else if (S.tool === 'meas') t = !S.measOpen || !S.meas.length ? 'Bearing and distance: klik titik pertama. Esc = selesai.'
     : `Bearing and distance: klik titik berikutnya (${S.meas.length} titik). Backspace = batal titik terakhir, Esc = akhiri garis.`;
   else if (S.tool === 'target') t = 'Select camera target: klik titik/permukaan yang menjadi pusat putar. Esc = batal.';
   else t = S.sel.length ? `${selText()} — klik kanan = menu, Esc = batal pilih.` : 'Klik garis/titik untuk memilih · klik kanan = menu · roda = zoom · tengah seret = geser · kanan seret = putar';
-  if (S.tool && S.tool !== 'ident') t += `  [Snap: ${SNAP[S.snap][0]} — tombol 1–4 / klik kanan]`;
+  if (S.tool && S.tool !== 'ident' && (!EDIT[S.tool] || EDIT[S.tool].snap() !== 'point' || S.tool === 'ptMove')) t += `  [Snap: ${SNAP[S.snap][0]} — tombol 1–4 / klik kanan]`;
   $('#sPrompt').textContent = t;
   $('#sPlane').textContent = `Bidang: Horizontal Z ${f3(S.plane.z)}`;
   $('#sPrompt').classList.toggle('fn', !!S.tool);
 }
 function setTool(t) {
   if (S.tool === t && t) { endTool(); return; }
-  S.tool = t || null; S.measOpen = false;
+  S.tool = t || null; S.measOpen = false; ED.st = {};
   $('#bIdent').classList.toggle('on', t === 'ident'); $('#bMeasure').classList.toggle('on', t === 'meas');
   if (t === 'ident' || t === 'meas') showTab(t === 'ident' ? 'tIdent' : 'tMeasure');
   if (t) msg(`Fungsi ${TOOL_NAME[t]} dimulai.`);
@@ -747,7 +748,7 @@ function setTool(t) {
 function endTool() {
   if (!S.tool) return;
   msg(`Fungsi ${TOOL_NAME[S.tool]} selesai.`);
-  S.tool = null; S.measOpen = false; S.hover = null; S.cur = null;
+  S.tool = null; S.measOpen = false; S.hover = null; S.cur = null; ED.st = {}; S.sel = [];
   $('#bIdent').classList.remove('on'); $('#bMeasure').classList.remove('on');
   renderMeasure(); prompt_(); S.dirty = true;
 }
@@ -840,10 +841,10 @@ function updateHover() {
   hoverQueued = false;
   if (!hoverXY || drag) return;
   const [px, py] = hoverXY, h = hit(px, py, 30, true);
-  const e = !S.tool && h.e && h.e.d <= 8 ? segOf(h.e.L, h.e.i) : null;
+  const e = (!S.tool || (EDIT[S.tool] && EDIT[S.tool].seg)) && h.e && h.e.d <= 8 ? segOf(h.e.L, h.e.i) : null;
   // fungsi aktif: posisi menurut mode snap (Point properties selalu snap titik); tanpa fungsi: titik dekat, DTM, lalu bidang
   let c = null;
-  if (S.tool) c = cursorAt(px, py, S.tool === 'ident' ? 'point' : S.snap, h);
+  if (S.tool) c = cursorAt(px, py, S.tool === 'ident' ? 'point' : EDIT[S.tool] ? EDIT[S.tool].snap() : S.snap, h);
   else if (S.origin) c = (h.v && h.v.d <= 10 ? cursorAt(px, py, 'point', h) : null) || cursorAt(px, py, 'tri') || cursorAt(px, py, 'plane');
   const v = c && c.m === 'point' && (S.tool || !e) ? { L: c.L, i: c.i } : null;
   const key = (o) => o ? [o.L && o.L.id, o.i, o.a, o.x, o.y].join() : '';
@@ -890,6 +891,7 @@ canvas.addEventListener('pointerup', (e) => {
   if (d.b !== 0) return;
   if (S.tool === 'ident') doIdent(px, py);
   else if (S.tool === 'meas') { doMeasure(px, py); prompt_(); }
+  else if (EDIT[S.tool]) EDIT[S.tool].click(px, py).then(() => { prompt_(); hoverQueued = true; requestAnimationFrame(updateHover); });
   else if (S.tool === 'target') setTarget(cursorAt(px, py) || cursorAt(px, py, 'tri') || cursorAt(px, py, 'plane'));
   else {
     const h = hit(px, py, 12), g = h.e && h.e.d <= 8 ? segOf(h.e.L, h.e.i) : null;
@@ -912,7 +914,6 @@ canvas.addEventListener('wheel', (e) => {
   if (!hoverQueued) { hoverQueued = true; requestAnimationFrame(updateHover); }
 }, { passive: false });
 $('#sPlane').onclick = () => { const v = window.prompt('Elevasi bidang aktif (horizontal):', String(S.plane.z)); if (v !== null) setPlaneZ(parseFloat(v.replace(',', '.'))); };
-prompt_();
 /* jendela form mengambang (seperti form fungsi Surpac) */
 let winZ = 20;
 function showTab(id) {
@@ -965,6 +966,7 @@ view.addEventListener('drop', (e) => { e.preventDefault(); $('#drop').classList.
 
 /*TOOLS*/
 /*HARIAN*/
+/*EDIT*/
 /*TAURI*/
 /*RIWAYAT*/
 /*NAV*/

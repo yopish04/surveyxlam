@@ -230,6 +230,8 @@ const CMD = {
   ident: () => setTool('ident'), meas: () => setTool('meas'), sec: () => showTab('tSec'),
   dtm: () => showTab('tDtm'), sod: () => { showTab('tDtm'); $('#sodSrc').focus(); }, vol: () => showTab('tVol'),
   raw: () => showTab('tRaw'),
+  undo: () => edUndo(false), redo: () => edUndo(true),
+  ...Object.fromEntries(Object.keys(EDIT).map((k) => [k, () => setTool(k)])),
   riw: () => { showTab('tRiw'); riwRefresh(); },
   upHarian: () => { $('#upJenis').value = 'harian'; upJenis(); showTab('tUp'); },
   upPotong: () => { $('#upJenis').value = 'potong'; upJenis(); showTab('tUp'); },
@@ -250,6 +252,7 @@ window.addEventListener('keydown', (e) => {
   if (!(e.ctrlKey || e.metaKey)) return;
   const k = e.key.toLowerCase();
   if (k === 's') { e.preventDefault(); saveLayer(e.shiftKey); } else if (k === 'o') { e.preventDefault(); $('#fileIn').click(); }
+  else if ((k === 'z' || k === 'y') && !/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) { e.preventDefault(); edUndo(k === 'y' || e.shiftKey); }
 });
 $('#navFilter').onchange = (e) => { NAV.filter = e.target.value; for (const r of NAV.roots) if (r.ok) { const re = async (n) => { if (n.kids) { for (const k of n.kids) if (k.kind === 'file' && k.size == null) { try { const f = await k.h.getFile(); k.size = f.size; } catch (er) {} } for (const k of n.kids) if (k.open) await re(k); } }; re(r.node).then(renderTree); } renderTree(); };
 /* pembagi Navigator / Layers */
@@ -266,3 +269,4 @@ try { if (localStorage.getItem('smaBg') === 'l') $('#view').classList.add('light
 msg('SMA Survey siap. File › Set work directory untuk membuka folder kerja (mis. D:\\yopi).');
 if (!window.showDirectoryPicker && !window.TAURI_FS) msg('Browser ini belum mendukung Navigator folder. Pakai Chrome atau Edge; untuk sementara pakai Open file.', 'w');
 navRestore();
+prompt_();
