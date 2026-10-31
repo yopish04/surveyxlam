@@ -1,0 +1,16 @@
+[package]
+name = "sma-core"
+version = "0.1.0"
+edition = "2021"
+description = "Mesin SMA Survey: baca/tulis file Surpac, CREATE DTM, volume, update progress (tanpa dependensi luar)"
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "sma"
+path = "src/bin/sma.rs"
+
+[profile.release]
+opt-level = 3
+lto = true
