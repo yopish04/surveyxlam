@@ -50,6 +50,30 @@ jobs:
         run: npx tauri build
       - name: Uji backend (pelindung folder server, paket data, SQLite)
         run: cargo test --release --manifest-path src-tauri/Cargo.toml --lib
+      - name: Paket portable (tanpa instal)
+        shell: pwsh
+        run: |
+          $v = (Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json).version
+          $d = "portable/SMA-Survey-$v-portable"
+          New-Item -ItemType Directory -Force $d | Out-Null
+          Copy-Item src-tauri/target/release/sma-survey.exe "$d/SMA Survey.exe"
+          @(
+            'SMA Survey versi portable (tanpa instal).'
+            ''
+            'Cara pakai: salin folder ini ke mana saja (D:\, flashdisk), lalu klik dua kali "SMA Survey.exe".'
+            'Riwayat volume, daftar folder Navigator, dan pengaturan disimpan di folder data\ di samping exe.'
+            'Hapus file portable.txt ini kalau mau memakai folder data biasa (AppData) seperti versi terpasang.'
+            ''
+            'Butuh Microsoft Edge WebView2 Runtime (sudah ada di Windows 10/11 yang ter-update).'
+            'Kalau aplikasi tidak terbuka: https://go.microsoft.com/fwlink/p/?LinkId=2124703'
+            'Asosiasi file .str/.dtm dan shortcut Start Menu hanya ada di versi installer.'
+          ) | Set-Content -Encoding utf8 "$d/portable.txt"
+          Compress-Archive -Path $d -DestinationPath "portable/SMA-Survey-$v-portable.zip" -Force
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SMA-Survey-portable
+          path: desktop/app/portable/*.zip
+          if-no-files-found: error
       - uses: actions/upload-artifact@v4
         with:
           name: SMA-Survey-installer
@@ -65,3 +89,4 @@ jobs:
           files: |
             desktop/app/src-tauri/target/release/bundle/msi/*.msi
             desktop/app/src-tauri/target/release/bundle/nsis/*.exe
+            desktop/app/portable/*.zip

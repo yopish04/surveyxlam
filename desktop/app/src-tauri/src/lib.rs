@@ -196,6 +196,14 @@ fn vol_last(db: tauri::State<'_, Db>, pit: String, before: String) -> Result<Opt
 #[tauri::command]
 fn vol_history(db: tauri::State<'_, Db>, pit: String, limit: i64) -> Result<Vec<db::VolRec>, String> { db::history(&db.0.lock().unwrap(), &pit, limit).map_err(|e| e.to_string()) }
 
+/// mode portable: ada file portable.txt di samping exe -> folder data\ di samping exe (kalau bisa ditulisi)
+fn portable_dir() -> Option<std::path::PathBuf> {
+    let exe_dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
+    if !exe_dir.join("portable.txt").exists() { return None; }
+    let d = exe_dir.join("data");
+    std::fs::create_dir_all(&d).ok().map(|_| d)
+}
+
 /// argumen baris perintah yang berupa file (tanpa nama program dan tanpa opsi -x)
 fn file_args(it: impl Iterator<Item = String>) -> Vec<String> { it.skip(1).filter(|a| !a.starts_with('-')).collect() }
 
@@ -212,10 +220,16 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .manage(Startup(args))
         .setup(|app| {
-            let dir = app.path().app_data_dir()?;
+            // versi portable: riwayat volume, folder Navigator, dan pengaturan disimpan di folder data\ di samping exe
+            let portable = portable_dir();
+            let dir = match &portable { Some(d) => d.clone(), None => app.path().app_data_dir()? };
             std::fs::create_dir_all(&dir)?;
             let conn = db::open(&dir.join("sma_survey.db")).map_err(|e| e.to_string())?;
             app.manage(Db(Mutex::new(conn)));
+            let cfg = app.config().app.windows.first().cloned().ok_or("jendela main tidak ada di tauri.conf.json")?;
+            let mut win = tauri::WebviewWindowBuilder::from_config(app.handle(), &cfg)?;
+            if let Some(d) = &portable { win = win.data_directory(d.join("webview")); }
+            win.build()?;
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
