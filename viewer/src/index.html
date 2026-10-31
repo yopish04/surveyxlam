@@ -45,7 +45,7 @@
   <button id="b3d" class="tog" title="3D (3)">3D</button>
   <label class="fld" title="Pembesaran vertikal">Z×<input id="zEx" type="number" value="1" min="0.1" max="20" step="0.5"></label>
   <span class="sep"></span>
-  <button id="bIdent" class="tog on" title="Point properties (I)"><svg viewBox="0 0 20 20"><circle cx="9" cy="9" r="5"/><path d="M13 13l5 5"/></svg></button>
+  <button id="bIdent" class="tog" title="Point properties (I)"><svg viewBox="0 0 20 20"><circle cx="9" cy="9" r="5"/><path d="M13 13l5 5"/></svg></button>
   <button id="bMeasure" class="tog" title="Bearing and distance (M)"><svg viewBox="0 0 20 20"><path d="M2 15L15 2l3 3L5 18z M6 11l2 2 M9 8l2 2 M12 5l2 2"/></svg></button>
   <button data-cmd="sec" title="Section DTM"><svg viewBox="0 0 20 20"><path d="M2 15l4-6 4 3 4-8 4 5"/><path d="M2 18h16"/></svg></button>
   <span class="sep"></span>
@@ -82,7 +82,7 @@
     <section id="msgwin"><div class="ptitle"><span>Message window</span><span class="pact"><button data-cmd="msgClear" title="Bersihkan">⌫</button><button data-cmd="msg" title="Sembunyikan">▾</button></span></div><div id="msgLog"></div></section>
   </section>
 </main>
-<footer id="status"><span id="sXY">Y –  X –  Z –</span><span id="sDir">Folder simpan: <b class="dirName">Downloads</b></span><span id="sInfo"></span></footer>
+<footer id="status"><span id="sPrompt"></span><span id="sXY">Y –  X –  Z –</span><span id="sDir">Folder simpan: <b class="dirName">Downloads</b></span><span id="sInfo"></span></footer>
 <div id="ctx" hidden></div>
 <div id="tIdent" class="win" hidden>
   <div class="wt"><span>POINT PROPERTIES — Identify</span><button class="wx" title="Tutup">✕</button></div>
@@ -205,7 +205,9 @@
   <ul>
     <li><b>Navigator</b>: <i>File › Set work directory</i> untuk folder kerja (mis. D:\yopi), <i>Tambah folder server (baca saja)</i> untuk Z:\. Klik dua kali file untuk membuka (DTM otomatis membuka .str-nya), seret file ke layar grafis, klik kanan untuk menu (folder simpan, folder baru, ganti nama, hapus). Folder yang dipilih di Navigator menjadi folder simpan hasil. Folder server tidak pernah ditulisi.</li>
     <li><b>Buka file</b>: pilih .str (teks/biner), .dtm (pilih bersama .str-nya) dan .shp. Bisa juga seret file ke layar. File hanya dibaca di komputer ini, tidak dikirim ke mana pun.</li>
-    <li><b>Plan</b>: seret kiri = geser, roda = zoom di kursor. <b>3D</b>: seret kiri = putar, seret kanan / Shift+seret = geser.</li>
+    <li><b>Mouse (seperti Surpac)</b>: roda = zoom di kursor, tombol tengah seret = geser, tombol kanan seret = putar (dari Plan langsung ke 3D). Seret kiri juga menggeser (untuk touchpad), Ctrl + seret kiri = putar.</li>
+    <li><b>Memilih</b>: tanpa fungsi aktif, klik garis = pilih segmen (Shift/Ctrl + klik = tambah), klik dua kali = seluruh string. Klik kanan = menu (properti, pilih string, zoom, salin ke Excel, simpan .str, sembunyikan). Esc = batal pilih.</li>
+    <li><b>Fungsi</b>: pilih fungsi dulu (Point properties <i>I</i>, Bearing and distance <i>M</i>), ikuti petunjuk di status bar kiri bawah. Kursor menempel ke titik terdekat (kotak putih). Esc atau klik kanan › Selesai = akhiri fungsi; di Bearing and distance Esc pertama mengakhiri garis, Backspace membatalkan titik terakhir.</li>
     <li><b>Identify</b>: klik titik → nomor string, Y, X, Z, deskripsi. <b>Ukur</b>: klik beberapa titik → jarak datar, miring, bearing, grade; di atas DTM juga jarak mengikuti permukaan DTM.</li>
     <li><b>Salin ke Excel</b>: tabel disalin, tinggal Ctrl+V di Excel. <b>Simpan .str</b>: titik yang dipilih/diukur disimpan sebagai string file Surpac.</li>
     <li>Layer: centang untuk tampil/sembunyi, klik kotak warna untuk ganti warna, klik ▸ untuk daftar nomor string.</li>
@@ -214,7 +216,7 @@
     <li><b>Volume</b>: DTM cut/fill per segmen boundary, sama dengan report Surpac. Isi nett kemarin untuk volume hari ini.</li>
     <li><b>TXT ke STR</b>: <i>Survey › TXT ke STR</i>, pilih folder data mentah (atau klik dua kali file .txt di Navigator). Periksa tebakan area dan profil di tabel, lalu Proses: crest/toe, spot, boundary, jalan, exca, dan file _CEK.str dibuat otomatis.</li>
     <li><b>Update</b>: update harian (potong global + tambah harian + boundary), potong progress, atau boundary tambah/kurangi. Hasil langsung jadi layer; simpan ke folder pilihan.</li>
-    <li>Tombol: F zoom semua, P plan, 3 tampak 3D, I identify, M ukur, Esc selesai ukur.</li>
+    <li>Tombol: F zoom semua, P plan, 3 tampak 3D, I point properties, M bearing and distance, Esc selesai / batal pilih.</li>
   </ul>
   <form method="dialog"><button>Tutup</button></form>
 </dialog>

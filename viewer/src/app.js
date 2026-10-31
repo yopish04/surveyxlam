@@ -55,10 +55,12 @@ precision mediump float; in vec3 vc; out vec4 o; void main(){ o=vec4(vc,1.); }`)
 
 /* ---------- keadaan ---------- */
 const S = {
-  layers: [], origin: null, ex: 1, plan: true, tool: 'ident', showPts: false, spot: parseRange('500-999'),
+  layers: [], origin: null, ex: 1, plan: true, tool: null, showPts: false, spot: parseRange('500-999'),
   cam: { t: [0, 0, 0], dist: 1000, az: 0, el: 90, fov: 45 * Math.PI / 180 },
   picks: [], meas: [], measOpen: false, pending: [], dirty: true, nextId: 1,
+  sel: [], hover: null, hoverSeg: null,   // pilihan segmen, titik snap & garis di bawah kursor
 };
+let drag = null, hoverXY = null, hoverQueued = false;
 const PAL = ['#e6194b', '#3cb44b', '#4363d8', '#f58231', '#911eb4', '#42d4f4', '#f032e6', '#bfef45', '#ff8fab', '#469990', '#b39ddb', '#9a6324', '#a52a2a', '#00c08b', '#808000', '#1e88e5'];
 const colorOf = (num) => num === 1 ? '#e6194b' : PAL[(num - 1) % PAL.length];
 const hex2rgb = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
@@ -343,19 +345,30 @@ function draw() {
   // overlay: titik identify & garis ukur
   gl.disable(gl.DEPTH_TEST);
   gl.disableVertexAttribArray(1);
-  const ov = [], O = S.origin || [0, 0, 0];
+  const ov = [], O = S.origin || [0, 0, 0], calls = [];
   const put = (p) => ov.push(p.x - O[0], p.y - O[1], (isNaN(p.z) ? 0 : p.z) - O[2]);
-  for (const p of S.picks) put(p);
-  const nPick = S.picks.length;
-  for (const p of S.meas) put(p);
+  const putI = (L, i) => ov.push(L.pos[3 * i], L.pos[3 * i + 1], L.pos[3 * i + 2]);
+  const call = (mode, n, rgb, ps = 0) => { if (n > 0) calls.push([mode, ov.length / 3 - n, n, rgb, ps]); };
+  // segmen terpilih (kuning) dan garis di bawah kursor (biru muda)
+  for (const g of S.sel) { for (let i = g.a; i <= g.b; i++) putI(g.L, i); const n = g.b - g.a + 1, pts = n === 1 || S.spot(g.s); call(pts ? gl.POINTS : gl.LINE_STRIP, n, [1, 1, 0], 7); if (!pts) { for (let i = g.a; i <= g.b; i++) putI(g.L, i); call(gl.POINTS, n, [1, 1, 0], 5); } }
+  const hs = S.hoverSeg;
+  if (hs && !S.sel.some((x) => x.L === hs.L && x.a === hs.a)) { for (let i = hs.a; i <= hs.b; i++) putI(hs.L, i); const n = hs.b - hs.a + 1; call(n > 1 ? gl.LINE_STRIP : gl.POINTS, n, [0.4, 0.9, 1], 7); }
+  for (const p of S.picks) put(p); call(gl.POINTS, S.picks.length, [1, 0.84, 0], 9);
+  for (const p of S.meas) put(p); call(gl.LINE_STRIP, S.meas.length > 1 ? S.meas.length : 0, [1, 0.2, 0.9]);
+  for (const p of S.meas) put(p); call(gl.POINTS, S.meas.length, [1, 0.2, 0.9], 7);
+  // garis karet: titik ukur terakhir -> kursor
+  if (S.tool === 'meas' && S.measOpen && S.meas.length && hoverXY && !drag) {
+    let q = null;
+    if (S.hover) { const r = S.hover.L.r, i = S.hover.i; q = { x: r.x[i], y: r.y[i], z: r.z[i] }; }
+    else if (S.plan) { const gr = ground(hoverXY[0], hoverXY[1]); q = { x: gr.x, y: gr.y, z: S.meas[S.meas.length - 1].z }; }
+    if (q) { put(S.meas[S.meas.length - 1]); put(q); call(gl.LINES, 2, [1, 0.6, 0.95]); }
+  }
+  // kotak snap di titik terdekat (fungsi aktif)
+  if (S.hover) { putI(S.hover.L, S.hover.i); call(gl.POINTS, 1, [1, 1, 1], 14); putI(S.hover.L, S.hover.i); call(gl.POINTS, 1, bg(), 9); putI(S.hover.L, S.hover.i); call(gl.POINTS, 1, [1, 1, 1], 3); }
   if (ov.length) {
     gl.bindBuffer(gl.ARRAY_BUFFER, ovBuf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(ov), gl.DYNAMIC_DRAW);
     gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
-    gl.uniform1f(lineP.u.ps, 9 * dpr);
-    gl.vertexAttrib3f(1, 1, 0.84, 0); if (nPick) gl.drawArrays(gl.POINTS, 0, nPick);
-    gl.vertexAttrib3f(1, 1, 0.2, 0.9);
-    if (S.meas.length > 1) gl.drawArrays(gl.LINE_STRIP, nPick, S.meas.length);
-    gl.uniform1f(lineP.u.ps, 7 * dpr); if (S.meas.length) gl.drawArrays(gl.POINTS, nPick, S.meas.length);
+    for (const [mode, first, n, c, ps] of calls) { gl.vertexAttrib3f(1, c[0], c[1], c[2]); gl.uniform1f(lineP.u.ps, (ps || 1) * dpr); gl.drawArrays(mode, first, n); }
   }
   $('#north').style.transform = `rotate(${-S.cam.az}deg)`;
 }
@@ -373,24 +386,105 @@ function drawRanges(L, R, mode) {
 (function loop() { if (S.dirty) draw(); requestAnimationFrame(loop); })();
 new ResizeObserver(() => { S.dirty = true; }).observe(canvas);
 
-/* ---------- memilih titik ---------- */
-function nearest(px, py, maxPx = 12) {
-  const cam = camera(), M = cam.M, W = cam.W, H = cam.H, ex = S.ex;
-  let best = null, bd = maxPx * maxPx;
+/* ---------- memilih titik & garis di bawah kursor ----------
+   Plan: indeks grid per layer (sel dunia XY) supaya cepat juga untuk jutaan titik.
+   3D: semua titik diproyeksikan ke layar (dibatasi saat hover untuk file sangat besar). */
+function gridOf(L) {
+  if (L.grid) return L.grid;
+  const p = L.pos, sn = L.r.sn, n = L.r.rows, b = L.bbox;
+  const ext = Math.max(b[3] - b[0], b[4] - b[1], 1), cs = Math.max(ext / 1024, 0.25);
+  const nx = Math.floor((b[3] - b[0]) / cs) + 1, ny = Math.floor((b[4] - b[1]) / cs) + 1;
+  const cellsOf = (i, f) => {              // sel yang dilalui garis i -> i+1 (atau titik i)
+    const j = i + 1 < n && sn[i + 1] === sn[i] && sn[i] && !S.spot(sn[i]) ? i + 1 : i;   // string spot = titik saja
+    const x0 = p[3 * i], y0 = p[3 * i + 1], x1 = p[3 * j], y1 = p[3 * j + 1];
+    const steps = Math.max(1, Math.ceil(Math.hypot(x1 - x0, y1 - y0) / (cs * 0.5)));
+    let last = -1;
+    for (let k = 0; k <= steps; k++) {
+      const t = k / steps, cx = Math.min(nx - 1, Math.max(0, Math.floor((x0 + (x1 - x0) * t - b[0]) / cs))), cy = Math.min(ny - 1, Math.max(0, Math.floor((y0 + (y1 - y0) * t - b[1]) / cs)));
+      const c = cy * nx + cx; if (c !== last) { f(c); last = c; }
+    }
+  };
+  const start = new Int32Array(nx * ny + 1);
+  for (let i = 0; i < n; i++) if (sn[i]) cellsOf(i, (c) => { start[c + 1]++; });
+  for (let c = 0; c < nx * ny; c++) start[c + 1] += start[c];
+  const items = new Int32Array(start[nx * ny]), fill = start.slice(0, nx * ny);
+  for (let i = 0; i < n; i++) if (sn[i]) cellsOf(i, (c) => { items[fill[c]++] = i; });
+  L.grid = { cs, nx, ny, x0: b[0], y0: b[1], start, items, stamp: new Uint32Array(n), q: 0 };
+  return L.grid;
+}
+const isEdge = (L, i) => i + 1 < L.r.rows && L.r.sn[i] && L.r.sn[i + 1] === L.r.sn[i] && !S.spot(L.r.sn[i]);
+function segDist2(px, py, ax, ay, bx, by) {
+  const dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy;
+  const t = l2 ? Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / l2)) : 0;
+  const ex = ax + t * dx - px, ey = ay + t * dy - py; return ex * ex + ey * ey;
+}
+/* -> { v: {L, i, d} titik terdekat, e: {L, i, d} garis terdekat (i -> i+1) } ; d dalam piksel */
+function hit(px, py, tolPx = 12, hover = false) {
+  const out = { v: null, e: null };
+  const cam = camera();
+  if (S.plan && S.origin) {
+    const g = ground(px, py), wpp = 2 * cam.halfH / cam.H, r = tolPx * wpp, gx = g.q[0], gy = g.q[1];
+    let bv = r * r, be = r * r;
+    for (const L of S.layers) {
+      if (L.kind !== 'str' || !L.vis) continue;
+      const G = gridOf(L), p = L.pos, sn = L.r.sn; G.q = (G.q + 1) >>> 0 || 1;
+      const cx0 = Math.max(0, Math.floor((gx - r - G.x0) / G.cs) - 1), cx1 = Math.min(G.nx - 1, Math.floor((gx + r - G.x0) / G.cs) + 1);
+      const cy0 = Math.max(0, Math.floor((gy - r - G.y0) / G.cs) - 1), cy1 = Math.min(G.ny - 1, Math.floor((gy + r - G.y0) / G.cs) + 1);
+      if (cx0 > cx1 || cy0 > cy1) continue;
+      for (let cy = cy0; cy <= cy1; cy++) for (let cx = cx0; cx <= cx1; cx++) {
+        const c = cy * G.nx + cx;
+        for (let k = G.start[c]; k < G.start[c + 1]; k++) {
+          const i = G.items[k]; if (G.stamp[i] === G.q) continue; G.stamp[i] = G.q;
+          if (!L.strs.get(sn[i]).vis) continue;
+          const ax = p[3 * i], ay = p[3 * i + 1];
+          let d = (ax - gx) ** 2 + (ay - gy) ** 2;
+          if (d < bv) { bv = d; out.v = { L, i }; }
+          if (isEdge(L, i)) {
+            const bx = p[3 * i + 3], by = p[3 * i + 4];
+            d = (bx - gx) ** 2 + (by - gy) ** 2; if (d < bv) { bv = d; out.v = { L, i: i + 1 }; }
+            d = segDist2(gx, gy, ax, ay, bx, by); if (d < be) { be = d; out.e = { L, i }; }
+          } else if (d < be) { be = d; out.e = { L, i }; }
+        }
+      }
+    }
+    if (out.v) out.v.d = Math.sqrt(bv) / wpp;
+    if (out.e) out.e.d = Math.sqrt(be) / wpp;
+    return out;
+  }
+  // 3D: proyeksi semua titik
+  let total = 0; for (const L of S.layers) if (L.kind === 'str' && L.vis) total += L.r.rows;
+  if (hover && total > 400000) return out;
+  const M = cam.M, W = cam.W, H = cam.H, ex = S.ex;
+  let bv = tolPx * tolPx, be = tolPx * tolPx;
   for (const L of S.layers) {
     if (L.kind !== 'str' || !L.vis) continue;
     const p = L.pos, sn = L.r.sn, n = L.r.rows;
+    let pxp = NaN, pyp = NaN, prevOk = false;
     for (let i = 0; i < n; i++) {
-      const s = sn[i]; if (!s) continue;
+      const s = sn[i]; if (!s) { prevOk = false; continue; }
       const x = p[3 * i], y = p[3 * i + 1], z = p[3 * i + 2] * ex;
-      const w = M[3] * x + M[7] * y + M[11] * z + M[15]; if (w <= 0) continue;
-      const sx = ((M[0] * x + M[4] * y + M[8] * z + M[12]) / w + 1) * W / 2 - px;
-      const sy = (1 - (M[1] * x + M[5] * y + M[9] * z + M[13]) / w) * H / 2 - py;
-      const d = sx * sx + sy * sy;
-      if (d < bd && L.strs.get(s).vis) { bd = d; best = { L, i }; }
+      const w = M[3] * x + M[7] * y + M[11] * z + M[15];
+      if (w <= 0 || !L.strs.get(s).vis) { prevOk = false; continue; }
+      const sx = ((M[0] * x + M[4] * y + M[8] * z + M[12]) / w + 1) * W / 2, sy = (1 - (M[1] * x + M[5] * y + M[9] * z + M[13]) / w) * H / 2;
+      const d = (sx - px) ** 2 + (sy - py) ** 2;
+      if (d < bv) { bv = d; out.v = { L, i }; }
+      if (prevOk && sn[i - 1] === s && !S.spot(s)) { const de = segDist2(px, py, pxp, pyp, sx, sy); if (de < be) { be = de; out.e = { L, i: i - 1 }; } }
+      else if (!isEdge(L, i) && d < be) { be = d; out.e = { L, i }; }
+      pxp = sx; pyp = sy; prevOk = true;
     }
   }
-  return best;
+  if (out.v) out.v.d = Math.sqrt(bv);
+  if (out.e) out.e.d = Math.sqrt(be);
+  return out;
+}
+function nearest(px, py, maxPx = 12) { const h = hit(px, py, maxPx); return h.v ? { L: h.v.L, i: h.v.i } : null; }
+/* segmen = titik berurutan dengan nomor string sama, dipisah baris 0 */
+function segOf(L, i) {
+  const sn = L.r.sn, s = sn[i]; let a = i, b = i;
+  if (S.spot(s)) return { L, a, b, s };              // string spot: titik saja
+  while (a > 0 && sn[a - 1] === s) a--;
+  while (b + 1 < L.r.rows && sn[b + 1] === s) b++;
+  return { L, a, b, s };
 }
 function ground(px, py) {      // titik di bidang tampak (plan: koordinat sebenarnya)
   const c = camera(), nx = px / c.W * 2 - 1, ny = 1 - py / c.H * 2, t = S.cam.t, O = S.origin || [0, 0, 0];
@@ -542,6 +636,7 @@ function renderLayers() {
 }
 function removeLayer(L) {
   const kill = L.kind === 'str' ? [L, ...L.dtms] : [L];
+  S.sel = S.sel.filter((g) => g.L !== L); if (S.hover && S.hover.L === L) S.hover = null; if (S.hoverSeg && S.hoverSeg.L === L) S.hoverSeg = null;
   for (const k of kill) {
     for (const b of ['vbo', 'cbo', 'lineIbo', 'ptIbo', 'ibo', 'wireIbo']) if (k[b]) gl.deleteBuffer(k[b]);
     S.layers.splice(S.layers.indexOf(k), 1);
@@ -557,32 +652,166 @@ function info() {
   $('#sInfo').textContent = S.layers.length ? `${p.toLocaleString('id-ID')} titik · ${t.toLocaleString('id-ID')} segitiga tampil` : '';
 }
 
-/* ---------- mouse & keyboard ---------- */
-let drag = null;
+/* ---------- mouse & keyboard (cara kerja Surpac) ----------
+   roda = zoom di kursor · tombol tengah seret = geser · tombol kanan seret = putar (dari Plan langsung ke 3D)
+   kiri seret = geser (cadangan untuk touchpad) · klik kiri = pilih / titik fungsi · klik kanan = menu
+   Fungsi (Point properties, Bearing & distance): pilih fungsi dulu, ikuti petunjuk di status bar, Esc = selesai. */
+const TOOL_NAME = { ident: 'Point properties', meas: 'Bearing and distance' };
+function prompt_() {
+  let t;
+  if (S.tool === 'ident') t = 'Point properties: klik titik (menempel ke titik terdekat). Esc / klik kanan = selesai.';
+  else if (S.tool === 'meas') t = !S.measOpen || !S.meas.length ? 'Bearing and distance: klik titik pertama. Esc = selesai.'
+    : `Bearing and distance: klik titik berikutnya (${S.meas.length} titik). Backspace = batal titik terakhir, Esc = akhiri garis.`;
+  else t = S.sel.length ? `${selText()} — klik kanan = menu, Esc = batal pilih.` : 'Klik garis/titik untuk memilih · klik kanan = menu · roda = zoom · tengah seret = geser · kanan seret = putar';
+  $('#sPrompt').textContent = t;
+  $('#sPrompt').classList.toggle('fn', !!S.tool);
+}
+function setTool(t) {
+  if (S.tool === t && t) { endTool(); return; }
+  S.tool = t || null; S.measOpen = false;
+  $('#bIdent').classList.toggle('on', t === 'ident'); $('#bMeasure').classList.toggle('on', t === 'meas');
+  if (t) showTab(t === 'ident' ? 'tIdent' : 'tMeasure');
+  if (t) msg(`Fungsi ${TOOL_NAME[t]} dimulai.`);
+  prompt_(); S.dirty = true;
+}
+function endTool() {
+  if (!S.tool) return;
+  msg(`Fungsi ${TOOL_NAME[S.tool]} selesai.`);
+  S.tool = null; S.measOpen = false; S.hover = null;
+  $('#bIdent').classList.remove('on'); $('#bMeasure').classList.remove('on');
+  renderMeasure(); prompt_(); S.dirty = true;
+}
+function escKey() {
+  if (S.tool === 'meas' && S.measOpen && S.meas.length) { S.measOpen = false; renderMeasure(); msg(`Garis ukur selesai (${S.meas.length} titik).`); prompt_(); return; }
+  if (S.tool) { endTool(); return; }
+  if (S.sel.length) { S.sel = []; S.dirty = true; prompt_(); }
+}
+/* pilihan segmen / string */
+function segStats(g) {
+  const r = g.L.r; let L2 = 0, L3 = 0, A = 0, zmin = Infinity, zmax = -Infinity;
+  for (let i = g.a; i <= g.b; i++) {
+    zmin = Math.min(zmin, r.z[i]); zmax = Math.max(zmax, r.z[i]);
+    if (i < g.b) { const dx = r.x[i + 1] - r.x[i], dy = r.y[i + 1] - r.y[i], dz = r.z[i + 1] - r.z[i]; L2 += Math.hypot(dx, dy); L3 += Math.hypot(dx, dy, dz); A += r.x[i] * r.y[i + 1] - r.x[i + 1] * r.y[i]; }
+  }
+  const closed = g.b > g.a + 1 && r.x[g.a] === r.x[g.b] && r.y[g.a] === r.y[g.b];
+  return { n: g.b - g.a + 1, L2, L3, A: closed ? Math.abs(A) / 2 : NaN, closed, zmin, zmax, seg: g.L.segNo[g.a] };
+}
+function selText() {
+  if (!S.sel.length) return '';
+  const g = S.sel[0], same = S.sel.every((x) => x.L === g.L && x.s === g.s);
+  if (S.sel.length > 1) return same ? `String ${g.s} (${S.sel.length} segmen) di ${g.L.name}` : `${S.sel.length} segmen dipilih`;
+  const t = segStats(g);
+  return `String ${g.s} · segmen ${t.seg} · ${t.n} titik · ${t.closed ? 'tertutup' : 'terbuka'} · ${f3(t.L2)} m`;
+}
+function selectSeg(g, add) {
+  const k = S.sel.findIndex((x) => x.L === g.L && x.a === g.a);
+  if (add) { if (k >= 0) S.sel.splice(k, 1); else S.sel.push(g); } else S.sel = [g];
+  S.dirty = true; prompt_();
+}
+function selectString(L, s) {
+  const sn = L.r.sn, out = [];
+  for (let i = 0; i < L.r.rows; i++) if (sn[i] === s && (i === 0 || sn[i - 1] !== s)) { let b = i; while (b + 1 < L.r.rows && sn[b + 1] === s) b++; out.push({ L, a: i, b, s }); }
+  S.sel = out; S.dirty = true; prompt_();
+  msg(`Pilih string ${s} di ${L.name}: ${out.length} segmen.`);
+}
+function selRows() { return S.sel.flatMap((g) => { const r = g.L.r, o = []; for (let i = g.a; i <= g.b; i++) o.push({ s: g.s, x: r.x[i], y: r.y[i], z: r.z[i], d: pointInfo(g.L, i).d }); o.push(null); return o; }); }
+function selProps() {
+  for (const g of S.sel) {
+    const t = segStats(g);
+    msg(`${g.L.name} · string ${g.s} segmen ${t.seg}: ${t.n} titik, ${t.closed ? 'tertutup' : 'terbuka'}, panjang datar ${f3(t.L2)} m, miring ${f3(t.L3)} m${t.closed ? `, luas ${f3(t.A)} m²` : ''}, Z ${f3(t.zmin)} – ${f3(t.zmax)}`);
+  }
+  $('#msgwin').classList.remove('min');
+}
+function zoomSel() {
+  const O = S.origin; if (!S.sel.length || !O) return;
+  const b = [Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity];
+  for (const g of S.sel) for (let i = g.a; i <= g.b; i++) { const p = g.L.pos; for (let a = 0; a < 3; a++) { b[a] = Math.min(b[a], p[3 * i + a]); b[a + 3] = Math.max(b[a + 3], p[3 * i + a]); } }
+  const c = S.cam, W = canvas.clientWidth || 1, H = canvas.clientHeight || 1;
+  c.t = [(b[0] + b[3]) / 2, (b[1] + b[4]) / 2, (b[2] + b[5]) / 2 * S.ex];
+  const half = Math.max((b[4] - b[1]) / 2, (b[3] - b[0]) / 2 * H / W, 5) * 1.3;
+  c.dist = half / Math.tan(c.fov / 2) * (S.plan ? 1 : 1.25); S.dirty = true;
+}
+function hideString(L, s) { L.strs.get(s).vis = false; S.sel = S.sel.filter((g) => !(g.L === L && g.s === s)); renderLayers(); S.dirty = true; prompt_(); msg(`String ${s} di ${L.name} disembunyikan (centang lagi di panel Layers).`); }
+function ctxMenu(x, y, h) {
+  const items = [];
+  if (S.tool) {
+    items.push([`Selesai: ${TOOL_NAME[S.tool]} (Esc)`, endTool]);
+    if (S.tool === 'meas') { items.push(['Akhiri garis ukur', escKey, !S.measOpen || !S.meas.length], ['Batal titik terakhir (Backspace)', undoMeas, !S.meas.length]); }
+    items.push('-');
+  }
+  const g = h && h.e && h.e.d <= 8 ? segOf(h.e.L, h.e.i) : null;
+  if (g && !S.sel.some((x) => x.L === g.L && x.a === g.a)) S.sel = [g], S.dirty = true, prompt_();
+  if (S.sel.length) {
+    const f = S.sel[0];
+    items.push([`Properti segmen (${S.sel.length})`, selProps], [`Pilih seluruh string ${f.s}`, () => selectString(f.L, f.s)], ['Zoom ke pilihan', zoomSel],
+      ['Salin koordinat ke Excel', () => copyText(['String\tY\tX\tZ\tDesc', ...selRows().filter(Boolean).map((r) => [r.s, fx(r.y), fx(r.x), fx(r.z), r.d].join('\t'))].join('\r\n'))],
+      ['Simpan pilihan sebagai .str…', () => { const nm = window.prompt('Nama file:', `pilihan_str${f.s}`); if (nm) saveStr(nm.replace(/\.str$/i, ''), selRows()); }],
+      [`Sembunyikan string ${f.s}`, () => hideString(f.L, f.s)], ['Batal pilih (Esc)', () => { S.sel = []; S.dirty = true; prompt_(); }], '-');
+  }
+  items.push(['Zoom all (F)', zoomAll], [S.plan ? '3D view (3)' : 'Plan view (P)', () => setPlan(!S.plan)],
+    ['Point properties (I)', () => setTool('ident')], ['Bearing and distance (M)', () => setTool('meas')]);
+  showCtx(x, y, items.map((it) => (it === '-' ? it : [it[0], it[1], !!it[2]])));
+}
+function undoMeas() { if (!S.meas.length) return; S.meas.pop(); S.measOpen = S.meas.length > 0; renderMeasure(); prompt_(); S.dirty = true; }
+/* hover: snap ke titik (fungsi aktif) atau sorot garis (tanpa fungsi), sekali per frame */
+function updateHover() {
+  hoverQueued = false;
+  if (!hoverXY || drag) return;
+  const [px, py] = hoverXY, h = hit(px, py, 12, true);
+  const v = h.v && h.v.d <= 10 ? h.v : null, e = !S.tool && h.e && h.e.d <= 8 ? segOf(h.e.L, h.e.i) : null;
+  const changed = (S.hover && S.hover.L) !== (v && v.L) || (S.hover && S.hover.i) !== (v && v.i) || (S.hoverSeg && S.hoverSeg.a) !== (e && e.a) || (S.hoverSeg && S.hoverSeg.L) !== (e && e.L);
+  S.hover = S.tool || !e ? v : null; S.hoverSeg = e;
+  if (S.hover) { const q = pointInfo(S.hover.L, S.hover.i); $('#sXY').textContent = `◻ str ${q.s} · seg ${q.seg} · titik ${q.pt}   Y ${f3(q.y)}   X ${f3(q.x)}   Z ${f3(q.z)}`; }
+  else if (S.plan && S.origin) { const gr = ground(px, py); $('#sXY').textContent = `Y ${f3(gr.y)}   X ${f3(gr.x)}   Z ${f3(zAt(gr.x, gr.y))}`; }
+  else $('#sXY').textContent = 'Tampak 3D — dekatkan kursor ke titik untuk koordinat';
+  if (changed) S.dirty = true;
+}
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
-canvas.addEventListener('pointerdown', (e) => { canvas.setPointerCapture(e.pointerId); drag = { x: e.clientX, y: e.clientY, b: e.button, sh: e.shiftKey, moved: false }; });
+canvas.addEventListener('pointerdown', (e) => {
+  if (e.button === 1) e.preventDefault();          // tombol tengah: jangan autoscroll
+  canvas.setPointerCapture(e.pointerId);
+  drag = { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, b: e.button, sh: e.shiftKey, ctrl: e.ctrlKey, moved: false };
+});
 canvas.addEventListener('pointermove', (e) => {
-  const r = canvas.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top;
-  if (S.plan && S.origin) { const g = ground(px, py); $('#sXY').textContent = `Y ${f3(g.y)}   X ${f3(g.x)}   Z ${f3(zAt(g.x, g.y))}`; }
-  else if (!S.plan) $('#sXY').textContent = 'Tampak 3D — klik titik untuk koordinat';
-  if (!drag) return;
+  const r = canvas.getBoundingClientRect();
+  hoverXY = [e.clientX - r.left, e.clientY - r.top];
+  if (!drag) { if (!hoverQueued) { hoverQueued = true; requestAnimationFrame(updateHover); } return; }
   const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
-  if (!drag.moved && Math.hypot(dx, dy) < 4) return;
-  drag.moved = true; drag.x = e.clientX; drag.y = e.clientY;
+  if (!drag.moved && Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) < 4) return;
+  if (!drag.moved) { drag.moved = true; S.hover = null; S.hoverSeg = null; }
+  drag.x = e.clientX; drag.y = e.clientY;
   const c = S.cam, cam = camera();
-  const pan = S.plan ? drag.b === 0 && !drag.sh : (drag.b !== 0 || drag.sh);
-  if (pan) {
+  const rotate = drag.b === 2 || (drag.b === 0 && drag.ctrl);
+  if (rotate) {
+    if (S.plan) { S.plan = false; $('#bPlan').classList.remove('on'); $('#b3d').classList.add('on'); c.el = 89.5; }
+    c.az = (c.az + dx * 0.4) % 360; c.el = Math.max(1, Math.min(89.5, c.el - dy * 0.3));
+    canvas.style.cursor = 'move';
+  } else {                                         // tombol tengah (atau kiri) = geser
     const wpp = 2 * cam.halfH / cam.H;
     for (let a = 0; a < 3; a++) c.t[a] += -cam.R[a] * dx * wpp + cam.U[a] * dy * wpp;
-  } else if (!S.plan) {
-    c.az = (c.az + dx * 0.4) % 360; c.el = Math.max(1, Math.min(89.5, c.el - dy * 0.3));
+    canvas.style.cursor = 'grabbing';
   }
   S.dirty = true;
 });
 canvas.addEventListener('pointerup', (e) => {
-  const d = drag; drag = null; if (!d || d.moved || d.b !== 0) return;
+  const d = drag; drag = null; canvas.style.cursor = '';
+  if (!d || d.moved) { if (d) { hoverQueued = true; requestAnimationFrame(updateHover); } return; }
   const r = canvas.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top;
-  if (S.tool === 'ident') doIdent(px, py); else doMeasure(px, py);
+  if (d.b === 2) { ctxMenu(e.clientX, e.clientY, hit(px, py, 12)); return; }
+  if (d.b !== 0) return;
+  if (S.tool === 'ident') doIdent(px, py);
+  else if (S.tool === 'meas') { doMeasure(px, py); prompt_(); }
+  else {
+    const h = hit(px, py, 12), g = h.e && h.e.d <= 8 ? segOf(h.e.L, h.e.i) : null;
+    if (g) selectSeg(g, e.shiftKey || e.ctrlKey);
+    else if (!e.shiftKey && S.sel.length) { S.sel = []; S.dirty = true; prompt_(); }
+  }
+});
+canvas.addEventListener('pointerleave', () => { hoverXY = null; if (S.hover || S.hoverSeg) { S.hover = null; S.hoverSeg = null; S.dirty = true; } });
+canvas.addEventListener('dblclick', (e) => {          // klik dua kali garis (tanpa fungsi) = pilih seluruh string
+  if (S.tool) return;
+  const r = canvas.getBoundingClientRect(), h = hit(e.clientX - r.left, e.clientY - r.top, 12);
+  if (h.e && h.e.d <= 8) selectString(h.e.L, h.e.L.r.sn[h.e.i]);
 });
 canvas.addEventListener('wheel', (e) => {
   e.preventDefault();
@@ -590,11 +819,9 @@ canvas.addEventListener('wheel', (e) => {
   const k = Math.pow(1.0015, e.deltaY);
   for (let a = 0; a < 3; a++) c.t[a] = g.q[a] + (c.t[a] - g.q[a]) * k;
   c.dist *= k; S.dirty = true;
+  if (!hoverQueued) { hoverQueued = true; requestAnimationFrame(updateHover); }
 }, { passive: false });
-function setTool(t) {
-  S.tool = t; $('#bIdent').classList.toggle('on', t === 'ident'); $('#bMeasure').classList.toggle('on', t === 'meas');
-  showTab(t === 'ident' ? 'tIdent' : 'tMeasure');
-}
+prompt_();
 /* jendela form mengambang (seperti form fungsi Surpac) */
 let winZ = 20;
 function showTab(id) {
@@ -622,7 +849,8 @@ for (const w of document.querySelectorAll('.win')) {
 window.addEventListener('keydown', (e) => {
   if (e.target.tagName === 'INPUT') return;
   const k = e.key.toLowerCase();
-  if (k === 'escape') { S.measOpen = false; renderMeasure(); }
+  if (k === 'escape') escKey();
+  else if (k === 'backspace' && S.tool === 'meas') { e.preventDefault(); undoMeas(); }
   else if (k === 'f') zoomAll(); else if (k === 'p') setPlan(true); else if (k === '3') setPlan(false);
   else if (k === 'i') setTool('ident'); else if (k === 'm') setTool('meas');
 });
@@ -632,7 +860,7 @@ $('#b3d').onclick = () => setPlan(false);
 $('#bIdent').onclick = () => setTool('ident');
 $('#bMeasure').onclick = () => setTool('meas');
 $('#zEx').onchange = (e) => { const v = Math.max(0.1, +e.target.value || 1); S.cam.t[2] *= v / S.ex; S.ex = v; S.dirty = true; };
-$('#spotIn').onchange = (e) => { S.spot = parseRange(e.target.value); for (const L of S.layers) if (L.kind === 'str') buildIndex(L); renderLayers(); };
+$('#spotIn').onchange = (e) => { S.spot = parseRange(e.target.value); for (const L of S.layers) if (L.kind === 'str') { buildIndex(L); L.grid = null; } renderLayers(); };
 $('#showPts').onchange = (e) => { S.showPts = e.target.checked; for (const L of S.layers) if (L.kind === 'str') buildIndex(L); };
 $('#bTheme').onclick = () => { const r = document.documentElement; r.dataset.theme = r.dataset.theme === 'dark' ? 'light' : 'dark'; try { localStorage.setItem('smaTheme', r.dataset.theme); } catch (e) {} S.dirty = true; };
 try { const t = localStorage.getItem('smaTheme'); if (t) document.documentElement.dataset.theme = t; else if (matchMedia('(prefers-color-scheme: dark)').matches) document.documentElement.dataset.theme = 'dark'; } catch (e) {}
@@ -646,5 +874,5 @@ view.addEventListener('drop', (e) => { e.preventDefault(); $('#drop').classList.
 /*TOOLS*/
 /*TAURI*/
 /*NAV*/
-window.SMA = { S, run, addStr, attachDtm, navAddRoot, NAV, openNodes, msg, loadFiles, zoomAll, setPlan, setTool, nearest, zAt, camera, draw };   // untuk uji otomatis
+window.SMA = { S, run, addStr, attachDtm, navAddRoot, NAV, openNodes, msg, loadFiles, zoomAll, setPlan, setTool, endTool, nearest, hit, zAt, camera, draw, ground };   // untuk uji otomatis
 })();
